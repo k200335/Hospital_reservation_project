@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'board',
 ]
 
 MIDDLEWARE = [
@@ -72,13 +73,44 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
+#     }
+# }
+
+# config/settings.py
+
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'mssql',
+        'NAME': 'kcqt77',                # 이미지 하단에 보이는 DB 이름
+        'USER': 'kcqt77',      # 보통 kcqt77 일 가능성이 높습니다
+        'PASSWORD': 'a9465518*',
+        'HOST': 'sql19-103.cafe24.com',
+        'PORT': '',                      # MSSQL 기본포트 1433 (비워두면 자동인식)
+        'OPTIONS': {
+            'driver': 'ODBC Driver 17 for SQL Server', # 설치된 드라이버 버전에 맞게 수정
+        },
     }
 }
+# /*$host = '221.155.228.179';
+# $port = '3306';
+# $db = 'kcqt_qyalit';
+# $user = 'kcqt_kyj';
+# $pass = '1977519';
+# $charset = 'utf8mb4';
+# */
 
+
+
+# /*$host = "sql19-103.cafe24.com";    //호스트 주소
+# $db = "kcqt77";   //데이타베이스 이름
+# $user = "kcqt77";      // 기본값 (설정에 따라 다를 수 있음)
+# $pass = "a9465518*";          // 기본값 (비밀번호가 있다면 입력)
+# $charset = "utf8mb4";    //문자인코딩
+# */
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -115,3 +147,9 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATICFILES_DIRS = [ BASE_DIR / 'static' ]
+
+# 로그인이 성공하면 메인 페이지('/')로 가라는 설정입니다.
+LOGIN_REDIRECT_URL = '/'
+
+LOGOUT_REDIRECT_URL = '/'

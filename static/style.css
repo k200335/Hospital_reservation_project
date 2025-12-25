@@ -1,0 +1,102 @@
+/* 1. 최상단 로그인 바 */
+.top-auth-bar { 
+    background: #f8f9fa; 
+    padding: 8px 0; 
+    border-bottom: 1px solid #ddd; 
+    font-size: 0.85rem; 
+}
+
+/* 2. 중앙 로고 & 타이틀 영역 */
+.header-main { 
+    padding: 30px 0; /* 슬라이더와 균형을 위해 약간 조정 */
+    background: #fff; 
+}
+
+.institute-title { 
+    font-size: 4.2rem; /* 한 줄 배치를 위해 최적화된 크기 */
+    font-weight: 800; 
+    color: #004a87; 
+    letter-spacing: -2px; 
+    line-height: 1.2;
+    white-space: nowrap; 
+    display: inline-block;
+}
+
+.contact-info {
+    font-size: 1.1rem;
+    color: #666;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+/* 3. 메인 메뉴바 */
+.main-menu-bar { 
+    background: #0089a7; 
+    color: white; 
+    border-top: 2px solid #005f73; 
+}
+
+.main-menu-bar .nav-link { 
+    color: white; 
+    font-weight: bold; 
+    padding: 15px 35px !important; 
+    border-right: 1px solid rgba(255,255,255,0.2); 
+    font-size: 1.1rem;
+}
+
+.main-menu-bar .nav-link:hover { 
+    background: #00768e; 
+    color: #ffeb3b; 
+}
+
+/* 4. 메인 배경 슬라이더 (Slick Slider 전용 코드) */
+.main-hero-slider { 
+    width: 100%; 
+    overflow: hidden; 
+}
+
+/* static/style.css */
+/* 슬라이더 아이템 설정 (중복 제거 및 통합) */
+.slide-item {
+    height: 600px !important;            /* 슬라이더 높이 강제 고정 */
+    background-size: cover !important;    /* 배경 이미지가 꽉 차도록 설정 */
+    background-position: center !important; /* 이미지 중앙 배치 */
+    background-repeat: no-repeat !important; /* 이미지 반복 방지 */
+    display: flex !important;             /* 중앙 정렬을 위한 플렉스 박스 설정 */
+    align-items: center;                  /* 상하 중앙 정렬 */
+    justify-content: center;              /* 좌우 중앙 정렬 */
+    position: relative;                   /* 오버레이 배치를 위한 기준점 */
+}
+
+/* 어두운 오버레이: 배경 사진 위의 글자를 잘 보이게 함 */
+.slide-item::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0, 0, 0, 0.4); /* 숫자가 높을수록 어두워짐 */
+    z-index: 1;
+}
+
+.slide-content {
+    position: relative;
+    z-index: 2; /* 오버레이보다 위로 올림 */
+    color: white;
+    text-align: center;
+}
+
+.slide-content h2 {
+    text-shadow: 2px 2px 10px rgba(0,0,0,0.5); /* 글자 가독성 보강 */
+}
+
+
+
+/* 5. 반응형 설정 */
+@media (max-width: 1200px) {
+    .institute-title { font-size: 3rem; }
+}
+
+@media (max-width: 768px) {
+    .institute-title { font-size: 2rem; }
+    .slide-item { height: 400px; }
+    .slide-content h2 { font-size: 2rem; }
+}

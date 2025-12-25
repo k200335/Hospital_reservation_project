@@ -1,17 +1,93 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>한국건설품질시험원(주)</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'style.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick.css">
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/slick-carousel@1.8.1/slick/slick-theme.css">
 </head>
 <body>
-    <h1>웹페이지 구축 환영</h1>    
-    <P>3. 관리자 페이지 접속해보기</P>
-    <p>다시 서버를 켭니다: python manage.py runserver</p>
-    <p>브라우저 주소창에 다음과 같이 입력합니다: http://127.0.0.1:8000/admin</p>
-    <p>비밀번호변경방법 python manage.py changepassword rladudwns29</p>
-    <p>pw k-1800-92- 입니다</P>
-    <!-- http://127.0.0.1:5500/index.html -->
+
+<div class="top-auth-bar">
+    <div class="container d-flex justify-content-end align-items-center gap-3">
+        {% if user.is_authenticated %}
+            <span><strong>{{ user.username }}</strong>님 환영합니다.</span>
+            <form action="/logout/" method="post" class="d-inline">{% csrf_token %}<button type="submit" class="btn btn-sm btn-outline-danger py-0">로그아웃</button></form>
+        {% else %}
+            <form action="/login/" method="post" class="d-flex gap-2">
+                {% csrf_token %}
+                <input type="text" name="username" class="form-control form-control-sm" placeholder="아이디" style="width:110px;">
+                <input type="password" name="password" class="form-control form-control-sm" placeholder="비밀번호" style="width:110px;">
+                <button type="submit" class="btn btn-sm btn-primary">로그인</button>
+            </form>
+            <a href="/signup/" class="btn btn-sm btn-success">회원가입</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="header-main">
+    <div class="container-fluid px-5">
+        <div class="row align-items-center">
+            <div class="col-md-2"><h2 class="fw-bold mb-0" style="color: #0089a7;">LOGO</h2></div>
+            <div class="col-md-8 text-center"><h1 class="institute-title mb-0">한국건설품질시험원(주)</h1></div>
+            <div class="col-md-2 text-end"><p class="contact-info mb-0">문의: 031-946-5518</p></div>
+        </div>
+    </div>
+</div>
+
+<nav class="main-menu-bar shadow-sm">
+    <div class="container p-0">
+        <ul class="nav justify-content-center">
+            <li class="nav-item"><a class="nav-link" href="/board/">접수 현황</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">품질검사 의뢰</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">품질검사 성적서</a></li>
+            <li class="nav-item"><a class="nav-link" href="#">공지사항</a></li>
+        </ul>
+    </div>
+</nav>
+
+<div class="main-hero-slider">
+    <div class="slide-item" style="background-image: url('{% static "images/img1.jpg" %}');">
+        <div class="slide-content">
+            <h2 class="display-3 fw-bold">확신보다 확인으로!</h2>
+            <p class="fs-4">철저한 품질시험으로 안전한 건설 문화를 만듭니다.</p>
+        </div>
+    </div>
+    
+    <div class="slide-item" style="background-image: url('{% static "images/img2.jpg" %}');">
+        <div class="slide-content">
+            <h2 class="display-3 fw-bold">정확한 시험 데이터</h2>
+            <p class="fs-4">국가 공인 시험기관의 신뢰도를 경험하세요.</p>
+        </div>
+    </div>
+
+    <div class="slide-item" style="background-image: url('{% static "images/img3.jpg" %}');">
+        <div class="slide-content">
+            <h2 class="display-3 fw-bold">최고의 기술력</h2>
+            <p class="fs-4">한국건설품질시험원(주)이 함께합니다.</p>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'js/jquery-1.12.3.min.js' %}"></script>
+
+<script src="{% static 'js/slick.min.js' %}"></script>
+
+<script>
+    $(document).ready(function(){
+        $('.main-hero-slider').slick({
+            autoplay: true,       /* 자동 재생 켜기 */
+            autoplaySpeed: 3000,  /* 3초마다 전환 */
+            fade: true,           /* 페이드 효과 (부드럽게 전환) */
+            dots: true,           /* 하단 점 표시 */
+            arrows: false,        /* 좌우 화살표 숨김 */
+            infinite: true        /* 무한 반복 */
+        });
+    });
+</script>
 </body>
 </html>
