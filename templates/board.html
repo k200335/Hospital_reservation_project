@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}접수 현황 - 한국건설품질시험원(주){% endblock %}
+
+{% block content %}
+<div class="receipt-board-page">
+    <div class="content-container">
+        <div class="container-fluid px-4">
+            <div class="page-title-area mb-4">
+                <h2>품질검사 의뢰서 접수 현황</h2>
+            </div>
+            
+            <div class="top-controls">
+                <div class="info-text">
+                    <i class="bi bi-pin-angle-fill text-primary"></i> <b>의뢰서 번호</b>까지 틀이 고정되어 있습니다.                    
+                </div>
+                
+                <div class="action-button-group">
+                    <button type="button" class="btn-sm bg-db-save" onclick="openNewWindow('/save_csi_receipt/')">
+                        <i class="bi bi-database-fill-down"></i> CSI_접수_DB저장
+                    </button>
+                    <button type="button" class="btn-sm bg-db-save" onclick="openNewWindow('/save_csi_issued/')">
+                        <i class="bi bi-database-fill-down"></i> CSI_발급일_DB저장
+                    </button>
+                    <button type="button" class="btn-sm bg-db-save" onclick="openNewWindow('/save_csi_waiting/')">
+                        <i class="bi bi-database-fill-down"></i> CSI_발급대기일_DB저장
+                    </button>
+                    <button type="button" class="btn-sm bg-view-blue" onclick="openNewWindow('/unregistered/')">
+                        <i class="bi bi-exclamation-circle"></i> 미접수건 보기
+                    </button>
+                    <button type="button" class="btn-sm bg-view-cyan" onclick="openNewWindow('/issued_date/')">
+                        <i class="bi bi-calendar-check"></i> 발급일 보기
+                    </button>
+                    <button type="button" class="btn-sm bg-view-yellow" onclick="openNewWindow('/waiting_date/')">
+                        <i class="bi bi-clock-history"></i> 발급대기일 보기
+                    </button>
+                    <button type="button" class="btn-sm bg-excel" onclick="location.href='/export-excel/'">
+                        <i class="bi bi-file-earmark-excel"></i> 엑셀 출력
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive-custom">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="sticky-1">NO</th>
+                            <th class="sticky-2">의뢰서 번호</th>
+                            <th>접수번호</th>
+                            <th>접수일시</th>
+                            <th>접수자</th>
+                            <th>사업명</th>
+                            <th>의뢰기관명</th>
+                            <th>시료봉인명</th>
+                            <th>QT접수번호</th>
+                            <th>준공예정일</th>
+                            <th>재료</th>
+                            <th>기본료</th>
+                            <th>정보처리비</th>
+                            <th>조건수수료</th>
+                            <th>시편제작비</th>
+                            <th>출장비</th>
+                            <th>할인율</th>
+                            <th>정액할인</th>
+                            <th>공급가액</th>
+                            <th>부가세</th>
+                            <th>발급일</th>
+                            <th>발급대기일</th>
+                            <th>담당자</th>
+                            <th>인수자</th>
+                            <th>시료량</th>
+                            <th>시험및수거</th>
+                            <th>현장담당자연락처</th>
+                            <th>날짜</th>
+                            <th>미인정물량</th>
+                            <th>비고</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="row-hover">
+                            <td class="sticky-1">1</td>
+                            <td class="sticky-2">RQ-2025-001</td>
+                            <td>REC-242489</td>
+                            <td>2025-12-26 14:00</td>
+                            <td>홍길동</td>
+                            <td>동두천 지방하천 정비사업</td>
+                            <td>청일건설(주)</td>
+                            <td>아스콘 외 3종</td>
+                            <td>QT-1004</td>
+                            <td>2026-12-31</td>
+                            <td>혼합물</td>
+                            <td class="price-text">50,000</td>
+                            <td class="price-text">20,000</td>
+                            <td class="price-text">0</td>
+                            <td class="price-text">0</td>
+                            <td class="price-text">30,000</td>
+                            <td>0%</td>
+                            <td class="price-text">0</td>
+                            <td class="price-text">100,000</td>
+                            <td class="price-text">10,000</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>이담당</td>
+                            <td>박인수</td>
+                            <td>100t</td>
+                            <td>수거시험</td>
+                            <td>010-1234-5678</td>
+                            <td>2025-12-26</td>
+                            <td>0</td>
+                            <td>특이사항 없음</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openNewWindow(url) {
+        const width = 1100;
+        const height = 850;
+        const left = (window.screen.width / 2) - (width / 2);
+        const top = (window.screen.height / 2) - (height / 2);
+        window.open(url, '_blank', `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes`);
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,70 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}한국건설품질시험원(주){% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<div class="top-auth-bar">
+    <div class="container d-flex justify-content-end align-items-center gap-3">
+        {% if user.is_authenticated %}
+            <span><strong>{{ user.username }}</strong>님 환영합니다.</span>
+            <form action="/logout/" method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-sm btn-outline-danger py-0">로그아웃</button>
+            </form>
+        {% else %}
+            <form action="/login/" method="post" class="d-flex gap-2">
+                {% csrf_token %}
+                {% if form.errors %}
+                    <script>alert("아이디 또는 비밀번호가 일치하지 않습니다.");</script>
+                {% endif %}
+                <input type="text" name="username" class="form-control form-control-sm auth-input" placeholder="아이디" required>
+                <input type="password" name="password" class="form-control form-control-sm auth-input" placeholder="비밀번호" required>
+                <button type="submit" class="btn btn-sm btn-primary">로그인</button>
+            </form>
+            <a href="/signup/" class="btn btn-sm btn-success">회원가입</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="header-main">
+    <div class="container-fluid px-5 text-center">
+        <a href="/" style="text-decoration:none; color:inherit;">
+            <h1 class="institute-title mb-0">한국건설품질시험원(주)</h1>
+        </a>
+    </div>
+</div>
+
+<nav class="main-menu-bar shadow-sm">
+    <div class="container p-0">
+        <ul class="nav justify-content-center">
+            <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('{% url 'board' %}')">접수 현황</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('/request/')">품질검사 의뢰</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('/report/')">품질검사 성적서</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('/notice/')">공지사항</a></li>
+        </ul>
+    </div>
+</nav>
+
+{% block content %}
+{% endblock %}
+
+<script src="{% static 'js/jquery-1.12.3.min.js' %}"></script>
+<script>
+    const isAuthenticated = "{{ user.is_authenticated|yesno:'true,false' }}" === "true";
+    function checkLogin(targetUrl) {
+        if (isAuthenticated) { location.href = targetUrl; } 
+        else { alert("로그인을 해주세요."); document.querySelector('input[name="username"]')?.focus(); }
+    }
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

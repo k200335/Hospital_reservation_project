@@ -28,37 +28,38 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.views.generic import TemplateView
-from board.views import receipt_list  # board 앱의 함수를 불러옴
+from board.views import receipt_list  # board 앱의 함수
 
-# 1. 회원가입 로직 (함수 뷰)
+# [중요] 여기서부터 에러 해결 부분입니다. 
+# config 폴더에서 views를 import 하려던 줄을 삭제하세요.
+
+# 1. 회원가입 로직 (이미 잘 작동하던 코드)
 def signup(request):
     if request.method == 'POST':
         form = UserCreationForm(request.POST)
         if form.is_valid():
             form.save()
             username = form.cleaned_data.get('username')
-            messages.success(request, f'{username}님, 회원가입이 완료되었습니다! 로그인해 주세요.')
+            messages.success(request, f'{username}님, 가입 완료되었습니다.')
             return redirect('login')
     else:
         form = UserCreationForm()
     return render(request, 'signup.html', {'form': form})
 
+# 🚀 추가: save_csi_receipt 함수도 urls.py에 직접 만듭니다.
+def save_csi_receipt(request):
+    return render(request, 'save_csi_receipt.html')
+
 # 2. URL 경로 설정
 urlpatterns = [
-    # 메인 페이지 (index.html)
     path('', TemplateView.as_view(template_name='index.html'), name='home'),
-    
-    # 관리자 페이지 (하나만 남김)
     path('admin/', admin.site.urls),
-    
-    # 로그인/로그아웃 페이지
     path('login/', auth_views.LoginView.as_view(template_name='index.html'), name='login'),
-    path('logout/', auth_views.LogoutView.as_view(next_page='home'), name='logout'), 
-    
-    # 회원가입 페이지
+    path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'), 
     path('signup/', signup, name='signup'),
-    
-    # 접수 목록 페이지 (성공하셨던 그 주소!)
-    path('list/', receipt_list, name='receipt_list'),
+    path('board/', receipt_list, name='board'),
+
+    # 🚀 여기를 views. 없이 함수 이름만 적어주세요!
+    path('save_csi_receipt/', save_csi_receipt, name='save_csi_receipt'),
 ]
 

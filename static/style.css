@@ -1,9 +1,38 @@
 /* 1. 최상단 로그인 바 */
-.top-auth-bar { 
-    background: #f8f9fa; 
-    padding: 8px 0; 
-    border-bottom: 1px solid #ddd; 
-    font-size: 0.85rem; 
+/* 1. 최상단 인증 바 (정렬 수정) */
+.top-auth-bar {
+    background-color: #f8f9fa;
+    padding: 5px 0; /* 상하 여백 축소 */
+    border-bottom: 1px solid #ddd;
+    font-size: 13px;
+}
+
+/* 입력창 크기 및 여백 미세 조정 */
+.auth-input {
+    width: 130px !important; /* 너비를 약간 넓힘 */
+    height: 32px !important; /* 높이 고정 */
+    font-size: 13px !important;
+    display: inline-block;
+    vertical-align: middle;
+}
+
+/* 로그인/회원가입 버튼 정렬 */
+.top-auth-bar .btn {
+    height: 32px;
+    line-height: 1; /* 텍스트 수직 중앙 */
+    padding: 0 12px;
+    font-size: 13px;
+    white-space: nowrap; /* 글자가 세로로 꺾이지 않게 방지 */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 폼 컨테이너 간격 */
+.top-auth-bar form {
+    display: flex;
+    align-items: center;
+    gap: 5px; /* 입력창과 버튼 사이 간격 */
 }
 
 /* 2. 중앙 로고 & 타이틀 영역 */
