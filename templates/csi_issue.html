@@ -31,8 +31,8 @@
                 <span class="fw-bold">~</span>
                 <input type="date" id="end_date" class="form-control form-control-sm" style="width:130px;" value="{{ default_date }}">
                 
-                <button class="btn btn-sm btn-dark" onclick="fetchCsiIssueList(event)">조회</button>
-                <button class="btn btn-sm btn-success" onclick="saveMatchingData()">DB 저장</button>
+                <button id="btn-fetch" class="btn btn-sm btn-dark" onclick="fetchCsiIssueList(event)" disabled>조회</button>
+                <button id="btn-save" class="btn btn-sm btn-success" onclick="saveMatchingData()" disabled>DB 저장</button>
             </div>
         </div>
         
@@ -168,6 +168,47 @@ async function saveMatchingData() {
         alert("서버와 통신 중 에러가 발생했습니다.");
     }
 }
+
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. 서버에서 사용자 ID 가져오기 (Django 템플릿 문법)
+    const currentUserId = "{{ request.user.username }}"; 
+    
+    // 2. 허용할 아이디 리스트
+    const allowedIds = ["admin_work", "admin_home"]; 
+
+    const fetchBtn = document.getElementById('btn-fetch');
+    const saveBtn = document.getElementById('btn-save');
+
+    // 3. 권한 체크 로직
+    if (allowedIds.includes(currentUserId)) {
+        // 권한이 있는 경우: 버튼 활성화 및 스타일 복구
+        [fetchBtn, saveBtn].forEach(btn => {
+            if (btn) {
+                btn.removeAttribute('disabled');
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+            }
+        });
+        console.log("관리자 권한 확인됨: " + currentUserId);
+    } else {
+        // 권한이 없는 경우: 시각적 피드백 강화 (선택 사항)
+        [fetchBtn, saveBtn].forEach(btn => {
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = "0.5";
+                btn.style.cursor = "not-allowed";
+                btn.title = "권한이 없습니다.";
+                
+                btn.onclick = function(e) {
+                    e.preventDefault();
+                    alert("해당 기능을 사용할 권한이 없습니다.");
+                };
+            }
+        });
+        console.log("권한 없음: " + currentUserId);
+    }
+});
+
 </script>
 
 {% endblock %}

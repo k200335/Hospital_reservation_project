@@ -61,4 +61,6 @@ urlpatterns = [
     # 2. 데이터를 가져오는 API URL (AG-Grid가 호출하는 경로)
     path('fetch_combined_data/', views.fetch_combined_data, name='fetch_combined_data'),
     path('get_estimate_detail/', views.get_estimate_detail, name='get_estimate_detail'),
+    path('field_payment/', views.field_payment_view, name='field_payment'),
+    path('bizmeka-sync/', views.bizmeka_sync, name='bizmeka_sync'),
 ]

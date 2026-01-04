@@ -117,7 +117,10 @@
         <button type="button" class="btn btn-lg text-white fw-bold px-4" style="background-color: #005f73;" onclick="window.fetchAssignmentHistory(event)">
             <i class="bi bi-person-check-fill me-2"></i> 담당자 배정현황 불러오기
         </button>
-        <button type="button" class="btn btn-lg text-white fw-bold px-4" onclick="window.handleSaveToDB(event)">
+        <!-- <button type="button" class="btn btn-lg text-white fw-bold px-4" onclick="window.handleSaveToDB(event)">
+            <i class="bi bi-database-fill-check me-2"></i> DB 저장하기
+        </button> -->
+        <button type="button" id="btn-db-save" class="btn btn-lg text-white fw-bold px-4" onclick="window.handleSaveToDB(event)">
             <i class="bi bi-database-fill-check me-2"></i> DB 저장하기
         </button>
     </div>
@@ -738,6 +741,31 @@ window.downloadExcel = function() {
         alert("다운로드 중 오류가 발생했습니다: " + error.message);
     }
 };
+
+// 페이지 로드 시 권한 체크
+document.addEventListener("DOMContentLoaded", function() {
+    const currentUserId = "{{ request.user.username }}"; 
+    
+    // 1. 허용할 아이디들을 배열로 묶습니다.
+    const allowedIds = ["admin_work", "admin_home"]; 
+
+    const saveBtn = document.getElementById('btn-db-save');
+
+    // 2. includes()를 사용하여 현재 사용자가 목록에 있는지 확인합니다.
+    if (saveBtn && !allowedIds.includes(currentUserId)) {
+        // 권한이 없는 경우 비활성화 처리
+        saveBtn.disabled = true;
+        saveBtn.style.backgroundColor = "#6c757d";
+        saveBtn.style.opacity = "0.5";
+        saveBtn.style.cursor = "not-allowed";
+        saveBtn.title = "권한이 있는 관리자만 사용할 수 있습니다.";
+
+        saveBtn.onclick = function(e) {
+            e.preventDefault();
+            alert("DB 저장 권한이 없습니다.");
+        };
+    }
+});
 
 </script>
 {% endblock %}
