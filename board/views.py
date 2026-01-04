@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.db import connection, connections
 from django.views.decorators.csrf import csrf_exempt
+from selenium.webdriver.common.action_chains import ActionChains
 # 셀레늄 및 크롤링 관련
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -17,6 +18,8 @@ from bs4 import BeautifulSoup
 # 모델 임포트 (클래스명을 CsiReceipt로 통일)
 from .models import OuterreceiptNew, CsiReceipt
 from datetime import datetime
+import calendar  # 날짜 계산용
+import traceback # 에러 상세 출력용 (이번 에러 해결 핵심)
 from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException, TimeoutException
 
 # --- [1] 기본 게시판 및 페이지 렌더링 ---
@@ -1066,110 +1069,460 @@ def field_payment_view(request):
 
 
 
-# 여기서 부터 테스트코드
-def bizmeka_sync(request):
-    target_year = request.GET.get('year')
-    target_month = request.GET.get('month')
+# 여기서 부터 테스트코드(현재까지 날짜빼고 완성된코드임)
+# def bizmeka_sync(request):
+#     target_year = request.GET.get('year')
+#     target_month = request.GET.get('month')
     
-    # [1] 드라이버 및 옵션 설정
-    chrome_options = Options()
-    chrome_options.add_argument("--start-maximized")
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+#     # [1] 드라이버 및 옵션 설정
+#     chrome_options = Options()
+#     chrome_options.add_argument("--start-maximized")
+#     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
     
-    try:
-        # 1. 로그인 처리
-        driver.get("https://ezportal.bizmeka.com/")
-        wait = WebDriverWait(driver, 15)
+#     try:
+#         # 1. 로그인 처리
+#         driver.get("https://ezportal.bizmeka.com/")
+#         wait = WebDriverWait(driver, 15)
         
+#         driver.find_element(By.ID, "username").send_keys("k200335")
+#         driver.find_element(By.ID, "password").send_keys("k*1800*92*" + Keys.ENTER)
+        
+#         # 알림창 처리 및 메인 진입 대기
+#         start_time = time.time()
+#         while time.time() - start_time < 300:
+#             try:
+#                 driver.switch_to.alert.accept()
+#             except: pass
+#             if "main" in driver.current_url: break
+#             time.sleep(1)
+
+#         # 2. 일정 페이지 이동 및 월간 뷰 고정
+#         driver.get("https://ezgroupware.bizmeka.com/groupware/planner/calendar.do")
+#         time.sleep(3)
+#         wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "fc-month-button"))).click()
+#         time.sleep(1)
+
+#         # 3. [이동] '이전' 버튼으로 목표 달 도달 (선택 버튼 무시)
+#         while True:
+#             center_title = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".fc-center h2"))).text.strip()
+#             if target_year in center_title and f"{int(target_month)}월" in center_title:
+#                 break
+            
+#             prev_btn = driver.find_element(By.CLASS_NAME, "fc-prev-button")
+#             driver.execute_script("arguments[0].click();", prev_btn)
+#             time.sleep(1.5)
+
+#         # 4. [수집] 이미 로딩된 데이터 싹쓸이 (textContent 활용)
+#         time.sleep(2) 
+#         final_list = []
+
+#         # 4-1. 화면에 보이는 기본 일정 수집
+#         events = driver.find_elements(By.CSS_SELECTOR, ".fc-content-skeleton .fc-content")
+#         for ev in events:
+#             try:
+#                 # 텍스트를 강제로 긁어오는 textContent
+#                 raw_text = ev.get_attribute("textContent").replace('\n', ' ').strip()
+#                 parent_td = ev.find_element(By.XPATH, "./ancestor::td")
+#                 target_date = parent_td.get_attribute("data-date")
+                
+#                 if raw_text:
+#                     # [터미널 확인용] 데이터가 긁히고 있는지 실시간으로 출력합니다.
+#                     print(f">>> [기본수집] 날짜: {target_date} | 내용: {raw_text[:30]}...")
+                    
+#                     # 화면(image_020fa0.png)의 '날짜', '일정 상세내용' 필드에 정확히 매칭
+#                     final_list.append({
+#                         "date": target_date,   
+#                         "content": raw_text    
+#                     })
+#             except: pass
+
+#         # 4-2. '+N' 더보기 버튼 내 숨겨진 일정 수집
+#         more_links = driver.find_elements(By.CSS_SELECTOR, ".fc-more")
+#         for link in more_links:
+#             try:
+#                 p_date = link.find_element(By.XPATH, "./ancestor::td").get_attribute("data-date")
+#                 driver.execute_script("arguments[0].click();", link)
+#                 time.sleep(0.5)
+                
+#                 pop_items = driver.find_elements(By.CSS_SELECTOR, ".fc-more-popover .fc-content")
+#                 for p_item in pop_items:
+#                     p_txt = p_item.get_attribute("textContent").replace('\n', ' ').strip()
+#                     if p_txt:
+#                         # [터미널 확인용] 더보기 내부 데이터 수집 현황 출력
+#                         print(f"  └─ [더보기수집] 날짜: {p_date} | 내용: {p_txt[:30]}...")
+                        
+#                         final_list.append({
+#                             "date": p_date,
+#                             "content": p_txt
+#                         })
+                
+#                 driver.find_element(By.CSS_SELECTOR, ".fc-more-popover .fc-close").click()
+#                 time.sleep(0.2)
+#             except: pass
+
+#         # 최종 로그 출력
+#         print(f"=== 수집 완료! 총 {len(final_list)}개의 데이터를 찾았습니다. ===")
+
+#         # [핵심] JSON 반환 시 Key 이름을 화면 JS와 100% 일치시켜야 함
+#         return JsonResponse({
+#             "status": "success", 
+#             "total_count": len(final_list), 
+#             "data": final_list  # 여기서 보내는 'data'가 JS의 item.date, item.content로 연결됨
+#         })
+
+#     except Exception as e:
+#         print(f"!!! 에러 발생: {str(e)}") # 에러 내용을 터미널에 출력
+#         return JsonResponse({"status": "error", "message": f"시스템 에러: {str(e)}"})
+    # finally:
+    #     driver.quit()
+    
+    
+# 여기서부터 세번째 시작
+
+# def bizmeka_sync(request):
+#     target_year = request.GET.get('year')
+#     target_month = request.GET.get('month')
+    
+#     # [1] 드라이버 및 옵션 설정
+#     chrome_options = Options()
+#     chrome_options.add_argument("--start-maximized")
+#     # chrome_options.add_argument("--headless") # 필요 시 주석 해제
+#     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    
+#     try:
+#         # 1. 로그인 처리
+#         driver.get("https://ezportal.bizmeka.com/")
+#         wait = WebDriverWait(driver, 15)
+        
+#         driver.find_element(By.ID, "username").send_keys("k200335")
+#         driver.find_element(By.ID, "password").send_keys("k*1800*92*" + Keys.ENTER)
+        
+#         # 알림창 처리 및 메인 진입 대기
+#         start_time = time.time()
+#         while time.time() - start_time < 30:
+#             try:
+#                 driver.switch_to.alert.accept()
+#             except: pass
+#             if "main" in driver.current_url: break
+#             time.sleep(1)
+
+#         # 2. 일정 페이지 이동 및 월간 뷰 고정
+#         driver.get("https://ezgroupware.bizmeka.com/groupware/planner/calendar.do")
+#         time.sleep(3)
+#         wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "fc-month-button"))).click()
+#         time.sleep(1)
+
+#         # 3. [이동] 목표 년/월 도달
+#         while True:
+#             center_title = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".fc-center h2"))).text.strip()
+#             if target_year in center_title and f"{int(target_month)}월" in center_title:
+#                 break
+            
+#             prev_btn = driver.find_element(By.CLASS_NAME, "fc-prev-button")
+#             driver.execute_script("arguments[0].click();", prev_btn)
+#             time.sleep(1.5)
+
+#         # 4. [수집] 데이터 파싱 시작
+#         time.sleep(2) 
+#         final_list = []
+
+#         # 주차별 스켈레톤(fc-content-skeleton) 테이블 순회
+#         weeks = driver.find_elements(By.CLASS_NAME, "fc-content-skeleton")
+
+#         for week in weeks:
+#             # 해당 주차의 날짜 헤더(data-date) 추출
+#             date_cells = week.find_elements(By.CSS_SELECTOR, "thead td.fc-day-number")
+#             week_dates = [d.get_attribute("data-date") for d in date_cells]
+            
+#             # 해당 주차의 일정 행(tbody tr) 순회
+#             event_rows = week.find_elements(By.CSS_SELECTOR, "tbody tr")
+            
+#             for row in event_rows:
+#                 cells = row.find_elements(By.TAG_NAME, "td")
+                
+#                 # FullCalendar 레이아웃 대응을 위한 인덱스 수동 관리
+#                 curr_date_idx = 0
+#                 for cell in cells:
+#                     # 'fc-event-container'가 아니거나 일정이 없으면 인덱스만 체크하고 넘어감
+#                     events = cell.find_elements(By.CLASS_NAME, "fc-content")
+                    
+#                     if events:
+#                         for ev in events:
+#                             # 텍스트 추출 (textContent 사용)
+#                             raw_text = ev.get_attribute("textContent").replace('\n', ' ').strip()
+                            
+#                             if raw_text and curr_date_idx < len(week_dates):
+#                                 target_date = week_dates[curr_date_idx]
+                                
+#                                 print(f">>> [매칭수집] 날짜: {target_date} | 내용: {raw_text[:30]}...")
+#                                 final_list.append({
+#                                     "date": target_date,
+#                                     "content": raw_text
+#                                 })
+                    
+#                     # td가 차지하는 칸(colspan)만큼 날짜 인덱스 이동
+#                     colspan = cell.get_attribute("colspan")
+#                     curr_date_idx += int(colspan) if colspan else 1
+
+#         # 5. [추가] '+N 더보기' 버튼 내 숨겨진 일정 수집
+#         more_links = driver.find_elements(By.CLASS_NAME, "fc-more")
+#         for link in more_links:
+#             try:
+#                 # 더보기 버튼이 속한 td의 날짜 가져오기
+#                 p_date = link.find_element(By.XPATH, "./ancestor::td").get_attribute("data-date")
+                
+#                 driver.execute_script("arguments[0].click();", link)
+#                 time.sleep(0.5)
+                
+#                 pop_items = driver.find_elements(By.CSS_SELECTOR, ".fc-more-popover .fc-content")
+#                 for p_item in pop_items:
+#                     p_txt = p_item.get_attribute("textContent").replace('\n', ' ').strip()
+#                     if p_txt:
+#                         final_list.append({"date": p_date, "content": p_txt})
+                
+#                 # 팝업 닫기 (요소가 있을 때만 클릭)
+#                 close_btns = driver.find_elements(By.CSS_SELECTOR, ".fc-more-popover .fc-close")
+#                 if close_btns:
+#                     close_btns[0].click()
+#                 time.sleep(0.2)
+#             except: pass
+
+#         print(f"=== 수집 완료! 총 {len(final_list)}개 ===")
+
+#         return JsonResponse({
+#             "status": "success",
+#             "total_count": len(final_list),
+#             "data": final_list
+#         })
+
+#     except Exception as e:
+#         print(f"!!! 에러 발생: {str(e)}")
+#         return JsonResponse({"status": "error", "message": f"시스템 에러: {str(e)}"})
+#     finally:
+#         driver.quit()
+
+
+# 여기부터 네번째 시작
+# def bizmeka_sync(request):
+#     target_year = request.GET.get('year')
+#     target_month = request.GET.get('month')
+    
+#     chrome_options = Options()
+#     chrome_options.add_argument("--start-maximized")
+#     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+    
+#     try:
+#         # 1. 로그인 및 일정 페이지 이동
+#         driver.get("https://ezportal.bizmeka.com/")
+#         wait = WebDriverWait(driver, 15)
+#         driver.find_element(By.ID, "username").send_keys("k200335")
+#         driver.find_element(By.ID, "password").send_keys("k*1800*92*" + Keys.ENTER)
+        
+#         # 알림창 무시 및 메인 진입 확인
+#         start_time = time.time()
+#         while time.time() - start_time < 30:
+#             try: driver.switch_to.alert.accept()
+#             except: pass
+#             if "main" in driver.current_url: break
+#             time.sleep(1)
+
+#         driver.get("https://ezgroupware.bizmeka.com/groupware/planner/calendar.do")
+#         time.sleep(3)
+#         wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "fc-month-button"))).click()
+
+#         # 2. 목표 년/월 이동
+#         while True:
+#             center_title = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".fc-center h2"))).text.strip()
+#             if target_year in center_title and f"{int(target_month)}월" in center_title:
+#                 break
+#             driver.execute_script("arguments[0].click();", driver.find_element(By.CLASS_NAME, "fc-prev-button"))
+#             time.sleep(1.5)
+
+#         # 3. [핵심] 좌표 기반 날짜 매칭 수집
+#         time.sleep(2) 
+#         final_list = []
+        
+#         # 주차별 '스켈레톤' 테이블을 하나씩 돕니다.
+#         weeks = driver.find_elements(By.CLASS_NAME, "fc-content-skeleton")
+
+#         for week in weeks:
+#             # 해당 주차의 날짜 헤더(7개 칸)를 먼저 확보합니다.
+#             date_headers = week.find_elements(By.CSS_SELECTOR, "thead td.fc-day-number")
+#             week_dates = [d.get_attribute("data-date") for d in date_headers] # ['2025-12-01', '2025-12-02'...]
+
+#             # 일정들이 들어있는 tbody의 각 행(tr)을 분석합니다.
+#             rows = week.find_elements(By.CSS_SELECTOR, "tbody tr")
+#             for row in rows:
+#                 cells = row.find_elements(By.TAG_NAME, "td")
+                
+#                 # FullCalendar 구조 특성상, 각 td가 실제 몇 번째 열(0~6)인지가 날짜입니다.
+#                 # 'cellIndex'를 사용하면 rowspan/colspan에 상관없이 실제 열 위치를 알 수 있습니다.
+#                 for cell in cells:
+#                     events = cell.find_elements(By.CLASS_NAME, "fc-content")
+#                     if events:
+#                         # 이 칸이 시각적으로 몇 번째 열인지 브라우저에게 직접 물어봅니다.
+#                         col_idx = driver.execute_script("return arguments[0].cellIndex;", cell)
+                        
+#                         for ev in events:
+#                             raw_text = ev.get_attribute("textContent").strip()
+#                             if raw_text and col_idx < len(week_dates):
+#                                 target_date = week_dates[col_idx]
+#                                 print(f">>> [매칭완료] 날짜:{target_date} | 내용:{raw_text[:20]}...")
+#                                 final_list.append({
+#                                     "date": target_date,
+#                                     "content": raw_text
+#                                 })
+
+#         # 4. '+N' 더보기 버튼 처리
+#         more_links = driver.find_elements(By.CLASS_NAME, "fc-more")
+#         for link in more_links:
+#             try:
+#                 # 더보기 버튼은 부모 td에 data-date가 직접 붙어있는 경우가 많습니다.
+#                 p_date = link.find_element(By.XPATH, "./ancestor::td").get_attribute("data-date")
+                
+#                 driver.execute_script("arguments[0].click();", link)
+#                 time.sleep(0.6)
+                
+#                 pop_items = driver.find_elements(By.CSS_SELECTOR, ".fc-more-popover .fc-content")
+#                 for p_item in pop_items:
+#                     p_txt = p_item.get_attribute("textContent").strip()
+#                     if p_txt:
+#                         final_list.append({"date": p_date, "content": p_txt})
+                
+#                 # 팝업 닫기
+#                 close_btn = driver.find_elements(By.CSS_SELECTOR, ".fc-more-popover .fc-close")
+#                 if close_btn: close_btn[0].click()
+#                 time.sleep(0.2)
+#             except: pass
+
+#         return JsonResponse({"status": "success", "total_count": len(final_list), "data": final_list})
+
+#     except Exception as e:
+#         return JsonResponse({"status": "error", "message": str(e)})
+#     finally:
+#         driver.quit()
+
+# 다섯번째 수정
+
+def bizmeka_sync(request):
+    driver = None
+    try:
+        chrome_options = Options()
+        chrome_options.add_argument("--start-maximized")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        wait = WebDriverWait(driver, 15)
+
+        # 1. 로그인 시도
+        driver.get("https://ezportal.bizmeka.com/")
         driver.find_element(By.ID, "username").send_keys("k200335")
         driver.find_element(By.ID, "password").send_keys("k*1800*92*" + Keys.ENTER)
         
-        # 알림창 처리 및 메인 진입 대기
+        # [수동 조작 1] 2차 인증 대기
+        print(">>> [수동 조작 1] 2차 인증을 완료해 주세요.")
         start_time = time.time()
+        auth_success = False
         while time.time() - start_time < 300:
-            try:
-                driver.switch_to.alert.accept()
+            try: driver.switch_to.alert.accept()
             except: pass
-            if "main" in driver.current_url: break
+            if "main" in driver.current_url:
+                auth_success = True
+                break
             time.sleep(1)
 
-        # 2. 일정 페이지 이동 및 월간 뷰 고정
+        if not auth_success:
+            return JsonResponse({"status": "error", "message": "인증 시간 초과"})
+        
+        # 2. 일정 페이지 이동
         driver.get("https://ezgroupware.bizmeka.com/groupware/planner/calendar.do")
         time.sleep(3)
-        wait.until(EC.element_to_be_clickable((By.CLASS_NAME, "fc-month-button"))).click()
-        time.sleep(1)
 
-        # 3. [이동] '이전' 버튼으로 목표 달 도달 (선택 버튼 무시)
-        while True:
-            center_title = wait.until(EC.visibility_of_element_located((By.CSS_SELECTOR, ".fc-center h2"))).text.strip()
-            if target_year in center_title and f"{int(target_month)}월" in center_title:
-                break
-            
-            prev_btn = driver.find_element(By.CLASS_NAME, "fc-prev-button")
-            driver.execute_script("arguments[0].click();", prev_btn)
-            time.sleep(1.5)
+        # ------------------------------------------------------------------
+        # [자동] 목록보기 버튼 클릭 (여러 방식 시도)
+        # ------------------------------------------------------------------
+        print(">>> [자동] 목록보기 버튼 클릭 시도...")
+        try:
+            # 1순위: 텍스트가 '목록'인 버튼 찾기
+            list_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//button[contains(text(), '목록')]")))
+            driver.execute_script("arguments[0].click();", list_btn)
+        except:
+            try:
+                # 2순위: 타이틀 속성이 '목록보기'인 요소
+                list_btn = driver.find_element(By.CSS_SELECTOR, "button[title='목록보기']")
+                driver.execute_script("arguments[0].click();", list_btn)
+            except:
+                print(">>> 목록보기 자동 클릭 실패. 수동으로 '목록보기'를 눌러주세요.")
 
-        # 4. [수집] 이미 로딩된 데이터 싹쓸이 (textContent 활용)
-        time.sleep(2) 
+        # ------------------------------------------------------------------
+        # [강화된 대기] 사용자가 날짜를 다 고를 때까지 대기
+        # ------------------------------------------------------------------
+        print("\n" + "="*60)
+        print(">>> [수동 조작 2] '날짜 선택' -> '검색' 버튼을 클릭해 주세요.")
+        print(">>> 검색 결과가 나오면 10초 뒤에 자동으로 수집이 시작됩니다.")
+        print("="*60 + "\n")
+        
+        # 기존 데이터 잔상 때문에 넘어가는 것을 방지하기 위해 
+        # 사용자가 '검색' 버튼을 눌러 결과가 나타날 때까지 넉넉하게 대기 (최대 10분)
+        WebDriverWait(driver, 600).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, "table.listview tbody tr"))
+        )
+        
+        # 검색 버튼을 누른 직후에도 사용자가 더 수정할 수 있으므로 10초간 최종 대기
+        time.sleep(20) 
+        print(">>> 수집을 시작합니다. 브라우저를 만지지 마세요.")
+
+        # 3. 데이터 수집 로직 (무한 루프 방지 및 페이징)
         final_list = []
+        last_collected_count = -1
+        
+        while True:
+            rows = driver.find_elements(By.CSS_SELECTOR, "table.listview tbody tr")
+            if not rows or "데이터가 없습니다" in rows[0].text:
+                print(">>> 표시할 데이터가 없습니다.")
+                break
 
-        # 4-1. 화면에 보이는 기본 일정 수집
-        events = driver.find_elements(By.CSS_SELECTOR, ".fc-content-skeleton .fc-content")
-        for ev in events:
-            try:
-                # 텍스트를 강제로 긁어오는 textContent
-                raw_text = ev.get_attribute("textContent").replace('\n', ' ').strip()
-                parent_td = ev.find_element(By.XPATH, "./ancestor::td")
-                target_date = parent_td.get_attribute("data-date")
-                
-                if raw_text:
-                    # [터미널 확인용] 데이터가 긁히고 있는지 실시간으로 출력합니다.
-                    print(f">>> [기본수집] 날짜: {target_date} | 내용: {raw_text[:30]}...")
+            # 현재 페이지 데이터 파싱
+            for row in rows:
+                try:
+                    tds = row.find_elements(By.TAG_NAME, "td")
+                    if len(tds) < 3: continue
                     
-                    # 화면(image_020fa0.png)의 '날짜', '일정 상세내용' 필드에 정확히 매칭
-                    final_list.append({
-                        "date": target_date,   
-                        "content": raw_text    
-                    })
-            except: pass
+                    date_val = tds[0].text.strip()[:10]
+                    content_val = row.find_element(By.CSS_SELECTOR, "a.fc-title").text.strip()
+                    
+                    final_list.append({"date": date_val, "content": content_val})
+                except: continue
 
-        # 4-2. '+N' 더보기 버튼 내 숨겨진 일정 수집
-        more_links = driver.find_elements(By.CSS_SELECTOR, ".fc-more")
-        for link in more_links:
+            print(f">>> 현재까지 {len(final_list)}건 수집됨...")
+
+            # 수집 개수가 변하지 않으면(마지막 페이지 도달) 탈출
+            if len(final_list) == last_collected_count:
+                print(">>> 더 이상 새로운 데이터가 없어 수집을 종료합니다.")
+                break
+            last_collected_count = len(final_list)
+
+            # 페이징: 다음 페이지 클릭
             try:
-                p_date = link.find_element(By.XPATH, "./ancestor::td").get_attribute("data-date")
-                driver.execute_script("arguments[0].click();", link)
-                time.sleep(0.5)
+                # active 클래스 다음의 숫자 버튼 찾기
+                next_page_btn = driver.find_elements(By.CSS_SELECTOR, "ul.pagination li.active + li a")
                 
-                pop_items = driver.find_elements(By.CSS_SELECTOR, ".fc-more-popover .fc-content")
-                for p_item in pop_items:
-                    p_txt = p_item.get_attribute("textContent").replace('\n', ' ').strip()
-                    if p_txt:
-                        # [터미널 확인용] 더보기 내부 데이터 수집 현황 출력
-                        print(f"  └─ [더보기수집] 날짜: {p_date} | 내용: {p_txt[:30]}...")
-                        
-                        final_list.append({
-                            "date": p_date,
-                            "content": p_txt
-                        })
-                
-                driver.find_element(By.CSS_SELECTOR, ".fc-more-popover .fc-close").click()
-                time.sleep(0.2)
-            except: pass
+                if next_page_btn and next_page_btn[0].text.isdigit():
+                    print(f">>> 다음 페이지({next_page_btn[0].text})로 이동...")
+                    driver.execute_script("arguments[0].click();", next_page_btn[0])
+                    time.sleep(3) # 로딩 대기
+                else:
+                    print(">>> 마지막 페이지입니다.")
+                    break
+            except Exception as e:
+                print(f">>> 페이징 종료: {e}")
+                break
 
-        # 최종 로그 출력
-        print(f"=== 수집 완료! 총 {len(final_list)}개의 데이터를 찾았습니다. ===")
-
-        # [핵심] JSON 반환 시 Key 이름을 화면 JS와 100% 일치시켜야 함
-        return JsonResponse({
-            "status": "success", 
-            "total_count": len(final_list), 
-            "data": final_list  # 여기서 보내는 'data'가 JS의 item.date, item.content로 연결됨
-        })
+        print(f">>> 최종 수집 완료: 총 {len(final_list)}건")
+        return JsonResponse({"status": "success", "total_count": len(final_list), "data": final_list})
 
     except Exception as e:
-        print(f"!!! 에러 발생: {str(e)}") # 에러 내용을 터미널에 출력
-        return JsonResponse({"status": "error", "message": f"시스템 에러: {str(e)}"})
-    # finally:
-    #     driver.quit()
+        print(traceback.format_exc())
+        return JsonResponse({"status": "error", "message": str(e)})
+    finally:
+        if driver:
+            driver.quit()
 
