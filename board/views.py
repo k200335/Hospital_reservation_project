@@ -500,7 +500,7 @@ def save_csi_matching_data(request):
                     INSERT INTO csi_issue_results (의뢰번호, 성적서번호, 발급일자)
                     VALUES (%s, %s, %s)
                     ON DUPLICATE KEY UPDATE
-                        의뢰번호 = VALUES(의뢰번호),
+                        성적서번호 = VALUES(성적서번호),
                         발급일자 = VALUES(발급일자)
                 """
                 
@@ -516,7 +516,258 @@ def save_csi_matching_data(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
         
-# 여기서 부터 QT 통합
+
+# ------여기서부터 성적서 발급대기일 크롤링 페이지입니다--------
+# @csrf_exempt
+# def fetch_csi_wait_data(request):
+#     if request.method != 'POST':
+#         return JsonResponse({'status': 'error', 'message': '잘못된 접근입니다.'})
+
+#     driver = None
+#     try:
+        
+
+#         chrome_options = Options()
+#         chrome_options.add_argument("--window-size=1920,1080")
+#         # chrome_options.add_argument("--headless")
+#         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+#         wait = WebDriverWait(driver, 15)
+
+#         # 1. 로그인 (기존과 동일)
+#         driver.get("https://gcloud.csi.go.kr/cmq/main.do")
+#         wait.until(EC.element_to_be_clickable((By.ID, "userId"))).send_keys("youngjun")
+#         driver.find_element(By.ID, "pswd").send_keys("k*1800*92*")
+#         driver.find_element(By.CLASS_NAME, "login-btn").click()
+#         time.sleep(2)
+
+#         # 2. 메뉴 이동
+#         driver.get("https://gcloud.csi.go.kr/cmq/qti/qltRptIssuWait/qltRptIssuWaitList.do")
+#         wait.until(EC.presence_of_element_located((By.NAME, "ymdKey")))
+        
+        
+        
+#         driver.execute_script("go_search();")
+#         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "pagination")))
+#         time.sleep(2)
+
+#         # 3. 데이터 수집 루프
+#         final_results = []
+#         rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+
+#         for i in range(len(rows)):
+#             current_rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+#             if i >= len(current_rows): break
+#             row = current_rows[i]
+            
+#             try:
+#                 # [스크린샷 분석 반영] 목록에서 기본 정보 추출
+#                 # 접수번호가 td[2]에 있고, 발급대기일자가 td[8]에 있습니다.
+#                 tmp_receipt_no = row.find_element(By.XPATH, "./td[2]").text.strip()
+#                 list_info = {
+#                     'seal_name': row.find_element(By.XPATH, "./td[3]").text.strip(),
+#                     'project_name': row.find_element(By.XPATH, "./td[5]").text.strip(), # 공사명
+#                     'recv_date': row.find_element(By.XPATH, "./td[6]").text.strip(),    # 접수일자
+#                     'wait_date': row.find_element(By.XPATH, "./td[8]").text.strip()     # 발급대기일자 (2026-01-02 등)
+#                 }
+                
+#                 # 상세페이지 진입 (접수번호 링크 클릭)
+#                 target_link = row.find_element(By.CLASS_NAME, "goSelectLink")
+#                 driver.execute_script("arguments[0].click();", target_link)
+                
+#                 # 상세내역 확장 (품질시험 의뢰서 내역 클릭)
+#                 wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질시험 의뢰서 내역')]")))
+#                 driver.execute_script("document.evaluate(\"//a[contains(text(), '품질시험 의뢰서 내역')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.click();")
+#                 time.sleep(1.2)
+                
+#                 # 상세페이지에서 '의뢰번호'와 '접수번호' 재확인 추출
+#                 try:
+#                     u_id = driver.find_element(By.XPATH, "//th[contains(text(), '의뢰번호')]/following-sibling::td").text.strip()
+#                 except: u_id = "추출실패"
+                
+#                 try:
+#                     # 상세페이지의 접수번호 (목록의 것과 대조용 혹은 확정용)
+#                     final_receipt_no = driver.find_element(By.XPATH, "//th[contains(text(), '접수번호')]/following-sibling::td").text.strip()
+#                 except: final_receipt_no = tmp_receipt_no # 실패시 목록 데이터 사용
+
+#                 # 사용자님 HTML 테이블 헤더 순서에 최적화된 데이터 구성
+#                 final_results.append({
+#                     'u_id': u_id,                             # 1. 의뢰번호
+#                     'wait_date': list_info['wait_date'],      # 2. 발급대기일자
+#                     'receipt_no': final_receipt_no,           # 3. 접수번호
+#                     'seal_name': list_info['seal_name'],
+#                     'project_name': list_info['project_name'],
+#                     'recv_date': list_info['recv_date'],
+#                     'cert_no': '발급대기',                     # 성적서번호 대신 '발급대기' 표시
+#                     # 필요시 'agency' 등 추가 가능
+#                 })
+
+#                 # 다시 목록으로 돌아가기
+#                 driver.execute_script("window.history.back();")
+#                 wait.until(EC.presence_of_element_located((By.CLASS_NAME, "goSelectLink")))
+#                 time.sleep(1)
+
+#             except Exception as e:
+#                 print(f"데이터 수집 중 오류: {e}")
+#                 continue
+
+#         # 모든 수집이 완료되면 드라이버 종료
+#         if driver:
+#             driver.quit()
+
+#         # 데이터가 하나도 수집되지 않았을 때의 처리
+#         if not final_results:
+#             return JsonResponse({
+#                 'status': 'success', 
+#                 'results': [], 
+#                 'message': '현재 발급 대기 중인 데이터가 없습니다.'
+#             })
+
+#         # 성공 시 수집된 리스트 반환
+#         return JsonResponse({
+#             'status': 'success', 
+#             'results': final_results
+#         })
+
+#     except Exception as e:
+#         # 에러 발생 시에도 드라이버는 반드시 종료해서 메모리 누수 방지
+#         if driver:
+#             try:
+#                 driver.quit()
+#             except:
+#                 pass
+        
+#         # 에러 메시지를 JSON 형태로 반환하여 HTML 알림창(alert)에 띄움
+#         print(f"시스템 에러 발생: {str(e)}") # 서버 로그용
+#         return JsonResponse({
+#             'status': 'error', 
+#             'message': f"데이터 수집 중 오류가 발생했습니다: {str(e)}"
+#         })
+
+# ------------여기서부터 위에꺼 테스트------------
+@csrf_exempt
+def fetch_csi_wait_data(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': '잘못된 접근입니다.'})
+
+    driver = None
+    try:
+        chrome_options = Options()
+        chrome_options.add_argument("--window-size=1920,1080")
+        # chrome_options.add_argument("--headless")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        wait = WebDriverWait(driver, 15)
+
+        # 1. 로그인
+        driver.get("https://gcloud.csi.go.kr/cmq/main.do")
+        wait.until(EC.element_to_be_clickable((By.ID, "userId"))).send_keys("youngjun")
+        driver.find_element(By.ID, "pswd").send_keys("k*1800*92*")
+        driver.find_element(By.CLASS_NAME, "login-btn").click()
+        time.sleep(2)
+
+        # 2. 메뉴 이동 및 검색 (날짜 없이 바로 검색)
+        driver.get("https://gcloud.csi.go.kr/cmq/qti/qltRptIssuWait/qltRptIssuWaitList.do")
+        driver.execute_script("go_search();")
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, "pagination")))
+        time.sleep(2)
+
+        final_results = []
+        current_page_idx = 1 
+
+        # --- [3. 데이터 수집 및 페이징 루프 시작] ---
+        while True:
+            wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "goSelectLink")))
+            time.sleep(2) 
+            
+            # 현재 페이지의 첫 번째 성적서 번호를 기억 (페이지 전환 확인용)
+            first_cert_before = driver.find_elements(By.CLASS_NAME, "goSelectLink")[0].text.strip()
+            rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+
+            for i in range(len(rows)):
+                current_rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+                if i >= len(current_rows): break
+                row = current_rows[i]
+                
+                try:
+                    # 목록 데이터 수집 (발급대기 페이지 td 순서)
+                    list_info = {
+                        'cert_no': row.find_element(By.XPATH, "./td[2]").text.strip(),
+                        'seal_name': row.find_element(By.XPATH, "./td[3]").text.strip(),
+                        'project_name': row.find_element(By.XPATH, "./td[4]").text.strip(),
+                        'agency': row.find_element(By.XPATH, "./td[5]").text.strip(),
+                        'req_date': row.find_element(By.XPATH, "./td[6]").text.strip(),
+                        'recv_date': row.find_element(By.XPATH, "./td[7]").text.strip(),
+                        'wait_date': row.find_element(By.XPATH, "./td[8]").text.strip()
+                    }
+                    target_link = row.find_element(By.XPATH, "./td[2]//a")
+
+                    # 상세페이지 진입하여 의뢰/접수번호 수집
+                    driver.execute_script("arguments[0].click();", target_link)
+                    expand_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질시험 의뢰서 내역')]")))
+                    driver.execute_script("arguments[0].click();", expand_btn)
+                    time.sleep(1.2)
+                    
+                    try:
+                        u_id = driver.find_element(By.XPATH, "//th[contains(text(), '의뢰번호')]/following-sibling::td").text.strip()
+                    except: u_id = "미부여"
+                    
+                    try:
+                        receipt_no = driver.find_element(By.XPATH, "//th[contains(text(), '접수번호')]/following-sibling::td").text.strip()
+                    except: receipt_no = "-"
+
+                    final_results.append({
+                        'u_id': u_id,
+                        'wait_date': list_info['wait_date'],
+                        'receipt_no': receipt_no,
+                        'cert_no': list_info['cert_no'],
+                        'seal_name': list_info['seal_name'],
+                        'project_name': list_info['project_name'],
+                        'agency': list_info['agency'],
+                        'req_date': list_info['req_date'],
+                        'recv_date': list_info['recv_date']
+                    })
+
+                    driver.execute_script("window.history.back();")
+                    wait.until(EC.presence_of_element_located((By.CLASS_NAME, "goSelectLink")))
+                    time.sleep(1.5)
+
+                except Exception:
+                    continue
+
+            # --- [4. 페이징 처리: 다음 페이지로 이동] ---
+            try:
+                next_page_num = current_page_idx + 1
+                btn_xpath = f"//ul[contains(@class,'pagination')]//a[text()='{next_page_num}']"
+                next_btns = driver.find_elements(By.XPATH, btn_xpath)
+                
+                if next_btns:
+                    driver.execute_script("arguments[0].click();", next_btns[0])
+                else:
+                    # 텍스트로 못 찾을 경우 goPage 자바스크립트 함수 직접 호출
+                    driver.execute_script(f"goPage({next_page_num});")
+                
+                # 페이지가 실제로 넘어갔는지 확인 (첫 번째 데이터가 바뀌었는지)
+                is_changed = False
+                for _ in range(15):
+                    time.sleep(1)
+                    current_links = driver.find_elements(By.CLASS_NAME, "goSelectLink")
+                    if current_links and current_links[0].text.strip() != first_cert_before:
+                        is_changed = True
+                        current_page_idx = next_page_num
+                        break
+                
+                if not is_changed: break # 다음 페이지로 안 넘어가면 종료
+            except:
+                break # 에러나거나 버튼 없으면 종료
+
+        driver.quit()
+        return JsonResponse({'status': 'success', 'results': final_results})
+
+    except Exception as e:
+        if driver: driver.quit()
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+
+#--------------------- 여기서 부터 QT 통합-------------------
 # @csrf_exempt
 # def fetch_combined_data(request):
 #     try:

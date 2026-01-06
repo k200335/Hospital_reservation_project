@@ -1,0 +1,214 @@
+<!-- {% extends "base.html" %}
+{% block content %}
+
+<style>
+    /* 4등분 고정 레이아웃 설정 */
+    .split-wrapper {
+        display: grid;
+        grid-template-columns: 1fr 1fr; /* 50%씩 좌우 분할 */
+        grid-template-rows: 1fr 1fr;    /* 50%씩 상하 분할 */
+        height: calc(100vh - 70px);     /* 네비게이션 제외 전체 높이 */
+        width: 100%;
+        gap: 0;                         /* 간격 없음 */
+    }
+
+    /* 각 판넬 스타일 */
+    .panel { 
+        overflow: auto; 
+        padding: 15px; 
+        background: white; 
+        border: 1px solid #dee2e6; /* 경계선 유지 */
+    }
+    .panel-bg { background-color: #f8f9fa; }
+</style>
+
+<div class="split-wrapper">
+    <div class="panel" id="panel-1">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="fw-bold text-primary mb-0">1. CSI 성적서 발급 정보 매칭</h5>
+            <div class="d-flex gap-2 align-items-center">
+                <input type="date" id="start_date" class="form-control form-control-sm" style="width:130px;" value="{{ default_date }}">
+                <span class="fw-bold">~</span>
+                <input type="date" id="end_date" class="form-control form-control-sm" style="width:130px;" value="{{ default_date }}">
+                
+                <button id="btn-fetch" class="btn btn-sm btn-dark" onclick="fetchCsiIssueList(event)" disabled>조회</button>
+                <button id="btn-save" class="btn btn-sm btn-success" onclick="saveMatchingData()" disabled>DB 저장</button>
+            </div>
+        </div>
+        
+        <table class="table table-sm table-bordered" style="font-size: 0.82rem;">
+            <thead class="table-light sticky-top text-center">
+                <tr>
+                    <th style="width: 40px;"><input type="checkbox" id="check-all"></th>
+                    <th>의뢰번호</th> <th>성적서번호</th> <th>봉인명</th> <th>공사명</th>
+                    <th>의뢰기관</th> <th>의뢰일자</th> <th>접수일자</th> <th>대기일자</th> <th>발급일자</th>
+                </tr>
+            </thead>
+            <tbody id="csi-matching-body">
+                <tr><td colspan="10" class="text-center text-muted">발급일자를 선택하고 조회를 눌러주세요.</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <div class="panel panel-bg">2번 영역 (대기)</div>
+    <div class="panel panel-bg">3번 영역 (대기)</div>
+    <div class="panel panel-bg">4번 영역 (대기)</div>
+</div>
+
+<script>
+/** 1. 전체 선택/해제 기능 **/
+document.addEventListener('change', function(e) {
+    if (e.target && e.target.id === 'check-all') {
+        const isChecked = e.target.checked;
+        document.querySelectorAll('.row-check').forEach(cb => {
+            cb.checked = isChecked;
+        });
+    }
+});
+
+/** 2. CSI 데이터 수집 함수 (중복 제거됨) **/
+async function fetchCsiIssueList(event) {
+    const startDate = document.getElementById('start_date').value;
+    const endDate = document.getElementById('end_date').value;
+
+    if (!startDate || !endDate) return alert("시작일과 종료일을 모두 선택해주세요.");
+
+    const tbody = document.getElementById('csi-matching-body');
+    const btn = event.target;
+
+    tbody.innerHTML = `<tr><td colspan="10" class="text-center py-4">
+        <div class="spinner-border spinner-border-sm text-primary"></div>
+        <br>기간 내 CSI 데이터를 수집 중입니다...</td></tr>`;
+    btn.disabled = true;
+
+    try {
+        const response = await fetch("{% url 'fetch_csi_issue_data' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            // 시작일과 종료일을 함께 전송
+            body: JSON.stringify({ 
+                start_date: startDate,
+                end_date: endDate 
+            })
+        });
+
+        const data = await response.json();
+        // ... 이하 결과 출력 로직은 기존과 동일합니다 ...
+        if (data.status === 'success') {
+            tbody.innerHTML = '';
+            if (data.results.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="text-center">해당 기간에 데이터가 없습니다.</td></tr>';
+            } else {
+                data.results.forEach(item => {
+                    const row = `<tr>
+                        <td class="text-center"><input type="checkbox" class="row-check"></td>
+                        <td class="text-center"><strong class="text-primary">${item.u_id}</strong></td>
+                        <td>${item.cert_no}</td>
+                        <td>${item.seal_name}</td>
+                        <td>${item.project_name}</td>
+                        <td>${item.agency}</td>
+                        <td>${item.req_date}</td>
+                        <td>${item.recv_date}</td>
+                        <td>${item.wait_date}</td>
+                        <td>${item.issue_date}</td>
+                    </tr>`;
+                    tbody.insertAdjacentHTML('beforeend', row);
+                });
+            }
+        } else { alert(data.message); }
+    } catch (e) {
+        alert("통신 에러가 발생했습니다.");
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+/** 3. 데이터 저장 및 업데이트 (UPSERT) 함수 **/
+async function saveMatchingData() {
+    const selectedRows = document.querySelectorAll('.row-check:checked');
+    
+    if (selectedRows.length === 0) {
+        return alert("저장(업데이트)할 항목을 선택해주세요.");
+    }
+
+    // 사진의 DB 구조(의뢰번호, 성적서번호, 발급일자)에 맞춰 데이터 추출
+    const itemsToSave = Array.from(selectedRows).map(checkbox => {
+        const row = checkbox.closest('tr');
+        return {
+            u_id: row.cells[1].innerText.trim(),       // 의뢰번호
+            cert_no: row.cells[2].innerText.trim(),    // 성적서번호
+            issue_date: row.cells[9].innerText.trim()  // 발급일자
+        };
+    });
+
+    if (!confirm(`${itemsToSave.length}건의 데이터를 DB에 반영하시겠습니까?`)) return;
+
+    try {
+        const response = await fetch("{% url 'save_csi_matching_data' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ items: itemsToSave })
+        });
+
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert(result.message);
+            document.getElementById('check-all').checked = false;
+            selectedRows.forEach(cb => cb.checked = false);
+        } else {
+            alert("저장 실패: " + result.message);
+        }
+    } catch (e) {
+        alert("서버와 통신 중 에러가 발생했습니다.");
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. 서버에서 사용자 ID 가져오기 (Django 템플릿 문법)
+    const currentUserId = "{{ request.user.username }}"; 
+    
+    // 2. 허용할 아이디 리스트
+    const allowedIds = ["admin_work", "admin_home"]; 
+
+    const fetchBtn = document.getElementById('btn-fetch');
+    const saveBtn = document.getElementById('btn-save');
+
+    // 3. 권한 체크 로직
+    if (allowedIds.includes(currentUserId)) {
+        // 권한이 있는 경우: 버튼 활성화 및 스타일 복구
+        [fetchBtn, saveBtn].forEach(btn => {
+            if (btn) {
+                btn.removeAttribute('disabled');
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+            }
+        });
+        console.log("관리자 권한 확인됨: " + currentUserId);
+    } else {
+        // 권한이 없는 경우: 시각적 피드백 강화 (선택 사항)
+        [fetchBtn, saveBtn].forEach(btn => {
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = "0.5";
+                btn.style.cursor = "not-allowed";
+                btn.title = "권한이 없습니다.";
+                
+                btn.onclick = function(e) {
+                    e.preventDefault();
+                    alert("해당 기능을 사용할 권한이 없습니다.");
+                };
+            }
+        });
+        console.log("권한 없음: " + currentUserId);
+    }
+});
+
+</script>
+
+{% endblock %} -->

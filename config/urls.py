@@ -65,4 +65,9 @@ urlpatterns = [
     path('bizmeka-sync/', views.bizmeka_sync, name='bizmeka_sync'),
     # 비즈메카 QT DB 불러오는코드
     path('get_qt_db_data/', views.get_qt_db_data, name='get_qt_db_data'),
+    # 1. CSI 성적서 발급 정보 조회 (기존)
+    path('fetch-csi-issue-data/', views.fetch_csi_issue_data, name='fetch_csi_issue_data'),
+
+    # 2. CSI 성적서 발급대기 정보 조회 (신규 추가)
+    path('fetch-csi-wait-data/', views.fetch_csi_wait_data, name='fetch_csi_wait_data'),
 ]
