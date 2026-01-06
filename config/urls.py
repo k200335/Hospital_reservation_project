@@ -70,4 +70,6 @@ urlpatterns = [
 
     # 2. CSI 성적서 발급대기 정보 조회 (신규 추가)
     path('fetch-csi-wait-data/', views.fetch_csi_wait_data, name='fetch_csi_wait_data'),
+    # 2. CSI 성적서 발급대기 정보 DB저장하기
+    path('save-csi-wait-data/', views.save_csi_wait_data, name='save_csi_wait_data'),
 ]

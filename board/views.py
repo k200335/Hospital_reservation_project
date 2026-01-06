@@ -518,132 +518,6 @@ def save_csi_matching_data(request):
         
 
 # ------여기서부터 성적서 발급대기일 크롤링 페이지입니다--------
-# @csrf_exempt
-# def fetch_csi_wait_data(request):
-#     if request.method != 'POST':
-#         return JsonResponse({'status': 'error', 'message': '잘못된 접근입니다.'})
-
-#     driver = None
-#     try:
-        
-
-#         chrome_options = Options()
-#         chrome_options.add_argument("--window-size=1920,1080")
-#         # chrome_options.add_argument("--headless")
-#         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-#         wait = WebDriverWait(driver, 15)
-
-#         # 1. 로그인 (기존과 동일)
-#         driver.get("https://gcloud.csi.go.kr/cmq/main.do")
-#         wait.until(EC.element_to_be_clickable((By.ID, "userId"))).send_keys("youngjun")
-#         driver.find_element(By.ID, "pswd").send_keys("k*1800*92*")
-#         driver.find_element(By.CLASS_NAME, "login-btn").click()
-#         time.sleep(2)
-
-#         # 2. 메뉴 이동
-#         driver.get("https://gcloud.csi.go.kr/cmq/qti/qltRptIssuWait/qltRptIssuWaitList.do")
-#         wait.until(EC.presence_of_element_located((By.NAME, "ymdKey")))
-        
-        
-        
-#         driver.execute_script("go_search();")
-#         wait.until(EC.presence_of_element_located((By.CLASS_NAME, "pagination")))
-#         time.sleep(2)
-
-#         # 3. 데이터 수집 루프
-#         final_results = []
-#         rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
-
-#         for i in range(len(rows)):
-#             current_rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
-#             if i >= len(current_rows): break
-#             row = current_rows[i]
-            
-#             try:
-#                 # [스크린샷 분석 반영] 목록에서 기본 정보 추출
-#                 # 접수번호가 td[2]에 있고, 발급대기일자가 td[8]에 있습니다.
-#                 tmp_receipt_no = row.find_element(By.XPATH, "./td[2]").text.strip()
-#                 list_info = {
-#                     'seal_name': row.find_element(By.XPATH, "./td[3]").text.strip(),
-#                     'project_name': row.find_element(By.XPATH, "./td[5]").text.strip(), # 공사명
-#                     'recv_date': row.find_element(By.XPATH, "./td[6]").text.strip(),    # 접수일자
-#                     'wait_date': row.find_element(By.XPATH, "./td[8]").text.strip()     # 발급대기일자 (2026-01-02 등)
-#                 }
-                
-#                 # 상세페이지 진입 (접수번호 링크 클릭)
-#                 target_link = row.find_element(By.CLASS_NAME, "goSelectLink")
-#                 driver.execute_script("arguments[0].click();", target_link)
-                
-#                 # 상세내역 확장 (품질시험 의뢰서 내역 클릭)
-#                 wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질시험 의뢰서 내역')]")))
-#                 driver.execute_script("document.evaluate(\"//a[contains(text(), '품질시험 의뢰서 내역')]\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.click();")
-#                 time.sleep(1.2)
-                
-#                 # 상세페이지에서 '의뢰번호'와 '접수번호' 재확인 추출
-#                 try:
-#                     u_id = driver.find_element(By.XPATH, "//th[contains(text(), '의뢰번호')]/following-sibling::td").text.strip()
-#                 except: u_id = "추출실패"
-                
-#                 try:
-#                     # 상세페이지의 접수번호 (목록의 것과 대조용 혹은 확정용)
-#                     final_receipt_no = driver.find_element(By.XPATH, "//th[contains(text(), '접수번호')]/following-sibling::td").text.strip()
-#                 except: final_receipt_no = tmp_receipt_no # 실패시 목록 데이터 사용
-
-#                 # 사용자님 HTML 테이블 헤더 순서에 최적화된 데이터 구성
-#                 final_results.append({
-#                     'u_id': u_id,                             # 1. 의뢰번호
-#                     'wait_date': list_info['wait_date'],      # 2. 발급대기일자
-#                     'receipt_no': final_receipt_no,           # 3. 접수번호
-#                     'seal_name': list_info['seal_name'],
-#                     'project_name': list_info['project_name'],
-#                     'recv_date': list_info['recv_date'],
-#                     'cert_no': '발급대기',                     # 성적서번호 대신 '발급대기' 표시
-#                     # 필요시 'agency' 등 추가 가능
-#                 })
-
-#                 # 다시 목록으로 돌아가기
-#                 driver.execute_script("window.history.back();")
-#                 wait.until(EC.presence_of_element_located((By.CLASS_NAME, "goSelectLink")))
-#                 time.sleep(1)
-
-#             except Exception as e:
-#                 print(f"데이터 수집 중 오류: {e}")
-#                 continue
-
-#         # 모든 수집이 완료되면 드라이버 종료
-#         if driver:
-#             driver.quit()
-
-#         # 데이터가 하나도 수집되지 않았을 때의 처리
-#         if not final_results:
-#             return JsonResponse({
-#                 'status': 'success', 
-#                 'results': [], 
-#                 'message': '현재 발급 대기 중인 데이터가 없습니다.'
-#             })
-
-#         # 성공 시 수집된 리스트 반환
-#         return JsonResponse({
-#             'status': 'success', 
-#             'results': final_results
-#         })
-
-#     except Exception as e:
-#         # 에러 발생 시에도 드라이버는 반드시 종료해서 메모리 누수 방지
-#         if driver:
-#             try:
-#                 driver.quit()
-#             except:
-#                 pass
-        
-#         # 에러 메시지를 JSON 형태로 반환하여 HTML 알림창(alert)에 띄움
-#         print(f"시스템 에러 발생: {str(e)}") # 서버 로그용
-#         return JsonResponse({
-#             'status': 'error', 
-#             'message': f"데이터 수집 중 오류가 발생했습니다: {str(e)}"
-#         })
-
-# ------------여기서부터 위에꺼 테스트------------
 @csrf_exempt
 def fetch_csi_wait_data(request):
     if request.method != 'POST':
@@ -765,6 +639,50 @@ def fetch_csi_wait_data(request):
     except Exception as e:
         if driver: driver.quit()
         return JsonResponse({'status': 'error', 'message': str(e)})
+
+# ---------------여기서 부터 발급대기일 입력하기-------------
+@csrf_exempt
+def save_csi_wait_data(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            selected_items = data.get('items', [])
+
+            if not selected_items:
+                return JsonResponse({'status': 'error', 'message': '저장할 항목이 없습니다.'})
+
+            with connection.cursor() as cursor:
+                # 🚀 사용자님 DB 컬럼명에 맞춘 UPSERT 쿼리
+                # 1. 성적서번호 컬럼에는 "승인전" 고정값 입력
+                # 2. 발급일자 컬럼에는 표의 '발급대기일자' 입력
+                sql = """
+                    INSERT INTO csi_issue_results (의뢰번호, 성적서번호, 발급일자)
+                    VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        성적서번호 = VALUES(성적서번호),
+                        발급일자 = VALUES(발급일자)
+                """
+                
+                # 파라미터 구성
+                # item['u_id'] -> 의뢰번호
+                # "승인전"      -> 성적서번호 컬럼에 들어갈 고정값
+                # item['wait_date'] -> 발급일자 컬럼에 들어갈 데이터
+                params = [
+                    (item['u_id'], "승인전", item['wait_date']) 
+                    for item in selected_items
+                ]
+                
+                cursor.executemany(sql, params)
+
+            return JsonResponse({
+                'status': 'success', 
+                'message': f'{len(selected_items)}건 처리 완료 (의뢰번호 기준 "승인전" 및 대기일자 업데이트)'
+            })
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+
+
 
 
 #--------------------- 여기서 부터 QT 통합-------------------

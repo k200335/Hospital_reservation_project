@@ -1,6 +1,6 @@
 {% extends "base.html" %}
-
 {% block content %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
     /* 4등분 고정 레이아웃 */
     .split-wrapper {
@@ -54,11 +54,15 @@
         <div class="d-flex justify-content-between align-items-center mb-2">
             <h5 class="fw-bold text-info mb-0">2. CSI 성적서 발급대기 정보 조회</h5>
             <div class="d-flex gap-2 align-items-center">
-                <input type="date" id="start_date_2" class="form-control form-control-sm" style="width:130px;" value="{{ default_date }}">
-                <span class="fw-bold">~</span>
-                <input type="date" id="end_date_2" class="form-control form-control-sm" style="width:130px;" value="{{ default_date }}">
                 <button id="btn-fetch-2" class="btn btn-sm btn-dark" onclick="fetchQtData(event)" disabled>조회</button>
-                <button id="btn-save-2" class="btn btn-sm btn-info text-white" onclick="saveQtMatchingData()" disabled>DB 저장</button>
+                
+                <button id="btn-save-2" class="btn btn-sm btn-info text-white" onclick="saveQtData()" disabled>DB 저장</button>
+                
+                <button id="btn-excel-download-2" class="btn btn-sm btn-success" onclick="downloadExcel2()" disabled>엑셀 다운로드</button>
+                
+                <button id="btn-excel-upload-2" class="btn btn-sm btn-warning text-white" onclick="triggerExcelUpload2()" disabled>엑셀 가져오기</button>
+                
+                <input type="file" id="excel_file_2" style="display:none;" onchange="uploadExcel2(event)" accept=".xlsx, .xls">
             </div>
         </div>
         <table class="table table-sm table-bordered table-custom">
@@ -230,7 +234,53 @@ async function fetchQtData(event) {
 }
 
     /* 5. 2번 영역: DB 저장 (추가된 기능) */
-    function saveQtMatchingData() { alert("2번 영역 데이터 DB 저장 기능 실행"); }
+    async function saveQtData() {
+    // 1. 2번 영역 전용 체크박스 클래스(.row-check-2)로 선택된 행 가져오기
+    const selectedRows = document.querySelectorAll('.row-check-2:checked');
+    
+    if (selectedRows.length === 0) {
+        return alert("저장(업데이트)할 항목을 선택해주세요.");
+    }
+
+    // 2. 2번 테이블 순서에 맞춰 데이터 추출
+    // 순서: 체크박스(0) | 의뢰번호(1) | 발급대기일자(2) | 접수번호(3) ...
+    const itemsToSave = Array.from(selectedRows).map(checkbox => {
+        const row = checkbox.closest('tr');
+        return {
+            u_id: row.cells[1].innerText.trim(),       // 의뢰번호
+            wait_date: row.cells[2].innerText.trim(),  // 발급대기일자 -> 파이썬의 '발급일자' 컬럼으로 감
+            // receipt_no: row.cells[3].innerText.trim()  // 접수번호 (필요시 DB 확장 대비)
+        };
+    });
+
+    if (!confirm(`${itemsToSave.length}건의 데이터를 DB에 반영하시겠습니까?\n(성적서번호는 '승인전'으로 업데이트됩니다.)`)) return;
+
+    try {
+        // 3. 2번 전용 저장 URL 호출
+        const response = await fetch("{% url 'save_csi_wait_data' %}", {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ items: itemsToSave })
+        });
+
+        const result = await response.json();
+        if (result.status === 'success') {
+            alert(result.message);
+            // 전체 선택 체크박스 해제 (2번 영역용 ID가 있다면 그것으로 변경)
+            const checkAll2 = document.getElementById('check-all-2');
+            if (checkAll2) checkAll2.checked = false;
+            selectedRows.forEach(cb => cb.checked = false);
+        } else {
+            alert("저장 실패: " + result.message);
+        }
+    } catch (e) {
+        console.error(e);
+        alert("서버와 통신 중 에러가 발생했습니다.");
+    }
+}
 
     /* 권한 제어 */
 document.addEventListener("DOMContentLoaded", function() {
@@ -245,7 +295,9 @@ document.addEventListener("DOMContentLoaded", function() {
         document.getElementById('btn-fetch'),   // 1번 조회
         document.getElementById('btn-save'),    // 1번 저장
         document.getElementById('btn-fetch-2'), // 2번 조회
-        document.getElementById('btn-save-2')   // 2번 저장
+        document.getElementById('btn-save-2'),   // 2번 저장
+        document.getElementById('btn-excel-download-2'), // 추가
+        document.getElementById('btn-excel-upload-2')    // 추가
     ];
 
     // 3. 권한 체크 로직
@@ -281,6 +333,108 @@ document.addEventListener("DOMContentLoaded", function() {
         console.log("권한 없음: " + currentUserId);
     }
 });
+
+/** 2번 영역: 표 데이터를 엑셀로 다운로드 **/
+function downloadExcel2() {
+    const tbody = document.getElementById('qt-matching-body');
+    const rows = tbody.querySelectorAll('tr');
+    
+    // 데이터가 없는 경우 체크
+    if (rows.length === 0 || rows[0].innerText.includes("조회된 데이터가 없습니다")) {
+        return alert("다운로드할 데이터가 없습니다.");
+    }
+
+    // 1. 엑셀에 들어갈 헤더 정의 (사용자님이 바꾼 순서 기준)
+    const data = [
+        ["의뢰번호", "발급대기일자", "접수번호", "봉인명", "시험·검사 종목", "공사명", "접수일자", "시험·검사진행 확정일자", "진행상태"]
+    ];
+
+    // 2. 표의 각 행을 돌면서 데이터 추출
+    rows.forEach(row => {
+        const cells = row.cells;
+        data.push([
+            cells[1].innerText.trim(), // 의뢰번호
+            cells[2].innerText.trim(), // 발급대기일자
+            cells[3].innerText.trim(), // 접수번호
+            cells[4].innerText.trim(), // 봉인명
+            cells[5].innerText.trim(), // 시험·검사 종목
+            cells[6].innerText.trim(), // 공사명
+            cells[7].innerText.trim(), // 접수일자
+            cells[8].innerText.trim(), // 시험·검사진행 확정일자
+            cells[9].innerText.trim()  // 진행상태
+        ]);
+    });
+
+    // 3. 엑셀 워크북 생성 및 파일 저장
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "발급대기목록");
+
+    // 파일명에 오늘 날짜 포함 (예: CSI_발급대기_20260107.xlsx)
+    const today = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    XLSX.writeFile(workbook, `CSI_발급대기_${today}.xlsx`);
+}
+
+/** 2번 영역: 엑셀 파일 읽어서 표에 표시 **/
+function uploadExcel2(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        // 첫 번째 시트 가져오기
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // 시트 데이터를 JSON 배열로 변환 (헤더 제외하고 데이터만)
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        
+        if (jsonData.length <= 1) {
+            alert("엑셀 파일에 데이터가 없습니다.");
+            return;
+        }
+
+        const tbody = document.getElementById('qt-matching-body');
+        tbody.innerHTML = ''; // 기존 표 내용 초기화
+
+        // 첫 번째 행은 헤더이므로 i=1부터 시작
+        for (let i = 1; i < jsonData.length; i++) {
+            const rowData = jsonData[i];
+            if (rowData.length === 0) continue;
+
+            // 엑셀 컬럼 순서가 저장할 때와 동일하다고 가정 (의뢰번호, 대기일자, 접수번호...)
+            // 엑셀 순서: 0:의뢰번호, 1:발급대기일자, 2:접수번호, 3:성적서번호, 4:봉인명, 5:공사명, 6:의뢰기관, 7:의뢰일자, 8:접수일자
+            const htmlRow = `
+                <tr>
+                    <td class="text-center"><input type="checkbox" class="row-check-2"></td>
+                    <td class="text-center"><strong>${rowData[0] || ''}</strong></td>
+                    <td class="text-center">${rowData[1] || ''}</td>
+                    <td class="text-center">${rowData[2] || ''}</td>
+                    <td>${rowData[3] || ''}</td>
+                    <td>${rowData[4] || ''}</td>
+                    <td>${rowData[5] || ''}</td>
+                    <td>${rowData[6] || ''}</td>
+                    <td class="text-center">${rowData[7] || ''}</td>
+                    <td class="text-center">${rowData[8] || ''}</td>
+                </tr>
+            `;
+            tbody.insertAdjacentHTML('beforeend', htmlRow);
+        }
+        
+        alert(`${jsonData.length - 1}건의 데이터를 엑셀에서 불러왔습니다.`);
+        // 파일 input 초기화 (같은 파일 다시 올릴 수 있도록)
+        event.target.value = '';
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+/** 숨겨진 파일 선택창 클릭 트리거 **/
+function triggerExcelUpload2() {
+    document.getElementById('excel_file_2').click();
+}
 </script>
 {% endblock %}
 
