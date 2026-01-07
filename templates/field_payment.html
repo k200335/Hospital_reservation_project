@@ -447,7 +447,7 @@ const gridOptions = {
     suppressMovableColumns: true,
     rowSelection: 'multiple',
     headerHeight: 30,
-    rowHeight: 35,
+    rowHeight: 30,
     rowData: [],
 
     // [핵심 추가] 셀을 클릭했을 때 실행되는 함수
@@ -518,7 +518,7 @@ const dbGridOptions = {
         type: 'none' 
     },
     headerHeight: 30,
-    rowHeight: 35,
+    rowHeight: 30,
     rowData: [],
 
     // ⭐ 클릭 이벤트 수정: 'receipt_code'를 직접 참조하도록 변경
@@ -904,41 +904,6 @@ async function loadFinishedData() {
 // -----------------완료건 보기는 여기까지--------------
 
 // -----------------여기서 부터 정산하기 모달 창------------
-// [수정된 통합 정산 함수]
-// function processSettlement() {
-//     // 1. 선택된 행 가져오기 (변수명 일치 확인)
-//     const bizRows = gridApi.getSelectedRows(); // 좌측 비즈메카
-//     const qtRows = dbGridApi.getSelectedRows(); // 우측 QT DB
-
-//     // 2. 선택 체크
-//     if (bizRows.length === 0 || qtRows.length === 0) {
-//         alert("비즈메카와 QT DB에서 각각 정산할 항목을 선택(체크)해 주세요.");
-//         return;
-//     }
-
-//     // 3. 우측 하단 요약표에서 출장비 원본 가져오기
-//     const travelFeeElem = document.getElementById('sum_travel_fee');
-//     const travelFee = travelFeeElem ? Number(travelFeeElem.innerText.replace(/,/g, '') || 0) : 0;
-
-//     // 4. 모달 상단 입력칸 초기화
-//     document.getElementById('m_travel_fee').value = travelFee;
-//     document.getElementById('m_extra_fee').value = 0;
-//     document.getElementById('m_work_count').value = 1;
-//     document.getElementById('m_memo').value = "";
-
-//     // 5. 모달 내 테이블 그리기 실행
-//     updateTableReflection();
-
-//     // 6. 모달 띄우기 (부트스트랩 5 방식)
-//     const modalElem = document.getElementById('settlementModal');
-//     if (modalElem) {
-//         const myModal = bootstrap.Modal.getOrCreateInstance(modalElem);
-//         myModal.show();
-//     } else {
-//         console.error("settlementModal ID를 찾을 수 없습니다.");
-//     }
-// }
-
 // [통합 및 수정] 정산하기 모달 실행 함수
 function processSettlement() {
     const bizRows = gridApi.getSelectedRows(); 
@@ -1134,15 +1099,53 @@ document.addEventListener('mousedown', function (e) {
 });
 
 // 1. DB 기준 정보 (이미지 image_a592ff.png 기준 데이터 구성)
-const itemStandards = [
+// 1. [백업용] DB 연결 실패 시를 대비한 최소한의 기본 목록
+const fallbackItems = [
     { id: 6, name: "생콘", base: 3, price: "출장비", extra: 30000 },
     { id: 7, name: "어스앵커", base: 2, price: 200000, extra: 100000 },
     { id: 8, name: "코아채취(아스콘)", base: 3, price: "출장비", extra: 10000 },
     { id: 9, name: "코아채취(콘크리트)", base: 1, price: 300000, extra: 50000 },
     { id: 18, name: "몰드수거", base: 1, price: 0, extra: 0 },
-    { id: 20, name: "시료수거", base: 1, price: 0, extra: 50000 }
-    // 필요한 데이터를 위와 같은 형식으로 추가하세요.
+    { id: 20, name: "시료수거", base: 1, price: 0, extra: 50000 },
+    { id: 21, name: "시료접수", base: 1, price: 0, extra: 50000 }
 ];
+
+// 전역 변수로 관리
+let itemStandards = [];
+
+// 2. [수정] DB에서 데이터를 불러오는 메인 함수
+async function loadItemStandards() {
+    try {
+        // DB API 호출
+        const response = await fetch('/api/get-item-standards/'); 
+        
+        if (response.ok) {
+            // DB 데이터 로드 성공 시
+            itemStandards = await response.json(); 
+        } else {
+            throw new Error("DB 응답 에러");
+        }
+    } catch (error) {
+        console.warn("DB 로드 실패, 백업 목록을 사용합니다:", error);
+        // DB 호출 실패 시 백업용 데이터 사용
+        itemStandards = fallbackItems; 
+    }
+
+    // 드롭다운 생성 로직
+    const selector = document.getElementById('m_item_selector');
+    if (!selector) return;
+
+    selector.innerHTML = '<option value="">-- 종목 선택 --</option>'; 
+    itemStandards.forEach(item => {
+        const opt = document.createElement('option');
+        opt.value = item.id;
+        opt.textContent = item.name;
+        opt.dataset.base = item.base;
+        opt.dataset.price = item.price;
+        opt.dataset.extra = item.extra;
+        selector.appendChild(opt);
+    });
+}
 
 // 2. 페이지 로드 시 드롭다운 메뉴 생성
 document.addEventListener('DOMContentLoaded', () => {
@@ -1162,43 +1165,81 @@ document.addEventListener('DOMContentLoaded', () => {
 function applyItemStandard() {
     const selector = document.getElementById('m_item_selector');
     const selectedId = selector.value;
-    const selectedText = selector.options[selector.selectedIndex].text; // 선택된 종목 명칭
+    const selectedText = selector.options[selector.selectedIndex].text;
     const item = itemStandards.find(i => i.id == selectedId);
     
     if (!item) return;
 
-    // [기본 값 세팅]
-    document.getElementById('m_work_count').value = item.base;
-    
-    // 출장비 세팅 (기존 로직 유지)
+    // 1. [상단 DB기준 칸] 업데이트 (비교를 위한 기준값 표시)
+    if(document.getElementById('db_base_val'))  document.getElementById('db_base_val').value = item.base;
+    if(document.getElementById('db_price_val')) document.getElementById('db_price_val').value = item.price;
+    if(document.getElementById('db_extra_val')) document.getElementById('db_extra_val').value = item.extra;
+
+    // 2. [공수 비교 로직] ★이 부분이 다시 활성화되어야 합니다★
+    const workCountInput = document.getElementById('m_work_count');
+    const currentInputVal = Number(workCountInput.value) || 0;
+    const dbBaseVal = Number(item.base);
+
+    // [예시] 입력된 공수가 기준공수보다 작다면 기준공수로 맞춰주고, 크다면 사용자의 입력을 존중함
+    // 만약 "무조건 비교만 하고 값은 안 바꾸겠다"면 이 조건문을 빼고 비교 로직만 넣으시면 됩니다.
+    if (currentInputVal < dbBaseVal) {
+        // 입력값이 기준보다 작을 때만 기준값으로 세팅 (최소 공수 보장)
+        // workCountInput.value = dbBaseVal; 
+    }
+
+    // 3. [출장비 세팅]
     if (item.price === "출장비") {
         const currentTravelFee = document.getElementById('m_travel_fee').value;
-        document.getElementById('m_travel_fee').value = currentTravelFee || 250000;
+        if (!currentTravelFee || currentTravelFee == "0") {
+            document.getElementById('m_travel_fee').value = 250000;
+        }
     } else {
         document.getElementById('m_travel_fee').value = item.price;
     }
 
-    // --- [사용자 요청 조건 처리 핵심] ---
-    let extraFee = item.extra; 
-    let category = "현장시험"; // 기본값
+    // 4. [추가금액 & 구분 규칙] 깐깐한 조건 검사
+    let extraFee = 0; 
+    let category = "현장시험"; 
 
-    // 조건 1: 시료수거, 몰드수거, 시료접수
+    // 시료수거/접수 조건 체크
     if (["시료수거", "몰드수거", "시료접수"].includes(selectedText)) {
-        category = "시료수거"; // 구분을 '시료수거'로 변경
+        category = "시료수거"; 
         if (selectedText === "시료수거" || selectedText === "시료접수") {
-            extraFee = 50000; // 추가금액 5만원
+            extraFee = 50000; 
         }
-    } 
-    // 조건 2: 코아채취 관련
-    else if (selectedText.includes("코아채취")) {
-        category = "기타"; // 구분을 '기타'로 변경
+    } else if (selectedText.includes("코아채취")) {
+        category = "기타";
     }
 
-    // 추가금액 입력창 업데이트
-    document.getElementById('m_extra_fee').value = extraFee;
+    // 5. [추가 로직] 공수 비교에 따른 추가금액 보정 (필요시 사용)
+    // 만약 입력공수가 기준공수보다 많을 때 추가금을 더 준다거나 하는 로직을 여기 넣습니다.
+    if (currentInputVal > dbBaseVal) {
+        console.log("기준공수 초과 입력됨: 로직 수행 가능");
+    }
 
-    // [중요] 변경된 category 값을 표 반영 함수로 전달합니다.
+    document.getElementById('m_extra_fee').value = extraFee;
     updateTableReflection(category); 
+}
+
+function resetModalFields() {
+    // 1. 종목 선택 드롭다운 초기화
+    const selector = document.getElementById('m_item_selector');
+    if (selector) selector.selectedIndex = 0;
+
+    // 2. 상단 DB기준(회색 칸) 초기화
+    const dbFields = ['db_base_val', 'db_price_val', 'db_extra_val'];
+    dbFields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+
+    // 3. 하단 실제 입력창 초기화
+    if (document.getElementById('m_work_count')) document.getElementById('m_work_count').value = 1; // 기본공수 1세팅
+    if (document.getElementById('m_travel_fee')) document.getElementById('m_travel_fee').value = 0;
+    if (document.getElementById('m_extra_fee'))  document.getElementById('m_extra_fee').value = 0;
+    if (document.getElementById('m_memo'))       document.getElementById('m_memo').value = ''; // 비고란
+
+    console.log("모달 입력 데이터가 초기화되었습니다.");
 }
 
 // 2. 표(Table) 내용을 업데이트하는 함수
@@ -1336,6 +1377,7 @@ async function saveToDatabase() {
         const result = await response.json();
         if (result.status === 'success') {
             alert(result.message);
+            resetModalFields(); // 모든 입력값과 회색 DB기준 칸 초기화
             // 저장 성공 시 모달 닫기 혹은 초기화
             bootstrap.Modal.getInstance(document.getElementById('settlementModal')).hide();
         } else {
@@ -1346,7 +1388,12 @@ async function saveToDatabase() {
         alert("서버 통신 오류가 발생했습니다.");
     }
 }
-
+// 모달이 완전히 화면에서 사라졌을 때(hidden) 실행되는 이벤트리스너
+document.getElementById('settlementModal').addEventListener('hidden.bs.modal', function () {
+    // 이전에 만든 초기화 함수를 호출합니다.
+    resetModalFields(); 
+    console.log("모달이 닫혀서 데이터가 초기화되었습니다.");
+});
 function openSettlementModal(bizRow, qtRow) {
     // 1. 모달 내 입력창 초기화
     document.getElementById('m_item_selector').value = ""; 
