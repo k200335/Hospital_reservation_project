@@ -22,6 +22,7 @@ import calendar  # 날짜 계산용
 import traceback # 에러 상세 출력용 (이번 에러 해결 핵심)
 from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException, TimeoutException
 
+
 # --- [1] 기본 게시판 및 페이지 렌더링 ---
 
 def receipt_list(request):
@@ -1371,4 +1372,6 @@ def save_settlement_data(request):
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     return JsonResponse({'status': 'error', 'message': 'Invalid Method'}, status=400)
 # ------------------------여기까지가 완료건 보기 관련 끝----------------------------
+
+
 
