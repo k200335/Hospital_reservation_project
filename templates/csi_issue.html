@@ -344,57 +344,7 @@ async function fetchQtData(event) {
     }
 }
 
-    /* 권한 제어 */
-document.addEventListener("DOMContentLoaded", function() {
-    // 1. 서버에서 사용자 ID 가져오기
-    const currentUserId = "{{ request.user.username }}"; 
-    
-    // 2. 허용할 아이디 리스트
-    const allowedIds = ["admin_work", "admin_home"]; 
 
-    // 모든 버튼을 하나의 배열로 관리합니다.
-    const allBtns = [
-        document.getElementById('btn-fetch'),   // 1번 조회
-        document.getElementById('btn-save'),    // 1번 저장
-        document.getElementById('btn-fetch-2'), // 2번 조회
-        document.getElementById('btn-save-2'),   // 2번 저장
-        document.getElementById('btn-excel-download-2'), // 추가
-        document.getElementById('btn-excel-upload-2')    // 추가
-    ];
-
-    // 3. 권한 체크 로직
-    if (allowedIds.includes(currentUserId)) {
-        // [권한 있음] 모든 버튼 활성화
-        allBtns.forEach(btn => {
-            if (btn) {
-                btn.removeAttribute('disabled');
-                btn.disabled = false; // 확실히 하기 위해 명시적 처리
-                btn.style.opacity = "1";
-                btn.style.cursor = "pointer";
-            }
-        });
-        console.log("관리자 권한 확인됨: " + currentUserId);
-    } else {
-        // [권한 없음] 모든 버튼 비활성화 및 시각적 피드백
-        allBtns.forEach(btn => {
-            if (btn) {
-                btn.disabled = true;
-                btn.style.opacity = "0.5";
-                btn.style.cursor = "not-allowed";
-                btn.title = "권한이 없습니다.";
-                
-                // 클릭 시 알림 (이미 disabled면 안 눌리지만 이중 잠금)
-                btn.onclick = function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    alert("해당 기능을 사용할 권한이 없습니다.");
-                    return false;
-                };
-            }
-        });
-        console.log("권한 없음: " + currentUserId);
-    }
-});
 
 /** 2번 영역: 표 데이터를 엑셀로 다운로드 **/
 function downloadExcel2() {
@@ -858,6 +808,62 @@ async function savePanel4Data() {
         }
     } catch (e) { console.error(e); alert("오류 발생"); }
 }
+
+// ------------------------권한제어--------------STR
+
+    /* 권한 제어 */
+document.addEventListener("DOMContentLoaded", function() {
+    // 1. 서버에서 사용자 ID 가져오기
+    const currentUserId = "{{ request.user.username }}"; 
+    
+    // 2. 허용할 아이디 리스트
+    const allowedIds = ["admin_work", "admin_home"]; 
+
+    // 모든 버튼을 하나의 배열로 관리합니다.
+    const allBtns = [
+        document.getElementById('btn-fetch'),   // 1번 조회
+        document.getElementById('btn-save'),    // 1번 저장
+        document.getElementById('btn-fetch-2'), // 2번 조회
+        document.getElementById('btn-save-2'),   // 2번 저장
+        document.getElementById('btn-excel-download-2'), // 추가
+        document.getElementById('btn-excel-upload-2')    // 추가
+    ];
+
+    // 3. 권한 체크 로직
+    if (allowedIds.includes(currentUserId)) {
+        // [권한 있음] 모든 버튼 활성화
+        allBtns.forEach(btn => {
+            if (btn) {
+                btn.removeAttribute('disabled');
+                btn.disabled = false; // 확실히 하기 위해 명시적 처리
+                btn.style.opacity = "1";
+                btn.style.cursor = "pointer";
+            }
+        });
+        console.log("관리자 권한 확인됨: " + currentUserId);
+    } else {
+        // [권한 없음] 모든 버튼 비활성화 및 시각적 피드백
+        allBtns.forEach(btn => {
+            if (btn) {
+                btn.disabled = true;
+                btn.style.opacity = "0.5";
+                btn.style.cursor = "not-allowed";
+                btn.title = "권한이 없습니다.";
+                
+                // 클릭 시 알림 (이미 disabled면 안 눌리지만 이중 잠금)
+                btn.onclick = function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    alert("해당 기능을 사용할 권한이 없습니다.");
+                    return false;
+                };
+            }
+        });
+        console.log("권한 없음: " + currentUserId);
+    }
+});
+
+// -------------------------권한제어---------------END
 
 </script>
 </html>

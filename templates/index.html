@@ -49,8 +49,8 @@
                     <div class="submenu-inner">
                         <ul class="submenu-list">
                             <li><a href="#" onclick="checkLogin('/board/csi_receipt/')">배정하기</a></li>
-                            <li><a href="#" onclick="checkLogin('/board/csi_issue/')">발급일 가져오기</a></li>
-                            <li><a href="#" onclick="checkLogin('/board/csi_pending/')">작업중</a></li>
+                            <li><a href="#" onclick="checkAdminAccess('/board/csi_issue/')">발급일 가져오기</a></li>
+                            <li><a href="#" onclick="checkAdminAccess('/board/csi_pending/')">작업중</a></li>
                         </ul>
                     </div>
                 </div>
@@ -58,12 +58,12 @@
             
             <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('/request/')">접수 현황 및 실적 확인</a></li>
             <li class="nav-item">
-                <a class="nav-link" href="#" onclick="checkAdminAccess('/field_payment/')">현장팀 정산</a>
+                <a class="nav-link" href="#" onclick="checkAdminAccess('/field_payment/')">현장</a>
             </li>
             <li class="nav-item">
-                <a class="nav-link" href="#" onclick="checkAdminAccess('/receipt_settle_admin/')">시험팀 정산</a>
+                <a class="nav-link" href="#" onclick="checkAdminAccess('/receipt_settle_admin/')">시험</a>
             </li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('/notice/')">공지사항</a></li>
+            <li class="nav-item"><a class="nav-link" href="#" onclick="checkAdminAccess('/notice/')">공지사항</a></li>
         </ul>
     </div>
 </nav>

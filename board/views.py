@@ -29,6 +29,7 @@ import os
 
 import pythoncom
 from django.conf import settings
+import uuid # 고유 파일명을 위해 추가
 
 
 # --- [1] 기본 게시판 및 페이지 렌더링 ---
@@ -1692,31 +1693,120 @@ def update_finished_list(request):
 
 
 # 완료건 엑셀저장
+# def download_field_excel(request):
+#     if request.method == 'POST':
+#         app = None
+#         temp_file_path = None # 삭제를 위해 변수 선언
+#         try:
+#             pythoncom.CoInitialize() 
+            
+#             data = json.loads(request.body)
+#             items = data.get('items', [])
+            
+#             template_path = os.path.join(settings.BASE_DIR, 'static', 'excel_templates', 'field_payment_template.xlsx')
+            
+#             # 🌟 수정: 파일명이 겹치지 않게 고유한 ID를 붙여 임시 생성
+#             unique_filename = f"temp_{uuid.uuid4().hex}.xlsx"
+#             temp_file_path = os.path.join(settings.BASE_DIR, 'static', 'excel_templates', unique_filename)
+
+#             if not os.path.exists(template_path):
+#                 return JsonResponse({"success": False, "message": "양식 파일을 찾을 수 없습니다."}, status=404)
+
+#             app = xw.App(visible=False, add_book=False)
+#             wb = app.books.open(template_path)
+#             ws = wb.sheets[0]
+
+#             rows_to_write = []
+#             for i, item in enumerate(items):
+#                 rows_to_write.append([
+#                     i + 1,
+#                     str(item.get('시험수거일', '')),
+#                     str(item.get('현장담당', '')),
+#                     str(item.get('구분', '')),
+#                     str(item.get('의뢰업체명', '')),
+#                     str(item.get('시료명', '')),
+#                     item.get('공수', 0) or 0,
+#                     item.get('출장비', 0) or 0,
+#                     item.get('추가', 0) or 0,
+#                     str(item.get('비고', '')),
+#                     str(item.get('접수번호', '')),
+#                     str(item.get('영업담당', '')),
+#                     str(item.get('순번', ''))
+#                 ])
+
+#             if rows_to_write:
+#                 ws.range('A5').value = rows_to_write
+
+#             # 파일 저장
+#             wb.save(temp_file_path)
+#             wb.close()
+#             app.quit()
+#             app = None
+
+#             # 🌟 수정: 파일을 읽은 후 '반드시' 삭제 로직 실행
+#             current_date = datetime.now().strftime('%Y%m%d')
+#             with open(temp_file_path, 'rb') as f:
+#                 file_data = f.read() # 메모리에 읽어두기
+            
+#             response = HttpResponse(
+#                 file_data, 
+#                 content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+#             )
+#             response['Content-Disposition'] = f'attachment; filename=field_payment_{current_date}.xlsx'
+            
+#             # 🌟 핵심: 메모리에 담았으니 실제 파일은 삭제
+#             if os.path.exists(temp_file_path):
+#                 os.remove(temp_file_path)
+                
+#             return response
+
+#         except Exception as e:
+#             import traceback
+#             print(traceback.format_exc()) 
+#             return JsonResponse({"success": False, "message": str(e)}, status=500)
+#         finally:
+#             if app:
+#                 try: app.quit()
+#                 except: pass
+#             # 에러가 나서 중단되었을 경우에도 임시 파일이 있다면 삭제
+#             if temp_file_path and os.path.exists(temp_file_path):
+#                 try: os.remove(temp_file_path)
+#                 except: pass
+#             pythoncom.CoUninitialize()
+
 def download_field_excel(request):
     if request.method == 'POST':
+        start_time = datetime.now()  # 시작 시간 측정
         app = None
+        temp_file_path = None
+        
         try:
             pythoncom.CoInitialize() 
             
             data = json.loads(request.body)
             items = data.get('items', [])
+            total_count = len(items)
+            
+            print(f"[{start_time}] 엑셀 생성 시작 - 총 {total_count}건")
             
             # 경로 설정
             template_path = os.path.join(settings.BASE_DIR, 'static', 'excel_templates', 'field_payment_template.xlsx')
-            output_path = os.path.join(settings.BASE_DIR, 'static', 'excel_templates', 'temp_result.xlsx')
+            unique_filename = f"temp_field_{uuid.uuid4().hex}.xlsx"
+            temp_file_path = os.path.join(settings.BASE_DIR, 'static', 'excel_templates', unique_filename)
 
             if not os.path.exists(template_path):
                 return JsonResponse({"success": False, "message": "양식 파일을 찾을 수 없습니다."}, status=404)
 
-            # 1. 엑셀 앱 실행 및 속도 최적화
+            # 1. 엑셀 앱 실행
+            print("Step 1: 엑셀 엔진(xlwings) 구동 중...")
             app = xw.App(visible=False, add_book=False)
             wb = app.books.open(template_path)
             ws = wb.sheets[0]
 
-            # 2. 데이터를 2차원 리스트로 준비
+            # 2. 데이터 매핑 (메모리 작업)
+            print("Step 2: 데이터 매핑 중...")
             rows_to_write = []
             for i, item in enumerate(items):
-                # 각 셀에 들어갈 데이터를 안전하게 추출
                 rows_to_write.append([
                     i + 1,
                     str(item.get('시험수거일', '')),
@@ -1724,7 +1814,7 @@ def download_field_excel(request):
                     str(item.get('구분', '')),
                     str(item.get('의뢰업체명', '')),
                     str(item.get('시료명', '')),
-                    item.get('공수', 0) or 0, # None일 경우 0으로 처리
+                    item.get('공수', 0) or 0,
                     item.get('출장비', 0) or 0,
                     item.get('추가', 0) or 0,
                     str(item.get('비고', '')),
@@ -1733,37 +1823,62 @@ def download_field_excel(request):
                     str(item.get('순번', ''))
                 ])
 
-            # 3. 데이터가 있을 때만 입력
+            # 3. 데이터 쓰기
             if rows_to_write:
+                print(f"Step 3: 엑셀 시트에 기록 중 ({total_count}건)...")
                 ws.range('A5').value = rows_to_write
 
-            # 4. 파일 저장 및 닫기
-            wb.save(output_path)
+            # 4. 파일 저장 및 엑셀 종료
+            print("Step 4: 임시 파일 생성 및 종료 중...")
+            wb.save(temp_file_path)
             wb.close()
             app.quit()
-            app = None
+            app = None # 중복 종료 방지
 
-            # 5. 파일 전송 (날짜 문자열 직접 생성)
-            current_date = datetime.now().strftime('%Y%m%d')
-            with open(output_path, 'rb') as f:
-                response = HttpResponse(
-                    f.read(), 
-                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-                )
-                response['Content-Disposition'] = f'attachment; filename=field_payment_{current_date}.xlsx'
-                return response
+            # 5. 파일을 메모리로 읽기
+            with open(temp_file_path, 'rb') as f:
+                file_data = f.read()
+
+            # 6. 임시 파일 즉시 삭제
+            if os.path.exists(temp_file_path):
+                os.remove(temp_file_path)
+                print(f"Step 5: 임시 파일 삭제 완료 ({unique_filename})")
+
+            end_time = datetime.now()
+            duration = end_time - start_time
+            print(f"결과: 엑셀 생성 완료 (소요시간: {duration})")
+
+            # 응답 생성
+            current_date = end_time.strftime('%Y%m%d')
+            response = HttpResponse(
+                file_data, 
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = f'attachment; filename=field_payment_{current_date}.xlsx'
+            
+            # 커스텀 헤더에 소요 시간 정보 추가 (선택 사항)
+            response['X-Generation-Duration'] = str(duration)
+            
+            return response
 
         except Exception as e:
-            # 터미널에 에러 내용을 상세히 출력합니다.
             import traceback
-            print("--- Excel Download Error Start ---")
+            print("--- 엑셀 다운로드 오류 발생 ---")
             print(traceback.format_exc()) 
-            print("--- Excel Download Error End ---")
             return JsonResponse({"success": False, "message": str(e)}, status=500)
+            
         finally:
+            # 에러 발생 시에도 반드시 리소스 해제
             if app:
-                try: app.quit()
-                except: pass
+                try: 
+                    app.quit()
+                except: 
+                    pass
+            if temp_file_path and os.path.exists(temp_file_path):
+                try: 
+                    os.remove(temp_file_path)
+                except: 
+                    pass
             pythoncom.CoUninitialize()
 
 

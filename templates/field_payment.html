@@ -972,7 +972,7 @@ async function loadFinishedData() {
 }
 
 // 1. 함수를 전역 범위에 명시적으로 선언 (ReferenceError 방지)
-window.downloadFinishedExcel = async function() {
+/*window.downloadFinishedExcel = async function() {
     console.log("엑셀 다운로드 시작...");
     
     // 현재 작업 중인 하단 그리드 API 확인
@@ -1019,6 +1019,88 @@ window.downloadFinishedExcel = async function() {
     } catch (error) {
         console.error("Download Error:", error);
         alert("다운로드 중 오류 발생: " + error.message);
+    }
+};*/
+
+window.downloadFinishedExcel = async function() {
+    console.log("엑셀 다운로드 시작...");
+    
+    const gridApi = window.finishedGridApi;
+    if (!gridApi) {
+        alert("그리드가 아직 준비되지 않았습니다.");
+        return;
+    }
+
+    let selectedRows = gridApi.getSelectedRows();
+    if (selectedRows.length === 0) {
+        selectedRows = [];
+        gridApi.forEachNode(node => { if(node.data) selectedRows.push(node.data); });
+    }
+
+    if (selectedRows.length === 0) {
+        alert("데이터가 없습니다.");
+        return;
+    }
+
+    // --- 1. 로딩 오버레이 생성 ---
+    const loadingDiv = document.createElement('div');
+    loadingDiv.id = 'excel-loading-overlay';
+    loadingDiv.innerHTML = `
+        <div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.7);z-index:10000;display:flex;flex-direction:column;justify-content:center;align-items:center;color:white;font-family:sans-serif;">
+            <div style="border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 40px; height: 40px; animation: spin 2s linear infinite;"></div>
+            <p style="margin-top:20px; font-size:16px; font-weight:bold;">엑셀 파일을 생성 중입니다...</p>
+            <p id="timer-text" style="margin-top:10px; color:#bdc3c7;">경과 시간: 0초</p>
+            <p style="margin-top:5px; font-size:12px; color:#95a5a6;">(데이터 양에 따라 최대 1분 정도 소요될 수 있습니다.)</p>
+        </div>
+        <style>
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        </style>
+    `;
+    document.body.appendChild(loadingDiv);
+
+    // 타이머 시작
+    let seconds = 0;
+    const timerInterval = setInterval(() => {
+        seconds++;
+        document.getElementById('timer-text').innerText = `경과 시간: ${seconds}초`;
+    }, 1000);
+
+    try {
+        // --- 2. 서버에 요청 ---
+        const response = await fetch('/api/download_field_excel/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ items: selectedRows })
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `현장정산_${new Date().toISOString().slice(0,10)}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } else {
+            const errorData = await response.json();
+            alert("서버 오류: " + (errorData.message || "파일을 생성할 수 없습니다."));
+        }
+    } catch (error) {
+        console.error("Download Error:", error);
+        alert("다운로드 중 오류 발생: " + error.message);
+    } finally {
+        // --- 3. 로딩 오버레이 제거 및 타이머 종료 ---
+        clearInterval(timerInterval);
+        if (document.getElementById('excel-loading-overlay')) {
+            document.body.removeChild(loadingDiv);
+        }
     }
 };
 

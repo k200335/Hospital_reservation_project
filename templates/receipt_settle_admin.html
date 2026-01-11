@@ -7,6 +7,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
     <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
     <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script> -->
 </head>    
@@ -44,7 +46,11 @@
                 <div class="col-auto">
                     <button type="button" class="btn btn-primary btn-sm px-3" onclick="onSearch()">조회</button>
                 </div>
-                <div class="col-auto ms-auto">
+                <input type="file" id="excelFileInput" style="display: none;" accept=".xlsx, .xls" onchange="processExcelFile(event)">
+                <div class="col-auto ms-auto d-flex gap-2"> 
+                    <button type="button" class="btn btn-warning btn-sm px-3" onclick="importAppliedAmounts()">
+                        <i class="bi bi-download"></i> 적용금액 가져오기
+                    </button>
                     <button type="button" class="btn btn-success btn-sm px-3" onclick="onBtExport()">
                         <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
                     </button>
@@ -177,6 +183,12 @@
         paginationPageSize: 20,
         // 로딩 시 표시될 텍스트
         overlayLoadingTemplate: '<span class="ag-overlay-loading-center">데이터를 불러오는 중입니다...</span>',
+
+        // 🌟 이 부분을 추가하세요!
+        onGridReady: (params) => {
+            window.finishedGridApi = params.api; // 이제 외부에서 이 변수를 사용할 수 있습니다.
+            console.log("그리드 API 연결 완료");
+        },
     };
 
     // 4. 초기화 및 데이터 로드 (window.onload로 통합)
@@ -440,6 +452,86 @@ window.onload = function() {
         // ... 생략 ...
     }
 };
+
+// 그리드에 적용금액 넣기
+
+/**
+ * [적용금액 가져오기] 버튼 클릭 시 실행
+ */
+window.importAppliedAmounts = function() {
+    // 파일 선택창 강제 클릭
+    const fileInput = document.getElementById('excelFileInput');
+    if (fileInput) {
+        fileInput.click();
+    } else {
+        alert("파일 선택 input(id='excelFileInput')을 찾을 수 없습니다.");
+    }
+};
+
+/**
+ * 파일이 선택되었을 때 실행되는 실제 로직
+ */
+window.processExcelFile = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const excelRows = XLSX.utils.sheet_to_json(sheet);
+            
+            updateGridWithExcelData(excelRows);
+        } catch (err) {
+            console.error("Excel Parsing Error:", err);
+            alert("엑셀 파일을 읽는 중 오류가 발생했습니다.");
+        } finally {
+            event.target.value = ''; // 같은 파일 재선택 가능하게 초기화
+        }
+    };
+    reader.readAsArrayBuffer(file);
+};
+
+/**
+ * 그리드 데이터 매칭 및 업데이트
+ */
+function updateGridWithExcelData(excelRows) {
+    const gridApi = window.finishedGridApi; // 유저님의 그리드 API 변수명 확인 필요
+    if (!gridApi) {
+        alert("그리드 API를 찾을 수 없습니다.");
+        return;
+    }
+
+    let updateCount = 0;
+    const itemsToUpdate = [];
+
+    gridApi.forEachNode((node) => {
+        // 엑셀의 헤더명이 'QT번호', '적용금액'이라고 가정
+        // 유저님의 그리드 데이터 키값이 'QT번호'라고 가정
+        const gridQtNo = String(node.data['QT번호'] || '').trim();
+        
+        const matchedRow = excelRows.find(exRow => 
+            String(exRow['QT번호'] || '').trim() === gridQtNo
+        );
+
+        if (matchedRow) {
+            // '적용금액' 컬럼의 값을 '공급가액' 필드에 반영
+            node.setDataValue('적용금액', matchedRow['적용금액'] || 0);
+            updateCount++;
+        }
+    });
+
+    if (updateCount > 0) {
+        alert(`총 ${updateCount}건의 적용금액이 그리드에 반영되었습니다.`);
+        // 통계 수치 재계산 함수가 있다면 여기서 호출 (예: calculateStats())
+    } else {
+        alert("매칭되는 QT번호를 찾지 못했습니다. 엑셀의 'QT번호' 컬럼을 확인해주세요.");
+    }
+}
+
+
 </script>
 </html>
 {% endblock %}
