@@ -1,0 +1,445 @@
+{% extends "base.html" %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+    <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script> -->
+</head>    
+<div class="container-fluid py-3">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light py-3">
+            <form id="searchForm" class="row g-2 align-items-center">
+                <div class="col-auto">
+                    <select class="form-select form-select-sm" id="dateType">
+                        <option value="deposit">입금일 기준</option>
+                        <option value="receipt">실접수일 기준</option>
+                    </select>
+                </div>
+                
+                <div class="col-auto d-flex align-items-center">
+                    <input type="date" class="form-control form-select-sm" id="startDate">
+                    <span class="mx-1">~</span>
+                    <input type="date" class="form-control form-select-sm" id="endDate">
+                </div>
+
+                <div class="col-auto">
+                    <select class="form-select form-select-sm" id="searchType">
+                        <option value="sales_man">영업담당</option>
+                        <option value="qt_no">QT번호</option>
+                        <option value="agency">의뢰기관명</option>
+                        <option value="project">공사명</option>
+                        <option value="seal">봉인명</option>
+                    </select>
+                </div>
+
+                <div class="col-auto">
+                    <input type="text" class="form-control form-select-sm" id="searchText" placeholder="검색어 입력" style="width: 200px;">
+                </div>
+
+                <div class="col-auto">
+                    <button type="button" class="btn btn-primary btn-sm px-3" onclick="onSearch()">조회</button>
+                </div>
+                <div class="col-auto ms-auto">
+                    <button type="button" class="btn btn-success btn-sm px-3" onclick="onBtExport()">
+                        <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="card-body p-0">
+            <div id="myGrid" style="height: 600px; width: 100%;" class="ag-theme-alpine"></div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-3"><div class="card p-3 shadow-sm border-0 bg-primary text-white text-center"><h6>총 공급가액</h6><h4 id="stat-supply">0</h4></div></div>
+        <div class="col-md-3"><div class="card p-3 shadow-sm border-0 bg-success text-white text-center"><h6>총 입금액</h6><h4 id="stat-deposit">0</h4></div></div>
+        <div class="col-md-3"><div class="card p-3 shadow-sm border-0 bg-danger text-white text-center"><h6>총 미수금</h6><h4 id="stat-unpaid">0</h4></div></div>
+        <div class="col-md-3"><div class="card p-3 shadow-sm border-0 bg-info text-white text-center"><h6>조회 건수</h6><h4 id="stat-count">0건</h4></div></div>
+    </div>
+</div>
+
+
+<script>
+    // 1. 전역 변수 선언
+    let gridApi;
+
+    // 2. [기억 사항] 방대한 컬럼 정의 (누락 없이 전체 복구)
+    const columnDefs = [
+        { headerName: "담당자", field: "담당자", width: 100, pinned: 'left' },
+        { 
+            headerName: "미인정", 
+            field: "미인정", 
+            width: 80, pinned: 'left',
+            // 만약 데이터가 1이면 '미인정', 0이면 '인정'으로 표시하고 싶을 때 사용
+            valueFormatter: p => p.value == '1' ? '미인정' : (p.value == '0' ? '인정' : p.value)
+        },
+        { headerName: "의뢰번호", field: "의뢰번호", width: 150, pinned: 'left' },
+        { headerName: "지원", field: "지원", width: 80 }, 
+        { headerName: "영업담당", field: "영업담당", width: 100 },
+        { headerName: "QT번호", field: "QT번호", width: 140 },
+        // { headerName: "실접수일", field: "실접수일", width: 140 },
+        { headerName: "실접수일", field: "실접수일", width: 120,
+            // 🌟 '2025-12-17T14:16:03.130' -> '2025-12-17'로 변환
+            valueFormatter: p => {
+                if (p.value && p.value.includes('T')) {
+                    return p.value.split('T')[0];
+                }
+                return p.value || "";
+            }
+        },
+        { headerName: "의뢰기관명", field: "의뢰기관명", width: 220 },
+        { headerName: "공사명", field: "사업명", width: 300 },
+        { headerName: "봉인명", field: "봉인명", width: 220 },
+        { headerName: "시료량", field: "시료량", width: 100 },
+        
+        // 금액 관련 (숫자 포맷팅: Math.floor + toLocaleString)
+        { headerName: "공급가액", field: "공급가액", width: 120, type: 'numericColumn', valueFormatter: p => Math.floor(p.value || 0).toLocaleString() },
+        { headerName: "부가세", field: "부가세", width: 110, type: 'numericColumn', valueFormatter: p => Math.floor(p.value || 0).toLocaleString() },
+        { headerName: "합계", valueGetter: p => (Number(p.data.공급가액 || 0) + Number(p.data.부가세 || 0)), width: 120, type: 'numericColumn', valueFormatter: p => p.value.toLocaleString() },
+        
+        // 추가 비용 항목들
+        // { headerName: "출장비구분", field: "출장비구분", width: 120 },
+        { headerName: "출장비구분", field: "출장비구분", width: 100,
+        // 🌟 이 부분이 핵심입니다! 🌟
+        valueFormatter: p => {
+            if (p.value == '1') return "본원";
+            if (p.value == '2') return "지원";
+            return p.value || ""; // 1, 2가 아니면 원래 값 출력
+            }
+        },
+        { headerName: "출장비", field: "출장비", width: 100, valueFormatter: p => (p.value || 0).toLocaleString() },        
+        { headerName: "기본료", field: "기본료", width: 100, valueFormatter: p => (p.value || 0).toLocaleString() },
+        { headerName: "정보처리비", field: "정보처리비", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
+        { headerName: "시편제작비", field: "시편제작비", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
+        { headerName: "지게차운임", field: "지게차운임", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
+        { headerName: "시료수거비", field: "시료수거비", width: 110 },
+        { headerName: "청구위탁시험비", field: "청구위탁시험비", width: 130, valueFormatter: p => (p.value || 0).toLocaleString() },
+        
+        // 정산 및 입금 정보 (입금액 배경색 유지)
+        { headerName: "적용금액", field: "적용금액", width: 120 },
+        { headerName: "인센티브", field: "인센티브", width: 100 },
+        { headerName: "입금일", field: "입금일", width: 120 },
+        { headerName: "입금액", field: "입금액", width: 120, cellStyle: {'background-color': '#e6fffa'}, valueFormatter: p => (p.value || 0).toLocaleString() },
+        
+        // 계산서 및 연락처 정보
+        { headerName: "계산서발행회사명", field: "계산서발행회사명", width: 180 },
+        { headerName: "계산서발행일", field: "계산서발행일", width: 120 },
+        { headerName: "계산서담당자", field: "계산서담당자", width: 120 },
+        { headerName: "계산서hp", field: "계산서hp", width: 130 },
+        { headerName: "계산서tel", field: "계산서tel", width: 130 },
+        { headerName: "계산서fax", field: "계산서fax", width: 130 },
+        { headerName: "계산서email", field: "계산서email", width: 180 },
+        { headerName: "계산서발행자", field: "계산서발행자", width: 120 },
+        
+        // 의뢰인 상세
+        { headerName: "의뢰인성명", field: "의뢰인성명", width: 120 },
+        { headerName: "현장전화", field: "현장전화", width: 130 },
+        { headerName: "시료채취자", field: "시료채취자", width: 120 },
+        { headerName: "품질담당자", field: "품질담당자", width: 120 },
+        { headerName: "현장담당", field: "현장담당", width: 100 },
+        { headerName: "시료명", field: "시료명", width: 150 },
+        { 
+            headerName: "공수", 
+            field: "공수", 
+            width: 80, 
+            type: 'numericColumn' 
+        },
+        { 
+            headerName: "지급액합계", 
+            field: "지급액합계", 
+            width: 120, 
+            type: 'numericColumn',
+            valueFormatter: p => Math.floor(p.value || 0).toLocaleString() + "원"
+        },
+    ];
+
+    // columnDefs 배열 내부의 출장비구분 컬럼을 찾아서 수정하세요
+    
+    // 3. 그리드 옵션 설정
+    const gridOptions = {
+        columnDefs: columnDefs,
+        rowData: [], 
+        defaultColDef: {
+            resizable: true,
+            sortable: true,
+            filter: true,
+            flex: 0,
+            minWidth: 100
+        },
+        pagination: false,
+        paginationPageSize: 20,
+        // 로딩 시 표시될 텍스트
+        overlayLoadingTemplate: '<span class="ag-overlay-loading-center">데이터를 불러오는 중입니다...</span>',
+    };
+
+    // 4. 초기화 및 데이터 로드 (window.onload로 통합)
+    window.onload = function() {
+        const gridDiv = document.querySelector('#myGrid');
+        if (gridDiv) {
+            // 그리드 생성 및 API 할당
+            gridApi = agGrid.createGrid(gridDiv, gridOptions);
+            console.log("AG Grid 초기화 완료!");
+
+            // 서버에서 초기 데이터 전송 시 파싱 로직
+            const rawData = `{{ final_results|safe }}` || '[]';
+            try {
+                const initialData = JSON.parse(rawData);
+                if (initialData.length > 0) {
+                    gridApi.setGridOption('rowData', initialData);
+                    updateSummaryCards(initialData);
+                }
+            } catch (e) {
+                console.warn("초기 데이터가 비어있거나 형식이 잘못되었습니다.");
+            }
+        }
+    };
+
+    // 5. 조회 함수 (Ajax)
+    function onSearch() {
+        if (!gridApi) {
+            alert("그리드가 아직 준비되지 않았습니다.");
+            return;
+        }
+
+        const params = new URLSearchParams({
+            date_type: document.getElementById('dateType').value,
+            start_date: document.getElementById('startDate').value,
+            end_date: document.getElementById('endDate').value,
+            search_type: document.getElementById('searchType').value,
+            search_text: document.getElementById('searchText').value
+        });
+
+        gridApi.setGridOption('loading', true);
+
+        fetch(`/receipt_settle_admin/?${params.toString()}`)
+            .then(response => response.json())
+            .then(data => {
+                gridApi.setGridOption('rowData', data);
+                updateSummaryCards(data);
+                gridApi.setGridOption('loading', false);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                gridApi.setGridOption('loading', false);
+                alert("데이터 조회 중 오류가 발생했습니다.");
+            });
+    }
+
+    // 6. 하단 요약 카드 업데이트 (정산 수식 포함)
+    function updateSummaryCards(data) {
+        let totalSupply = 0;
+        let totalDeposit = 0;
+
+        data.forEach(row => {
+            totalSupply += (Number(row.공급가액) || 0);
+            totalDeposit += (Number(row.입금액) || 0);
+        });
+
+        // 미수금: (공급가액 * 1.1) - 입금액
+        let totalUnpaid = (totalSupply * 1.1) - totalDeposit;
+
+        document.getElementById('stat-supply').innerText = totalSupply.toLocaleString() + '원';
+        document.getElementById('stat-deposit').innerText = totalDeposit.toLocaleString() + '원';
+        document.getElementById('stat-unpaid').innerText = Math.floor(totalUnpaid).toLocaleString() + '원';
+        document.getElementById('stat-count').innerText = data.length.toLocaleString() + '건';
+    }
+
+    // 7. 엑셀 다운로드 (CSV)
+// 7. 엑셀 다운로드 (XLSX 형식)
+// function onBtExport() {
+//     if (!gridApi) return;
+//     if (typeof XLSX === 'undefined') {
+//         alert("엑셀 라이브러리가 로드되지 않았습니다.");
+//         return;
+//     }
+
+//     const rowData = [];
+//     gridApi.forEachNodeAfterFilterAndSort((node) => {
+//         if (node.data) {
+//             const mappedRow = {};
+//             columnDefs.forEach(col => {
+//                 if (col.headerName && (col.field || col.valueGetter)) {
+//                     // 1. valueFormatter가 있으면 적용된 텍스트를 가져옴
+//                     // 2. 없으면 일반 데이터(field)를 가져옴
+//                     let value = gridApi.getCellValue({
+//                         rowNode: node,
+//                         colKey: col.field || col.colId
+//                     });
+                    
+//                     mappedRow[col.headerName] = value ?? "";
+//                 }
+//             });
+//             rowData.push(mappedRow);
+//         }
+//     });
+
+//     const worksheet = XLSX.utils.json_to_sheet(rowData);
+//     const workbook = XLSX.utils.book_new();
+//     XLSX.utils.book_append_sheet(workbook, worksheet, "정산현황");
+//     XLSX.writeFile(workbook, `영업정산현황_${new Date().toISOString().slice(0, 10)}.xlsx`);
+// }
+
+// 
+
+
+async function onBtExport() {
+    if (!gridApi) return;
+
+    const templatePath = '/static/excel_templates/my_template.xlsx';
+
+    try {
+        const response = await fetch(templatePath);
+        if (!response.ok) throw new Error("엑셀 양식 파일을 찾을 수 없습니다.");
+
+        const arrayBuffer = await response.arrayBuffer();
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(arrayBuffer);
+        const worksheet = workbook.getWorksheet(1);
+
+        let rowData = [];
+        gridApi.forEachNodeAfterFilterAndSort((node) => {
+            if (node.data) rowData.push({ ...node.data });
+        });
+
+        rowData.sort((a, b) => (a.사업명 || "").localeCompare(b.사업명 || ""));
+
+        let currentProject = "";
+        let currentRowIndex = 2; 
+        let groupStartRow = 2;   
+        
+        // 🌟 [수정] 1. subtotal 변수 초기화 (이 부분이 누락되어 에러 발생)
+        let subtotal = { supply: 0, vat: 0, deposit: 0, payment: 0, applied_amount: 0 };
+
+        rowData.forEach((data, index) => {
+            if (currentProject !== "" && currentProject !== data.사업명) {
+                // 소계 삽입
+                insertSubtotalRow(worksheet, currentProject, groupStartRow, currentRowIndex - 1, currentRowIndex);
+                currentRowIndex++;
+                groupStartRow = currentRowIndex;
+                
+                // 🌟 [수정] 2. 다음 그룹을 위해 subtotal 초기화
+                subtotal = { supply: 0, vat: 0, deposit: 0, payment: 0, applied_amount: 0 };
+            }
+
+            const supply = Number(data.공급가액 || 0);
+            const vat = Number(data.부가세 || 0);
+            const deposit = Number(data.입금액 || 0);
+            const payment = Number(data.지급액합계 || 0);
+            const appliedPrice = Number(data.적용금액 || 0);
+
+            const row = worksheet.getRow(currentRowIndex);
+
+            // 실접수일 및 출장비구분 포맷팅
+            const formattedDate = (data.실접수일 && String(data.실접수일).includes('T'))
+                ? data.실접수일.split('T')[0]
+                : (data.실접수일 || "");
+
+            const formattedTripType = data.출장비구분 == '1' ? "본원" : (data.출장비구분 == '2' ? "지원" : (data.출장비구분 || ""));
+
+            row.values = [
+                data.담당자,
+                data.미인정 == '1' ? '미인정' : (data.미인정 == '0' ? '인정' : data.미인정),
+                data.의뢰번호, data.지원, data.영업담당, data.QT번호,
+                formattedDate, data.의뢰기관명, data.사업명, data.봉인명, data.시료량,
+                supply, vat, supply + vat,
+                formattedTripType,
+                Number(data.출장비 || 0), Number(data.기본료 || 0), Number(data.정보처리비 || 0),
+                Number(data.시편제작비 || 0), Number(data.지게차운임 || 0), data.시료수거비,
+                Number(data.청구위탁시험비 || 0), appliedPrice, // 23번째: 적용금액
+                data.인센티브, data.입금일, deposit,
+                data.계산서발행회사명, data.계산서발행일, data.계산서담당자, data.계산서hp,
+                data.계산서tel, data.계산서fax, data.계산서email, data.계산서발행자,
+                data.의뢰인성명, data.현장전화, data.시료채취자, data.품질담당자,
+                data.현장담당, data.시료명, data.공수, payment
+            ];
+
+            // 금액 컬럼 포맷팅
+            [12, 13, 14, 16, 17, 18, 19, 20, 22, 23, 26, 42].forEach(col => {
+                row.getCell(col).numFmt = '#,##0';
+            });
+
+            currentRowIndex++;
+            currentProject = data.사업명;
+            
+            // 데이터 누적
+            subtotal.supply += supply;
+            subtotal.vat += vat;
+            subtotal.deposit += deposit;
+            subtotal.payment += payment;
+            subtotal.applied_amount += appliedPrice;
+
+            if (index === rowData.length - 1) {
+                insertSubtotalRow(worksheet, currentProject, groupStartRow, currentRowIndex - 1, currentRowIndex);
+                currentRowIndex++;
+            }
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `영업정산현황_${new Date().toISOString().slice(0, 10)}.xlsx`);
+
+    } catch (error) {
+        console.error(error); // 브라우저 콘솔에서 더 자세한 에러 확인 가능
+        alert("에러: " + error.message);
+    }
+}
+
+function insertSubtotalRow(ws, projectName, startLine, endLine, targetRow) {
+    const row = ws.getRow(targetRow);
+    row.getCell(9).value = `[${projectName}] 소계`;
+
+    // L(12), M(13), N(14), W(23), Z(26), AP(42)
+    const sumCols = [
+        { idx: 12, col: 'L' }, { idx: 13, col: 'M' }, { idx: 14, col: 'N' },
+        { idx: 23, col: 'W' }, { idx: 26, col: 'Z' }, { idx: 42, col: 'AP' }
+    ];
+
+    sumCols.forEach(item => {
+        row.getCell(item.idx).value = {
+            formula: `SUM(${item.col}${startLine}:${item.col}${endLine})`
+        };
+        row.getCell(item.idx).numFmt = '#,##0';
+    });
+
+    // 스타일 적용 (생략...)
+    for (let i = 1; i <= 42; i++) {
+        const cell = row.getCell(i);
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD1DC' } };
+        cell.font = { bold: true };
+    }
+}
+
+
+
+
+window.onload = function() {
+    // --- 날짜 자동 설정 로직 시작 ---
+    const now = new Date();
+    
+    // 1. 종료일: 오늘 날짜 (YYYY-MM-DD 형식)
+    const today = now.toISOString().split('T')[0];
+    
+    // 2. 시작일: 이번 달 1일 (YYYY-MM-01 형식)
+    const firstDay = new Date(now.getFullYear(), now.getMonth(), 2).toISOString().split('T')[0].substring(0, 8) + '01';
+    
+    // HTML 요소에 값 넣기
+    document.getElementById('startDate').value = firstDay;
+    document.getElementById('endDate').value = today;
+    // --- 날짜 자동 설정 로직 끝 ---
+
+    // (기존 그리드 초기화 코드)
+    const gridDiv = document.querySelector('#myGrid');
+    if (gridDiv) {
+        gridApi = agGrid.createGrid(gridDiv, gridOptions);
+        // ... 생략 ...
+    }
+};
+</script>
+</html>
+{% endblock %}

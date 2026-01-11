@@ -80,4 +80,18 @@ urlpatterns = [
     path('api/get-item-standards/', views.get_item_standards, name='get_item_standards'),
     # 정산 완료 저장
     path('api/save-settlement/', views.save_settlement_data, name='save_settlement'),
+    
+    path('receipt_settle_admin/', views.receipt_settle_admin, name='receipt_settle_admin'),
+    
+    # 3번 영역: 데이터 불러오기 (MySQL 조회)
+    path('get_panel3_data/', views.get_panel3_data, name='get_panel3_data'),
+
+    # 3번 영역: 데이터 저장하기 (수정된 내용 반영)
+    path('save_panel3_data/', views.save_panel3_data, name='save_panel3_data'),
+    
+    # 4번 패널 데이터 저장 (신규 INSERT / 기존 UPDATE)
+    path('api/save_panel4_data', views.save_panel4_data, name='save_panel4_data'),
+    
+    # 4번 패널 데이터 조회 (DB 불러오기)
+    path('api/get_panel4_data', views.get_panel4_data, name='get_panel4_data'),
 ]

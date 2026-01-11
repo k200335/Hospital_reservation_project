@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 {% block content %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
 <style>
     /* 4등분 고정 레이아웃 */
     .split-wrapper {
@@ -80,8 +90,60 @@
         </table>
     </div>
 
-    <div class="panel panel-bg">3번 영역 (대기)</div>
-    <div class="panel panel-bg">4번 영역 (대기)</div>
+    <div class="panel" id="panel-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="fw-bold text-success mb-0">3. 의뢰정보관리</h5>
+            
+            <div class="d-flex gap-2 align-items-center">
+                <div class="me-2 fw-bold">총 <span id="total-count-3" class="text-primary">0</span>건</div>
+                
+                <select id="search_type_3" class="form-select form-select-sm" style="width:120px;">
+                    <option value="request_code">의뢰번호</option>
+                    <option value="agency">의뢰기관명</option>
+                    <option value="project">사업명</option>
+                </select>
+                
+                <input type="text" id="search_text_3" class="form-control form-control-sm" style="width:150px;" placeholder="검색어 입력">
+                
+                <button id="btn-fetch-3" class="btn btn-sm btn-dark" onclick="fetchPanel3Data()">불러오기</button>
+                <button id="btn-save-3" class="btn btn-sm btn-primary" onclick="savePanel3Data()">DB 저장</button>
+            </div>
+        </div>
+        
+        <div id="grid-panel-3" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+    </div>
+    <div class="panel" id="panel-4">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="fw-bold text-warning mb-0">4. 정산정보관리</h5>
+            <div class="d-flex gap-2 align-items-center">
+                <div class="me-2 fw-bold">총 <span id="total-count-4" class="text-primary">0</span>건</div>
+                <button class="btn btn-sm btn-success" onclick="triggerExcelUpload4()">엑셀 가져오기</button>
+                <input type="file" id="excel_file_4" style="display:none;" onchange="uploadExcel4(event)" accept=".xlsx, .xls">
+                <div class="input-group input-group-sm" style="width: 200px;">
+                    <span class="input-group-text bg-light">QT번호</span>
+                    <input type="text" id="search_qt_no" class="form-control" placeholder="검색어 입력">
+                </div>
+                <button class="btn btn-sm btn-dark" onclick="fetchPanel4Data()">DB 불러오기</button>
+                <button class="btn btn-sm btn-primary" onclick="savePanel4Data()">DB 저장</button>
+            </div>
+        </div>
+
+        <div class="table-responsive" style="height: 600px; overflow-y: auto; border: 1px solid #dee2e6;">
+            <table class="table table-sm table-bordered table-hover text-center mb-0">
+                <thead class="table-light sticky-top">
+                    <tr>
+                        <th style="width: 40px;"><input type="checkbox" id="check-all-4" onclick="toggleAllCheckboxes4(this)"></th>
+                        <th style="width: 80px;">ID</th>
+                        <th>QT번호</th>
+                        <th style="width: 200px;">금액</th>
+                    </tr>
+                </thead>
+                <tbody id="panel-4-body">
+                    <tr><td colspan="4" class="text-muted">데이터를 불러와 주세요.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
 <script>
@@ -435,6 +497,240 @@ function uploadExcel2(event) {
 function triggerExcelUpload2() {
     document.getElementById('excel_file_2').click();
 }
+
+// ---------------------------3번 영역입니다.-------------------------
+let gridApi3;
+
+// 1. 그리드 컬럼 정의
+const columnDefs3 = [
+    { headerName: "ID", field: "ID", width: 80, sortable: true, filter: true }, // ID는 수정 불가
+    { headerName: "의뢰번호", field: "의뢰번호", width: 150, editable: true },
+    { headerName: "접수번호", field: "접수번호", width: 150, editable: true },
+    { headerName: "사업명", field: "사업명", width: 200, editable: true },
+    { headerName: "의뢰기관명", field: "의뢰기관명", width: 180, editable: true },
+    { headerName: "영업구분", field: "영업구분", width: 100, editable: true },
+    { headerName: "담당자", field: "담당자", width: 100, editable: true }
+];
+
+// 2. 그리드 옵션 설정
+const gridOptions3 = {
+    columnDefs: columnDefs3,
+    rowData: [],
+    defaultColDef: {
+        resizable: true,
+        sortable: true,
+        filter: true,
+        flex: 1,
+        minWidth: 100
+    },
+    // 셀 수정 시 이벤트 (필요 시 사용)
+    onCellValueChanged: function(event) {
+        console.log('데이터 수정됨:', event.data);
+    },
+    onModelUpdated: (event) => {
+        const count = event.api.getDisplayedRowCount();
+        document.getElementById('total-count-3').innerText = count;
+    }
+};
+
+// 3. 페이지 로드 시 그리드 초기화
+document.addEventListener('DOMContentLoaded', () => {
+    const gridDiv3 = document.querySelector('#grid-panel-3');
+    gridApi3 = agGrid.createGrid(gridDiv3, gridOptions3);
+});
+
+// 4. [불러오기] 버튼 함수
+// 3번 영역 [불러오기] 버튼 실행 함수
+function fetchPanel3Data() {
+    if (!gridApi3) return;
+
+    const searchType = document.getElementById('search_type_3').value;
+    const searchText = document.getElementById('search_text_3').value;
+
+    // 로딩 표시
+    gridApi3.setGridOption('loading', true);
+
+    const url = `/get_panel3_data/?search_type=${searchType}&search_text=${encodeURIComponent(searchText)}`;
+
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            if (data.error) {
+                alert("데이터 로드 중 오류: " + data.error);
+                return;
+            }
+            // 그리드에 데이터 채우기
+            gridApi3.setGridOption('rowData', data);
+        })
+        .catch(err => {
+            console.error(err);
+            alert("서버 통신 오류가 발생했습니다.");
+        })
+        .finally(() => {
+            gridApi3.setGridOption('loading', false);
+        });
+
+        fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            gridApi3.setGridOption('rowData', data);
+            // 🌟 건수 업데이트
+            document.getElementById('total-count-3').innerText = data.length;
+        });
+}
+
+// 5. [DB 저장] 버튼 함수
+function savePanel3Data() {
+    // 그리드에 있는 전체 데이터를 가져옴
+    const rowData = [];
+    gridApi3.forEachNode(node => rowData.push(node.data));
+    
+    if (rowData.length === 0) {
+        alert("저장할 데이터가 없습니다.");
+        return;
+    }
+
+    if (!confirm("수정된 내용을 DB에 저장하시겠습니까?")) return;
+
+    fetch('/save_panel3_data/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken') // 장고 CSRF 토큰 함수 필요
+        },
+        body: JSON.stringify({ items: rowData })
+    })
+    .then(res => res.json())
+    .then(result => {
+        if (result.success) {
+            alert("성공적으로 저장되었습니다.");
+        } else {
+            alert("저장 실패: " + result.error);
+        }
+    })
+    .catch(err => alert("저장 중 통신 오류가 발생했습니다."));
+}
+
+// CSRF 토큰 취득용 함수 (장고 기본)
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// ------------------------여기서 부터 마지막 4번째 화면---------------
+// 1. 파일 선택 창 열기
+function triggerExcelUpload4() {
+    document.getElementById('excel_file_4').click();
+}
+
+// 2. 엑셀 파일 읽기 및 화면 표시
+async function uploadExcel4(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const arrayBuffer = e.target.result;
+            const workbook = new ExcelJS.Workbook();
+            await workbook.xlsx.load(arrayBuffer);
+            
+            const worksheet = workbook.getWorksheet(1); // 첫 번째 시트
+            const excelData = [];
+
+            // 엑셀의 각 행을 순회 (첫 번째 행이 제목이라고 가정하고 2번째 행부터 시작)
+            worksheet.eachRow((row, rowNumber) => {
+                if (rowNumber > 1) {
+                    // 엑셀 양식에 따라 열 번호(1, 2...)를 조정하세요.
+                    // 예: 1열이 QT번호, 2열이 금액인 경우
+                    const qtNo = row.getCell(1).text; 
+                    const amount = row.getCell(2).value;
+
+                    if (qtNo) {
+                        excelData.push({
+                            id: '', // 엑셀 업로드 시 ID는 비워둠 (DB 저장 시 생성)
+                            receipt_code: qtNo,
+                            applied_amount: amount
+                        });
+                    }
+                }
+            });
+
+            // 추출된 데이터를 화면 표에 렌더링
+            renderPanel4Table(excelData);
+            
+            // 파일 입력 초기화 (같은 파일 다시 올릴 수 있게)
+            event.target.value = ''; 
+            
+        } catch (error) {
+            console.error(error);
+            alert("엑셀 파일을 읽는 중 오류가 발생했습니다.");
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// 3. 일반 HTML 표에 데이터 뿌리기
+function renderPanel4Table(dataList, isDatabaseFetch = false) {
+    const tbody = document.getElementById('panel-4-body');
+    const totalCount = document.getElementById('total-count-4');
+    
+    tbody.innerHTML = ''; 
+    totalCount.innerText = dataList.length;
+
+    if (dataList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">데이터가 없습니다.</td></tr>';
+        return;
+    }
+
+    dataList.forEach((item, index) => {
+        const row = document.createElement('tr');
+        const numAmount = Number(item.applied_amount || 0);
+        const formattedAmount = numAmount.toLocaleString();
+
+        // 🌟 수정 포인트: DB에서 불러온 데이터일 때만 ID를 표시하고, 아니면 비워둡니다.
+        // item.id가 실제로 존재할 때만 ID를 넣고, 엑셀 업로드 시에는 공백 처리
+        const displayId = (isDatabaseFetch && item.id) ? item.id : "";
+        const idClass = displayId ? "db-id" : "new-id";
+
+        row.innerHTML = `
+            <td><input type="checkbox" class="row-checkbox-4"></td>
+            <td class="${idClass} text-center">${displayId}</td>
+            <td>
+                <input type="text" class="form-control form-control-sm text-center row-qt" value="${item.receipt_code || ''}">
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm text-end fw-bold row-amount" 
+                       style="color: #198754;" 
+                       value="${formattedAmount}" 
+                       onfocus="this.value = this.value.replace(/,/g, '')"
+                       onblur="this.value = Number(this.value).toLocaleString()">
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+/**
+ * 4번 패널(정산정보관리) 데이터 저장 함수
+ * 1. ID가 없는 행: 신규(INSERT) - 서버에서 QT번호 중복 체크 후 처리
+ * 2. ID가 있는 행: 수정(UPDATE) - ID 기준으로 데이터 갱신
+ */
+
+
+
+
 </script>
+</html>
 {% endblock %}
 

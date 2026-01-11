@@ -94,3 +94,11 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# settings.py 파일 하단 확인
+STATIC_URL = '/static/'
+
+# 아래 설정이 들어있어야 폴더를 인식합니다.
+STATICFILES_DIRS = [
+    BASE_DIR / "static",
+]
