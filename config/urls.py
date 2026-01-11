@@ -94,4 +94,10 @@ urlpatterns = [
     
     # 4번 패널 데이터 조회 (DB 불러오기)
     path('api/get_panel4_data', views.get_panel4_data, name='get_panel4_data'),
+    
+    # 엑셀 다운로드 API
+    path('api/download_field_excel/', views.download_field_excel, name='download_field_excel'),
+    # DB 수정 API
+    path('api/update_finished_list/', views.update_finished_list, name='update_finished_list'),
+    
 ]

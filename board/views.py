@@ -22,6 +22,14 @@ import calendar  # 날짜 계산용
 import traceback # 에러 상세 출력용 (이번 에러 해결 핵심)
 from selenium.common.exceptions import UnexpectedAlertPresentException, NoAlertPresentException, TimeoutException
 
+import xlwings as xw
+from io import BytesIO
+from django.http import HttpResponse
+import os
+
+import pythoncom
+from django.conf import settings
+
 
 # --- [1] 기본 게시판 및 페이지 렌더링 ---
 
@@ -1653,6 +1661,112 @@ def save_settlement_data(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     return JsonResponse({'status': 'error', 'message': 'Invalid Method'}, status=400)
+
+# 완료건 DB수정
+@csrf_exempt
+def update_finished_list(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            items = data.get('items', [])
+            with connection.cursor() as cursor:
+                for item in items:
+                    if not item.get('ID'): continue
+                    sql = """
+                        UPDATE winapps_현장팀 
+                        SET 시험수거일=%s, 현장담당=%s, 구분=%s, 의뢰업체명=%s, 시료명=%s, 
+                            공수=%s, 출장비=%s, 추가=%s, 비고=%s, 접수번호=%s, 
+                            영업담당=%s, 순번=%s
+                        WHERE ID = %s
+                    """
+                    cursor.execute(sql, [
+                        item.get('시험수거일'), item.get('현장담당'), item.get('구분'),
+                        item.get('의뢰업체명'), item.get('시료명'), item.get('공수'),
+                        item.get('출장비'), item.get('추가'), item.get('비고'),
+                        item.get('접수번호'), item.get('영업담당'), item.get('순번'),
+                        item.get('ID')
+                    ])
+            return JsonResponse({"success": True, "message": f"{len(items)}건 수정 완료"})
+        except Exception as e:
+            return JsonResponse({"success": False, "message": str(e)})
+
+
+# 완료건 엑셀저장
+def download_field_excel(request):
+    if request.method == 'POST':
+        app = None
+        try:
+            pythoncom.CoInitialize() 
+            
+            data = json.loads(request.body)
+            items = data.get('items', [])
+            
+            # 경로 설정
+            template_path = os.path.join(settings.BASE_DIR, 'static', 'excel_templates', 'field_payment_template.xlsx')
+            output_path = os.path.join(settings.BASE_DIR, 'static', 'excel_templates', 'temp_result.xlsx')
+
+            if not os.path.exists(template_path):
+                return JsonResponse({"success": False, "message": "양식 파일을 찾을 수 없습니다."}, status=404)
+
+            # 1. 엑셀 앱 실행 및 속도 최적화
+            app = xw.App(visible=False, add_book=False)
+            wb = app.books.open(template_path)
+            ws = wb.sheets[0]
+
+            # 2. 데이터를 2차원 리스트로 준비
+            rows_to_write = []
+            for i, item in enumerate(items):
+                # 각 셀에 들어갈 데이터를 안전하게 추출
+                rows_to_write.append([
+                    i + 1,
+                    str(item.get('시험수거일', '')),
+                    str(item.get('현장담당', '')),
+                    str(item.get('구분', '')),
+                    str(item.get('의뢰업체명', '')),
+                    str(item.get('시료명', '')),
+                    item.get('공수', 0) or 0, # None일 경우 0으로 처리
+                    item.get('출장비', 0) or 0,
+                    item.get('추가', 0) or 0,
+                    str(item.get('비고', '')),
+                    str(item.get('접수번호', '')),
+                    str(item.get('영업담당', '')),
+                    str(item.get('순번', ''))
+                ])
+
+            # 3. 데이터가 있을 때만 입력
+            if rows_to_write:
+                ws.range('A5').value = rows_to_write
+
+            # 4. 파일 저장 및 닫기
+            wb.save(output_path)
+            wb.close()
+            app.quit()
+            app = None
+
+            # 5. 파일 전송 (날짜 문자열 직접 생성)
+            current_date = datetime.now().strftime('%Y%m%d')
+            with open(output_path, 'rb') as f:
+                response = HttpResponse(
+                    f.read(), 
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+                response['Content-Disposition'] = f'attachment; filename=field_payment_{current_date}.xlsx'
+                return response
+
+        except Exception as e:
+            # 터미널에 에러 내용을 상세히 출력합니다.
+            import traceback
+            print("--- Excel Download Error Start ---")
+            print(traceback.format_exc()) 
+            print("--- Excel Download Error End ---")
+            return JsonResponse({"success": False, "message": str(e)}, status=500)
+        finally:
+            if app:
+                try: app.quit()
+                except: pass
+            pythoncom.CoUninitialize()
+
+
 # ------------------------여기까지가 완료건 보기 관련 끝----------------------------
 
 # def receipt_settle_admin(request):
@@ -1923,6 +2037,7 @@ def get_panel4_data(request):
     return JsonResponse({"success": True, "data": result_data})
 
 # [저장] 신규(Insert)와 수정(Update)을 ID 유무로 판단하여 처리
+# [views.py] save_panel4_data 함수 내부 수정
 @csrf_exempt
 def save_panel4_data(request):
     if request.method == 'POST':
@@ -1931,28 +2046,66 @@ def save_panel4_data(request):
             new_items = data.get('new_items', [])
             updated_items = data.get('updated_items', [])
             
+            created_ids = [] # ✨ 새로 생성된 ID를 담을 리스트
+            
             with connection.cursor() as cursor:
-                # A. 신규 데이터: QT번호 중복 체크 후 INSERT
+                # A. 신규 저장 (INSERT 후 ID 가져오기)
                 for item in new_items:
-                    cursor.execute("SELECT 1 FROM settlement_amount WHERE QT번호 = %s", [item['receipt_code']])
-                    if cursor.fetchone(): 
-                        continue # 이미 있으면 통과
-                    
                     cursor.execute(
                         "INSERT INTO settlement_amount (QT번호, 금액) VALUES (%s, %s)", 
                         [item['receipt_code'], item['applied_amount']]
                     )
+                    # 방금 INSERT된 ID 가져오기 (MySQL/MariaDB 기준)
+                    cursor.execute("SELECT LAST_INSERT_ID()")
+                    new_id = cursor.fetchone()[0]
+                    created_ids.append(new_id)
                 
-                # B. 기존 데이터: ID 기준으로 UPDATE
+                # B. 기존 수정 (UPDATE)
                 for item in updated_items:
                     cursor.execute(
                         "UPDATE settlement_amount SET QT번호 = %s, 금액 = %s WHERE ID = %s",
                         [item['receipt_code'], item['applied_amount'], item['id']]
                     )
             
-            return JsonResponse({"success": True, "message": "저장 완료"})
+            # ✨ 생성된 ID 목록을 같이 반환
+            return JsonResponse({"success": True, "created_ids": created_ids})
         except Exception as e:
             return JsonResponse({"success": False, "message": str(e)})     
+
+# [views.py]
+# from django.http import JsonResponse
+# from django.db import connection
+
+def get_panel4_data(request):
+    # URL 파라미터에서 qt_no 검색어 읽기
+    search_qt = request.GET.get('qt_no', '').strip()
+    
+    with connection.cursor() as cursor:
+        # 1. 기본 SQL 쿼리 (이미지 필드명 반영: QT번호, 금액)
+        sql = "SELECT ID, QT번호, 금액 FROM settlement_amount"
+        params = []
+        
+        # 2. 검색어가 입력되었다면 WHERE 조건 추가
+        if search_qt:
+            sql += " WHERE QT번호 LIKE %s"
+            params.append(f"%{search_qt}%")
+        
+        # 최신순 정렬
+        sql += " ORDER BY ID DESC"
+        
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+        
+        # 3. 프론트엔드 JS에서 인식할 수 있는 키(key) 이름으로 변환
+        result_data = [
+            {
+                'id': r[0], 
+                'receipt_code': r[1], 
+                'applied_amount': r[2]
+            } for r in rows
+        ]
+        
+    return JsonResponse({"success": True, "data": result_data})
 
 
 # ----------------------------------4번 분할화면 여기까지-----END

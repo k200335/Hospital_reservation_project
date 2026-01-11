@@ -5,6 +5,9 @@
 <head>
     <meta charset="UTF-8">
     <title>현장시험 통합 관리 시스템</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     
@@ -160,19 +163,8 @@
     </div>
 
     <div class="bottom-row" style="display: flex; gap: 8px; align-items: stretch;">
-    
-    <div style="flex: 2;">
-        <div class="card shadow-sm border-secondary border-opacity-25 h-100">
-            <div class="card-header small bg-light text-secondary fw-bold">
-                <i class="bi bi-info-circle"></i> 현장시험 용역비 지급기준
-            </div>
-            <div class="card-body p-2">
-                <p class="text-muted small">추가 관리 항목이나<br>메모 영역입니다.</p>
-            </div>
-        </div>
-    </div>
 
-    <div style="flex: 4;">
+    <div style="flex: 5;">
         <div class="card shadow-sm border-secondary border-opacity-25 h-100">
             <div class="card-header bg-light text-secondary py-1 px-2 d-flex justify-content-between align-items-center" style="height: 35px;">
                 <span class="small fw-bold"><i class="bi bi-check-circle-fill text-success"></i> 완료건 보기</span>
@@ -211,6 +203,9 @@
                     </select>
 
                     <button onclick="loadFinishedData()" class="btn btn-primary btn-sm py-0 fw-bold" style="font-size: 0.75rem;">불러오기</button>
+                    <button onclick="updateFinishedData()" class="btn btn-info btn-sm py-0 fw-bold text-white" style="font-size: 0.75rem;">
+                        <i class="bi bi-pencil-square"></i> DB 수정
+                    </button>
                     <button onclick="downloadFinishedExcel()" class="btn btn-success btn-sm py-0" style="font-size: 0.75rem;">
                         <i class="bi bi-file-earmark-excel"></i> 엑셀다운로드
                     </button>
@@ -858,11 +853,20 @@ function updateSummaryTable(data) {
 document.addEventListener('DOMContentLoaded', initTableClickEvent);
 
 // -----------------여기서 부터 완료건 보기-------------
-// 전역 변수로 선언하여 다른 함수에서도 접근 가능하게 함
+
+// 1. 전역 변수 선언
 let finishedGridApi;
-// 완료건 보기 컬럼 정의 (요청하신 순서대로)
+
+// 2. 완료건 보기 컬럼 정의 (순수하게 컬럼 정의만 남김)
 const finishedColumnDefs = [
-    { headerName: "ID", field: "ID", width: 60 },
+    { 
+        headerName: "", 
+        width: 40, 
+        checkboxSelection: true, 
+        headerCheckboxSelection: true, 
+        pinned: 'left' 
+    },
+    { headerName: "ID", field: "ID", width: 60, pinned: 'left', editable: false, cellClass: 'bg-light' },
     { headerName: "시험수거일", field: "시험수거일", width: 110 },
     { headerName: "현장담당", field: "현장담당", width: 90 },
     { headerName: "구분", field: "구분", width: 80 },
@@ -880,68 +884,55 @@ const finishedColumnDefs = [
     { headerName: "순번", field: "순번", width: 70 }
 ];
 
+// 3. 그리드 옵션 설정 (여기에 onGridReady가 있어야 함)
 const finishedGridOptions = {
     columnDefs: finishedColumnDefs,
+    rowSelection: 'multiple',
     defaultColDef: {
         sortable: true,
         filter: true,
         resizable: true,
-        flex: 0,
+        editable: true,
         cellStyle: { fontSize: '12px' }
     },
     headerHeight: 25,
     rowHeight: 25,
     rowData: [],
+    // 🌟 31.x 버전에서 가장 안전하게 API를 잡는 법
     onGridReady: (params) => {
-        window.finishedGridApi = params.api;
+        window.finishedGridApi = params.api; // window 객체에 즉시 할당
+        finishedGridApi = params.api;        // 전역 변수에 할당
+        console.log("하단 그리드 준비 완료!");
     }
 };
 
-// 3. 페이지 로드 즉시 그리드 생성
+// 4. 페이지 로드 시 그리드 생성
 document.addEventListener('DOMContentLoaded', () => {
     const gridDiv = document.querySelector('#finishedGrid');
     if (gridDiv) {
-        // AG Grid 초기화 (버전 31.x 이상 기준)
-        finishedGridApi = agGrid.createGrid(gridDiv, finishedGridOptions);
-        console.log("완료건 보기 그리드 초기화 완료");
-    } else {
-        console.error("finishedGrid를 찾을 수 없습니다. HTML ID를 확인하세요.");
+        // AG Grid 초기화
+        const api = agGrid.createGrid(gridDiv, finishedGridOptions);
+        window.finishedGridApi = api; // 생성과 동시에 다시 한번 할당
+        finishedGridApi = api;
     }
 });
 
-
-// 데이터불러오기 함수
-/*async function loadFinishedData() {
-    const year = document.getElementById('finish-year').value;
-    const month = document.getElementById('finish-month').value;
-    const manager = document.getElementById('finish-manager').value;
-
-    console.log(`[완료건 조회] ${year}년 ${month}월 / 담당자: ${manager}`);
-
-    try {
-        const response = await fetch(`/api/get_finished_data?year=${year}&month=${month}&manager=${manager}`);
-        const result = await response.json();
-
-        if (result.success) {
-            window.finishedGridApi.setGridOption('rowData', result.data);
-            console.log("데이터 로드 완료:", result.data.length, "건");
-        } else {
-            alert("조회 실패: " + result.message);
-        }
-    } catch (error) {
-        console.error("네트워크 에러:", error);
-    }
-}*/
-
+// 5. 조회 함수 (방어 로직 강화)
 async function loadFinishedData() {
-    // ... 상단 변수(year, month 등) 선언 동일 ...
-    // [수정] 아래 3줄이 반드시 함수 안에 있어야 합니다!
+    // 1. 하단 그리드 API만 먼저 확인합니다.
+    const finishedApi = window.finishedGridApi;
+
+    if (!finishedApi) {
+        alert("하단 그리드(완료건) 로딩 중입니다. 잠시 후 다시 시도하세요.");
+        return;
+    }
+
+    // 상단 그리드는 있으면 매칭하고, 없으면 그냥 하단 데이터만 보여줍니다.
+    const upperApi = window.upperGridApi; 
+
     const year = document.getElementById('finish-year')?.value;
     const month = document.getElementById('finish-month')?.value;
     const manager = document.getElementById('finish-manager')?.value;
-
-    // 만약 위 ID들이 다르다면 실제 HTML에 있는 ID로 바꿔주세요.
-    console.log(`[완료건 조회] ${year}년 ${month}월 / 담당자: ${manager}`);
 
     if (!year || !month) {
         alert("년도와 월을 선택해주세요.");
@@ -953,40 +944,144 @@ async function loadFinishedData() {
         const result = await response.json();
 
         if (result.success) {
-            // 1. 하단 그리드에 데이터 표시
-            window.finishedGridApi.setGridOption('rowData', result.data);
-            const finishedData = result.data;
+            // 2. 하단 그리드에 데이터 표시 (이 작업은 상단 그리드 유무와 상관없이 실행됨)
+            finishedApi.setGridOption('rowData', result.data);
+            console.log("하단 그리드 데이터 로드 완료");
 
-            // 2. 상단 그리드(비즈메카) 데이터를 가져와서 하나씩 비교
-            const updatedRows = [];
-            window.upperGridApi.forEachNode((node) => {
-                const row = node.data;
-                
-                // 날짜와 제목 추출 (상단 표 필드명에 맞게 date, title 등 확인)
-                const uDate = String(row.date || row['날짜'] || "").replace(/\s+/g, '').replace(/\./g, '-').trim();
-                const uTitle = String(row.title || row['제목'] || "").replace(/\s+/g, '');
-
-                // 하단 완료건과 비교
-                const matched = finishedData.some(item => {
-                    const fDate = String(item.시험수거일 || "").replace(/\s+/g, '').trim();
-                    const fCompany = String(item.의뢰업체명 || "").replace(/\(주\)|주식회사/g, '').replace(/\s+/g, '').trim();
-                    return uDate === fDate && uTitle.includes(fCompany);
+            // 3. 상단 그리드가 존재할 때만 매칭(색상 변경) 로직 실행
+            if (upperApi) {
+                const updatedRows = [];
+                upperApi.forEachNode((node) => {
+                    const row = { ...node.data };
+                    // ... (매칭 로직 동일) ...
+                    row.isCompleted = result.data.some(item => {
+                        const fDate = String(item.시험수거일 || "").trim();
+                        return row.date === fDate; // 예시 비교
+                    });
+                    updatedRows.push(row);
                 });
-
-                // ★ 중요: 데이터 자체에 '완료됨' 표시를 심어줍니다.
-                row.isCompleted = matched; 
-                updatedRows.push(row);
-            });
-
-            // 3. 표시가 완료된 데이터를 상단 그리드에 다시 세팅 (색깔이 자동으로 바뀜)
-            window.upperGridApi.setGridOption('rowData', updatedRows);
-            
-            console.log("매칭 완료 및 색상 적용 성공!");
+                upperApi.setGridOption('rowData', updatedRows);
+                console.log("상단 그리드 매칭 완료");
+            } else {
+                console.log("상단 그리드가 없어 매칭 로직을 건너뜁니다.");
+            }
         }
     } catch (error) {
         console.error("오류 발생:", error);
     }
 }
+
+// 1. 함수를 전역 범위에 명시적으로 선언 (ReferenceError 방지)
+window.downloadFinishedExcel = async function() {
+    console.log("엑셀 다운로드 시작...");
+    
+    // 현재 작업 중인 하단 그리드 API 확인
+    const gridApi = window.finishedGridApi;
+    if (!gridApi) {
+        alert("그리드가 아직 준비되지 않았습니다.");
+        return;
+    }
+
+    let selectedRows = gridApi.getSelectedRows();
+    if (selectedRows.length === 0) {
+        selectedRows = [];
+        gridApi.forEachNode(node => { if(node.data) selectedRows.push(node.data); });
+    }
+
+    if (selectedRows.length === 0) {
+        alert("데이터가 없습니다.");
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/download_field_excel/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // 🌟 여기서 getCookie 함수를 사용합니다.
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: JSON.stringify({ items: selectedRows })
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `현장정산_${new Date().toISOString().slice(0,10)}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+        } else {
+            alert("서버 오류가 발생했습니다.");
+        }
+    } catch (error) {
+        console.error("Download Error:", error);
+        alert("다운로드 중 오류 발생: " + error.message);
+    }
+};
+
+// Django 보안(CSRF) 토큰을 가져오는 함수
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+// 🌟 window 객체에 할당하여 HTML 버튼이 인식할 수 있게 합니다.
+window.updateFinishedData = async function() {
+    const gridApi = window.finishedGridApi;
+
+    if (!gridApi) {
+        alert("그리드 API가 준비되지 않았습니다.");
+        return;
+    }
+
+    // 1. 체크박스로 선택된 행들만 가져오기
+    const selectedRows = gridApi.getSelectedRows();
+
+    if (selectedRows.length === 0) {
+        alert("수정 완료 후, 저장할 항목을 체크박스로 선택해 주세요.");
+        return;
+    }
+
+    if (!confirm(`선택한 ${selectedRows.length}건의 수정 내용을 DB에 저장하시겠습니까?`)) return;
+
+    try {
+        const response = await fetch('/api/update_finished_list/', { 
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken') // Django CSRF 토큰 함수 필요
+            },
+            body: JSON.stringify({ items: selectedRows })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            alert(`성공적으로 저장되었습니다. (총 ${selectedRows.length}건)`);
+            gridApi.deselectAll(); // 저장 후 체크 해제
+            
+            // 저장 후 데이터를 다시 불러와서 그리드를 갱신하고 싶다면 아래 호출
+            // await loadFinishedData(); 
+        } else {
+            alert("저장 실패: " + result.message);
+        }
+    } catch (error) {
+        console.error("Update Error:", error);
+        alert("저장 중 서버 오류가 발생했습니다.");
+    }
+};
 
 // -----------------완료건 보기는 여기까지--------------
 

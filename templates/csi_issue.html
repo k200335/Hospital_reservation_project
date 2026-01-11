@@ -92,7 +92,7 @@
 
     <div class="panel" id="panel-3">
         <div class="d-flex justify-content-between align-items-center mb-2">
-            <h5 class="fw-bold text-success mb-0">3. 의뢰정보관리</h5>
+            <h5 class="fw-bold text-success mb-0">3. 의뢰정보(Q,E,T건 입력)</h5>
             
             <div class="d-flex gap-2 align-items-center">
                 <div class="me-2 fw-bold">총 <span id="total-count-3" class="text-primary">0</span>건</div>
@@ -132,8 +132,8 @@
             <table class="table table-sm table-bordered table-hover text-center mb-0">
                 <thead class="table-light sticky-top">
                     <tr>
-                        <th style="width: 40px;"><input type="checkbox" id="check-all-4" onclick="toggleAllCheckboxes4(this)"></th>
-                        <th style="width: 80px;">ID</th>
+                        <th><input type="checkbox" id="check-all-4"></th> <th>ID</th>
+                        <!-- <th style="width: 80px;">ID</th> -->
                         <th>QT번호</th>
                         <th style="width: 200px;">금액</th>
                     </tr>
@@ -720,15 +720,144 @@ function renderPanel4Table(dataList, isDatabaseFetch = false) {
         tbody.appendChild(row);
     });
 }
+// 1. 페이지 로드 시 "전체 선택" 이벤트 연결
+document.addEventListener('DOMContentLoaded', function() {
+    const checkAll = document.getElementById('check-all-4');
+    if (checkAll) {
+        checkAll.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.row-checkbox-4');
+            checkboxes.forEach(cb => cb.checked = this.checked);
+        });
+    }
+});
 
-/**
- * 4번 패널(정산정보관리) 데이터 저장 함수
- * 1. ID가 없는 행: 신규(INSERT) - 서버에서 QT번호 중복 체크 후 처리
- * 2. ID가 있는 행: 수정(UPDATE) - ID 기준으로 데이터 갱신
- */
+// 2. [DB 불러오기] 함수 (작성하신 코드 최적화)
+async function fetchPanel4Data() {
+    // 1. 검색창(QT번호) 입력값 가져오기
+    const searchInput = document.getElementById('search_qt_no');
+    const searchVal = searchInput ? searchInput.value.trim() : "";
+    
+    // 2. API 호출
+    const url = `/api/get_panel4_data?qt_no=${encodeURIComponent(searchVal)}`;
+    
+    try {
+        const response = await fetch(url);
+        const result = await response.json();
 
+        if (result.success) {
+            // 3. 받은 데이터를 테이블에 렌더링
+            renderPanel4Table(result.data, true);
 
+            // ✨ [추가] 조회 결과 알림창
+            if (result.data.length > 0) {
+                alert(`조회 성공: 총 ${result.data.length}건의 데이터를 불러왔습니다.`);
+            } else {
+                alert("조회 결과가 없습니다.");
+            }
+        } else {
+            alert("조회 실패: " + result.message);
+        }
+    } catch (error) {
+        console.error("Fetch Error:", error);
+        alert("데이터를 불러오는 중 오류가 발생했습니다.");
+    }
+}
 
+// 3. [데이터 렌더링] 함수
+function renderPanel4Table(dataList, isDatabaseFetch = false) {
+    const tbody = document.getElementById('panel-4-body');
+    const totalCount = document.getElementById('total-count-4');
+    const checkAll = document.getElementById('check-all-4');
+    
+    if (checkAll) checkAll.checked = false; // 새로 불러올 때 상단 체크 해제
+    tbody.innerHTML = ''; 
+    totalCount.innerText = dataList.length;
+
+    if (dataList.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">데이터가 없습니다.</td></tr>';
+        return;
+    }
+
+    dataList.forEach((item) => {
+        const row = document.createElement('tr');
+        const formattedAmount = Number(item.applied_amount || 0).toLocaleString();
+        const displayId = (isDatabaseFetch && item.id) ? item.id : "";
+
+        row.innerHTML = `
+            <td><input type="checkbox" class="row-checkbox-4"></td>
+            <td class="text-center font-monospace">${displayId}</td>
+            <td>
+                <input type="text" class="form-control form-control-sm text-center row-qt" value="${item.receipt_code || ''}">
+            </td>
+            <td>
+                <input type="text" class="form-control form-control-sm text-end fw-bold row-amount" 
+                       style="color: #198754;" 
+                       value="${formattedAmount}" 
+                       onfocus="this.value = this.value.replace(/,/g, '')"
+                       onblur="this.value = Number(this.value).toLocaleString()">
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+// 4. [DB 저장] 함수 (수정/신규 분기)
+async function savePanel4Data() {
+    const rows = document.querySelectorAll('#panel-4-body tr');
+    const new_items = [];
+    const updated_items = [];
+    const newRowsDom = []; // ✨ 신규 행만 따로 담기
+
+    rows.forEach(row => {
+        const checkbox = row.querySelector('.row-checkbox-4');
+        if (!checkbox || !checkbox.checked) return;
+
+        const id = row.cells[1].innerText.trim();
+        const qt = row.querySelector('.row-qt')?.value.trim();
+        const amountStr = row.querySelector('.row-amount')?.value.replace(/,/g, '').trim();
+        const amount = amountStr ? Number(amountStr) : 0;
+
+        if (!qt) return;
+
+        if (!id) {
+            new_items.push({ receipt_code: qt, applied_amount: amount });
+            newRowsDom.push(row); // 신규 행 저장
+        } else {
+            updated_items.push({ id: id, receipt_code: qt, applied_amount: amount });
+        }
+    });
+
+    if (new_items.length === 0 && updated_items.length === 0) return alert("저장할 항목을 체크해 주세요.");
+    if (!confirm(`저장하시겠습니까?`)) return;
+
+    try {
+        const response = await fetch('/api/save_panel4_data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_items, updated_items })
+        });
+        
+        const res = await response.json();
+        
+        if (res.success) {
+            // ✨ 1. 신규 저장된 행들에 서버에서 받은 ID 번호 부여
+            if (res.created_ids && res.created_ids.length > 0) {
+                newRowsDom.forEach((row, index) => {
+                    row.cells[1].innerText = res.created_ids[index]; // ID 칸에 번호 입력
+                    row.cells[1].style.color = "blue"; // 새로 생긴 번호는 파란색으로 표시(선택)
+                });
+            }
+
+            // ✨ 2. 체크박스 해제 및 완료 알림
+            rows.forEach(row => {
+                const cb = row.querySelector('.row-checkbox-4');
+                if (cb) cb.checked = false;
+            });
+
+            alert(`저장 완료! (총 ${new_items.length + updated_items.length}건)`);
+        }
+    } catch (e) { console.error(e); alert("오류 발생"); }
+}
 
 </script>
 </html>
