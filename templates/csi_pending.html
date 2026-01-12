@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>    
+</head>
+<body>
+<div style="margin-bottom: 15px;">
+    <input type="file" id="excel_file_input" style="display:none;" accept=".xlsx, .xls">
+    <button type="button" onclick="document.getElementById('excel_file_input').click();" class="btn-excel">
+        엑셀가져오기
+    </button>
+    <button type="button" id="btn_db_save" class="btn btn-primary">DB저장</button>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-bordered table-hover">
+        <thead class="table-light">
+            <tr>
+                <th><input type="checkbox" id="check_all" onclick="toggleAll(this)"></th>
+                <th>시험수거일</th>
+                <th>현장담당</th>
+                <th>구분</th>
+                <th>의뢰업체명</th>
+                <th>시료명</th>
+                <th>공수</th>
+                <th>출장비</th>
+                <th>추가</th>
+                <th>비고</th>
+                <th>접수번호</th>
+                <th>영업담당</th>
+                <th>순번</th>
+            </tr>
+        </thead>
+        <tbody id="grid_body">
+        </tbody>
+    </table>
+</div>
+
+<script>
+
+    window.onload = function() {
+    const fileInput = document.getElementById('excel_file_input');
+    
+    if (fileInput) {
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(sheet);
+                
+                displayData(rows);
+            };
+            reader.readAsArrayBuffer(file);
+        });
+    }
+};
+// / 전체 선택/해제 기능
+    function toggleAll(source) {
+        const checkboxes = document.querySelectorAll('.row-check');
+        checkboxes.forEach(cb => cb.checked = source.checked);
+    }
+
+    
+
+    // DB 저장 버튼 클릭 시 (예시)
+    function saveToDatabase() {
+        const checkedRows = document.querySelectorAll('.row-check:checked');
+        if (checkedRows.length === 0) {
+            alert("저장할 항목을 선택해주세요.");
+            return;
+        }
+        alert(checkedRows.length + "건의 데이터를 DB에 저장합니다.");
+        // 여기에 실제 서버 전송 로직(Ajax/Fetch)이 들어갑니다.
+    }
+
+    // 엑셀 파일 선택 시 이벤트 리스너
+document.getElementById('excel_file_input').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // 첫 번째 시트 가져오기
+        const sheetName = workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+
+        // 엑셀 데이터를 JSON 형태로 변환 (헤더가 첫 줄인 경우)
+        const rows = XLSX.utils.sheet_to_json(sheet);
+        
+        displayData(rows);
+    };
+    reader.readAsArrayBuffer(file);
+});
+
+// 엑셀 날짜 숫자를 YYYY-MM-DD 형식으로 변환하는 함수
+function excelDateToJSDate(serial) {
+    if (!serial || isNaN(serial)) return serial; // 숫자가 아니면 그대로 반환
+    
+    // 엑셀 날짜는 1899년 12월 30일을 기준으로 함
+    const utc_days  = Math.floor(serial - 25569);
+    const utc_value = utc_days * 86400;
+    const date_info = new Date(utc_value * 1000);
+
+    const year = date_info.getFullYear();
+    const month = ("0" + (date_info.getMonth() + 1)).slice(-2);
+    const day = ("0" + date_info.getDate()).slice(-2);
+
+    return `${year}-${month}-${day}`;
+}
+
+// 화면 그리드(표)에 데이터 뿌리기
+function displayData(rows) {
+    const tbody = document.getElementById('grid_body');
+    if (!tbody) return;
+
+    tbody.innerHTML = ''; 
+
+    rows.forEach((row) => {
+        const tr = document.createElement('tr');
+        
+        // 1. 시험수거일 날짜 변환 적용
+        const rawDate = row['시험수거일'];
+        const formattedDate = typeof rawDate === 'number' ? excelDateToJSDate(rawDate) : (rawDate || '');
+
+        tr.innerHTML = `
+            <td><input type="checkbox" class="row-check"></td>
+            <td>${formattedDate}</td>
+            <td>${row['현장담당'] || ''}</td>
+            <td>${row['구분'] || ''}</td>
+            <td>${row['의뢰업체명'] || ''}</td>
+            <td>${row['시료명'] || ''}</td>
+            <td>${row['공수'] || 0}</td>
+            <td>${row['출장비'] || 0}</td>
+            <td>${row['추가'] || ''}</td>
+            <td>${row['비고'] || ''}</td>
+            <td>${row['접수번호'] || ''}</td>
+            <td>${row['영업담당'] || ''}</td>
+            <td>${row['순번'] || ''}</td> `;
+        tbody.appendChild(tr);
+    });
+
+    alert(rows.length + "건의 데이터를 불러왔습니다.");
+}
+
+// 기존 saveToDatabase 함수 전체를 아래 코드로 교체하세요.
+document.getElementById('btn_db_save').onclick = async function() {
+    const checkedBoxes = document.querySelectorAll('.row-check:checked');
+    const totalCount = checkedBoxes.length;
+
+    if (totalCount === 0) {
+        alert("저장할 항목을 선택해주세요.");
+        return;
+    }
+
+    if (!confirm(`${totalCount}건의 데이터를 DB에 저장하시겠습니까?`)) return;
+    
+    // 진행 표시 추가
+    const btn = document.getElementById('btn_db_save');
+    const originalText = btn.innerText;
+    btn.disabled = true;
+    btn.innerText = `⏳ ${totalCount}건 저장 중...`;
+
+    const rowsToSave = [];
+    checkedBoxes.forEach(cb => {
+        const tr = cb.closest('tr');
+        const tds = tr.getElementsByTagName('td');
+        
+        // 엑셀에서 가져온 그리드 데이터 매칭
+        rowsToSave.push({
+            '시험수거일': tds[1].innerText.trim(),
+            '현장담당': tds[2].innerText.trim(),
+            '구분': tds[3].innerText.trim(),
+            '의뢰업체명': tds[4].innerText.trim(),
+            '시료명': tds[5].innerText.trim(),
+            '공수': tds[6].innerText.trim(),
+            '출장비': tds[7].innerText.trim(),
+            '추가': tds[8].innerText.trim(),
+            '비고': tds[9].innerText.trim(),
+            '접수번호': tds[10].innerText.trim(),
+            '영업담당': tds[11].innerText.trim(),
+            '순번': tds[12].innerText.trim()
+        });
+    });
+
+    try {
+        const response = await fetch('/board/save_field_team_data/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrftoken') 
+            },
+            body: JSON.stringify({ 'rows': rowsToSave })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.status === 'success') {
+            alert(`✅ 저장 완료!\n${totalCount}건이 winapps_현장팀 테이블에 등록되었습니다.`);
+            location.reload(); 
+        } else {
+            throw new Error(result.message || "서버 내부 오류");
+        }
+    } catch (e) {
+        console.error("Save Error:", e);
+        alert(`❌ 저장 실패\n사유: ${e.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.innerText = originalText;
+    }
+};
+    
+
+// getCookie 함수가 없다면 이것도 함께 아래에 넣어주세요
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function toggleAll(source) {
+    // 'row-check' 클래스를 가진 모든 체크박스를 찾습니다.
+    const checkboxes = document.querySelectorAll('.row-check');
+    
+    // 헤더 체크박스(source)가 체크되면 모두 체크, 해제되면 모두 해제합니다.
+    checkboxes.forEach(cb => {
+        cb.checked = source.checked;
+    });
+}
+</script>
+
+<style>
+    .btn-excel { background-color: #28a745; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; }
+    .btn-save { background-color: #007bff; color: white; border: none; padding: 8px 15px; cursor: pointer; border-radius: 4px; }
+    table th, table td { padding: 8px; font-size: 13px; border: 1px solid #ddd; }
+</style>
+</script>
+</body>
+</html>
+{% endblock %}

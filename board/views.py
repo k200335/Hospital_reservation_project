@@ -2224,3 +2224,60 @@ def get_panel4_data(request):
 
 
 # ----------------------------------4번 분할화면 여기까지-----END
+
+
+# --------------여기는 임시로 현장팀 자료 올리는 곳----작업중 페이지
+
+def csi_pending_view(request):
+    """
+    작업중(csi_pending.html) 페이지를 보여주는 함수
+    """
+    return render(request, 'csi_pending.html')
+
+@csrf_exempt
+def save_field_team_data(request):
+    if request.method == 'POST':
+        try:
+            # 1. 클라이언트로부터 JSON 데이터 수신
+            data = json.loads(request.body)
+            rows = data.get('rows', [])
+            
+            if not rows:
+                return JsonResponse({"status": "error", "message": "저장할 데이터가 없습니다."}, status=400)
+
+            # 2. DB 연결 및 인서트 실행
+            with connections['default'].cursor() as cursor:
+                # 제외 항목: 시료채취자, 현장시험자, 지급여부
+                sql = """
+                    INSERT INTO winapps_현장팀 (
+                        시험수거일, 현장담당, 구분, 의뢰업체명, 시료명, 
+                        공수, 출장비, 추가, 비고, 접수번호, 영업담당, 순번
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                
+                # 여러 줄을 한 번에 입력하기 위한 데이터 가공
+                params = [
+                    (
+                        row.get('시험수거일'), row.get('현장담당'), row.get('구분'),
+                        row.get('의뢰업체명'), row.get('시료명'), row.get('공수'),
+                        row.get('출장비'), row.get('추가'), row.get('비고'),
+                        row.get('접수번호'), row.get('영업담당'), row.get('순번')
+                    ) for row in rows
+                ]
+                
+                cursor.executemany(sql, params)
+
+            return JsonResponse({"status": "success", "message": f"{len(rows)}건이 성공적으로 저장되었습니다."})
+
+        except Exception as e:
+            return JsonResponse({"status": "error", "message": str(e)}, status=500)
+    
+    return JsonResponse({"status": "error", "message": "잘못된 접근입니다."}, status=405)
+
+
+
+
+
+
+
+# 작업중 페이지 여기까지

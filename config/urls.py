@@ -99,5 +99,9 @@ urlpatterns = [
     path('api/download_field_excel/', views.download_field_excel, name='download_field_excel'),
     # DB 수정 API
     path('api/update_finished_list/', views.update_finished_list, name='update_finished_list'),
+
+    path('board/csi_pending/', views.csi_pending_view, name='csi_pending'),
+
+    path('board/save_field_team_data/', views.save_field_team_data, name='save_field_team_data'),
     
 ]
