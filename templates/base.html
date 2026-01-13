@@ -11,55 +11,41 @@
     {% block extra_css %}{% endblock %}
 </head>
 <body>
+    
+<div class="top-auth-bar py-1 border-bottom">
+    <div class="container d-flex justify-content-between align-items-center">
+        
+        <div class="logo-area">
+            <a href="/" class="d-flex align-items-center text-decoration-none">
+                <img src="{% static 'images/kcqt_logo.jpg' %}" alt="Logo" style="height: 28px; width: auto;">
+                <span class="ms-2 fw-bold text-dark d-none d-sm-inline">한국건설품질시험원(주)</span>
+            </a>
+        </div>
 
-<div class="top-auth-bar">
-    <div class="container d-flex justify-content-end align-items-center gap-3">
-        <a href="/" class="btn btn-sm btn-outline-secondary py-0 d-flex align-items-center gap-1" title="메인페이지로 이동">
-            <i class="bi bi-house-door"></i> 홈
-        </a>
-        {% if user.is_authenticated %}
-            <span><strong>{{ user.username }}</strong>님 환영합니다.</span>
-            <form action="/logout/" method="post" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-outline-danger py-0">로그아웃</button>
-            </form>
-        {% else %}
-            <form action="/login/" method="post" class="d-flex gap-2">
-                {% csrf_token %}
-                
-                {% if form.errors %}
-                    <script>alert("아이디 또는 비밀번호가 일치하지 않습니다.");</script>
-                {% endif %}
+        <div class="d-flex align-items-center gap-2">
+            <a href="/" class="btn btn-sm btn-outline-secondary py-0 d-flex align-items-center gap-1" title="메인페이지로 이동">
+                <i class="bi bi-house-door"></i> 홈
+            </a>
+            
+            <div class="vr mx-1"></div> {% if user.is_authenticated %}
+                <span class="small me-2"><strong>{{ user.username }}</strong>님</span>
+                <form action="/logout/" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0">로그아웃</button>
+                </form>
+            {% else %}
+                <form action="/login/" method="post" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <input type="text" name="username" class="form-control form-control-sm" placeholder="아이디" style="width: 100px;" required>
+                    <input type="password" name="password" class="form-control form-control-sm" placeholder="비밀번호" style="width: 100px;" required>
+                    <button type="submit" class="btn btn-sm btn-primary py-0">로그인</button>
+                </form>
+                <a href="/signup/" class="btn btn-sm btn-success py-0">회원가입</a>
+            {% endif %}
+        </div>
 
-                <input type="text" name="username" class="form-control form-control-sm auth-input" placeholder="아이디" required>
-                <input type="password" name="password" class="form-control form-control-sm auth-input" placeholder="비밀번호" required>
-                <button type="submit" class="btn btn-sm btn-primary">로그인</button>
-            </form>
-            <a href="/signup/" class="btn btn-sm btn-success">회원가입</a>
-        {% endif %}
     </div>
 </div>
-
-<!-- <nav class="main-menu-bar shadow-sm">
-    <div class="container p-0">
-        <ul class="nav justify-content-center">
-            <li class="nav-item dropdown-container">
-                <a class="nav-link" href="#">접수 현황</a>
-                <div class="sliding-submenu">
-                    <ul class="submenu-list">
-                        <li><a href="#" onclick="openPopup('/board/csi_receipt/')">CSI_접수</a></li>
-                        <li><a href="#" onclick="checkLogin('/board/csi_issue/')">CSI_발급</a></li>
-                        <li><a href="#" onclick="checkLogin('/board/csi_pending/')">CSI_발급대기</a></li>
-                    </ul>
-                </div>
-            </li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('/request/')">품질검사 의뢰</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('/report/')">품질검사 성적서</a></li>
-            <li class="nav-item"><a class="nav-link" href="#" onclick="checkLogin('/notice/')">공지사항</a></li>
-        </ul>
-    </div>
-</nav> -->
-
 {% block content %}{% endblock %}
 
 <script src="{% static 'js/jquery-1.12.3.min.js' %}"></script>

@@ -7,35 +7,60 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css" />
-    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">    
 </head>
+<style>
+    .carousel-item img {
+    /* 이미지 높이를 400px로 고정 (원하시는 높이로 조절 가능) */
+    height: 400px; 
+    /* 이미지가 찌그러지지 않고 영역을 꽉 채우게 함 */
+    object-fit: cover; 
+}
+
+/* 이미지가 교체되는 애니메이션 자체의 속도를 조절 */
+.carousel-item {
+    transition: transform 2.5s ease-in-out, opacity 2.5s ease-in-out !important;
+}
+
+/* carousel-fade 효과를 사용할 때 더 부드럽게 겹쳐지도록 설정 */
+.carousel-fade .carousel-item {
+    transition-duration: 2.5s !important;
+}
+</style>
 <body>
 
-<div class="top-auth-bar">
-    <div class="container d-flex justify-content-end align-items-center gap-3">
-        <a href="/" class="btn btn-sm btn-outline-secondary py-0 d-flex align-items-center gap-1" title="메인페이지로 이동">
-            <i class="bi bi-house-door"></i> 홈
-        </a>
-        {% if user.is_authenticated %}
-            <span><strong>{{ user.username }}</strong>님 환영합니다.</span>
-            <form action="/logout/" method="post" class="d-inline">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-sm btn-outline-danger py-0">로그아웃</button>
-            </form>
-        {% else %}
-            <form action="/login/" method="post" class="d-flex gap-2">
-                {% csrf_token %}
-                
-                {% if form.errors %}
-                    <script>alert("아이디 또는 비밀번호가 일치하지 않습니다.");</script>
-                {% endif %}
+<div class="top-auth-bar py-1 border-bottom">
+    <div class="container d-flex justify-content-between align-items-center">
+        
+        <div class="logo-area">
+            <a href="/" class="d-flex align-items-center text-decoration-none">
+                <img src="{% static 'images/kcqt_logo.jpg' %}" alt="Logo" style="height: 28px; width: auto;">
+                <span class="ms-2 fw-bold text-dark d-none d-sm-inline">한국건설품질시험원(주)</span>
+            </a>
+        </div>
 
-                <input type="text" name="username" class="form-control form-control-sm auth-input" placeholder="아이디" required>
-                <input type="password" name="password" class="form-control form-control-sm auth-input" placeholder="비밀번호" required>
-                <button type="submit" class="btn btn-sm btn-primary">로그인</button>
-            </form>
-            <a href="/signup/" class="btn btn-sm btn-success">회원가입</a>
-        {% endif %}
+        <div class="d-flex align-items-center gap-2">
+            <a href="/" class="btn btn-sm btn-outline-secondary py-0 d-flex align-items-center gap-1" title="메인페이지로 이동">
+                <i class="bi bi-house-door"></i> 홈
+            </a>
+            
+            <div class="vr mx-1"></div> {% if user.is_authenticated %}
+                <span class="small me-2"><strong>{{ user.username }}</strong>님</span>
+                <form action="/logout/" method="post" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-danger py-0">로그아웃</button>
+                </form>
+            {% else %}
+                <form action="/login/" method="post" class="d-flex gap-2">
+                    {% csrf_token %}
+                    <input type="text" name="username" class="form-control form-control-sm" placeholder="아이디" style="width: 100px;" required>
+                    <input type="password" name="password" class="form-control form-control-sm" placeholder="비밀번호" style="width: 100px;" required>
+                    <button type="submit" class="btn btn-sm btn-primary py-0">로그인</button>
+                </form>
+                <a href="/signup/" class="btn btn-sm btn-success py-0">회원가입</a>
+            {% endif %}
+        </div>
+
     </div>
 </div>
 
@@ -68,6 +93,55 @@
     </div>
 </nav>
 
+<div class="d-flex flex-column" style="min-height: 100vh;">
+    
+    <div id="mainCarousel" class="carousel slide" data-bs-ride="carousel" style="height: 70vh;">
+        <div class="carousel-indicators">
+            <button type="button" data-bs-target="#mainCarousel" data-bs-slide-to="0" class="active"></button>
+            <button type="button" data-bs-target="#mainCarousel" data-bs-slide-to="1"></button>
+            <button type="button" data-bs-target="#mainCarousel" data-bs-slide-to="2"></button>
+        </div>
+        <div id="mainCarousel" class="carousel slide carousel-fade" data-bs-ride="carousel" style="height: 70vh;">
+            <div class="carousel-inner" style="height: 100%;">
+                <div class="carousel-item active" data-bs-interval="3000" style="height: 70vh;">
+                    <img src="{% static 'images/img9.png' %}" class="d-block w-100" style="height: 100%; object-fit: cover; filter: brightness(0.8);">
+                    <div class="carousel-caption d-flex flex-column h-100 align-items-center justify-content-center">
+                        <h1 class="display-1 fw-bold main-text">신뢰받는 품질시험 전문기관</h1>
+                        <p class="fs-3 sub-text">한국건설품질시험원(주)이 정밀한 결과를 보장합니다.</p>
+                    </div>
+                </div>
+
+                <div class="carousel-item" data-bs-interval="3000" style="height: 70vh;">
+                    <img src="{% static 'images/img6.jpg' %}" class="d-block w-100" style="height: 100%; object-fit: cover; filter: brightness(0.8);">
+                    <div class="carousel-caption d-flex flex-column h-100 align-items-center justify-content-center">
+                        <h1 class="display-1 fw-bold main-text">최첨단 시험 장비 보유</h1>
+                        <p class="fs-3 sub-text">정확한 데이터 분석을 통한 완벽한 품질 관리</p>
+                    </div>
+                </div>
+
+                <div class="carousel-item" data-bs-interval="3000" style="height: 70vh;">
+                    <img src="{% static 'images/img8.jpg' %}" class="d-block w-100" style="height: 100%; object-fit: cover; filter: brightness(0.8);">
+                    <div class="carousel-caption d-flex flex-column h-100 align-items-center justify-content-center">
+                        <h1 class="display-1 fw-bold main-text">최고의 전문가 그룹</h1>
+                        <p class="fs-3 sub-text">수년간의 노하우로 최적의 기술 서비스를 제공합니다.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-area bg-light border-top" style="height: 30vh; overflow-y: auto;">
+        <div class="container py-3">
+            {% block content %}
+                <p class="text-center text-muted"></p>
+            {% endblock %}
+        </div>
+    </div>
+</div>
+
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/jquery-1.12.3.min.js' %}"></script>
 <!-- 여기부터 CSI_접수 창 입니다 -->
  <li>
     <a href="#" onclick="openPopup('/board/csi_receipt/')"></a>  

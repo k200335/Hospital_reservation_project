@@ -129,3 +129,34 @@
     .slide-item { height: 400px; }
     .slide-content h2 { font-size: 2rem; }
 }
+
+/* 메인 큰 글씨 스타일 */
+.main-text {
+    text-shadow: 2px 2px 10px rgba(0, 0, 0, 0.7); /* 글자 그림자로 가독성 확보 */
+    letter-spacing: -2px; /* 자간 조절 */
+    animation: fadeInUp 1s ease-out; /* 글자가 아래서 위로 올라오는 효과 */
+}
+
+/* 서브 글씨 스타일 */
+.sub-text {
+    text-shadow: 1px 1px 5px rgba(0, 0, 0, 0.7);
+    font-weight: 300;
+    opacity: 0.9;
+}
+
+/* 이미지를 살짝 어둡게 해서 글자를 돋보이게 함 (선택사항) */
+.carousel-item img {
+    filter: brightness(0.7); 
+}
+
+/* 글자 애니메이션 효과 */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
