@@ -1,5 +1,6 @@
 import json
 import time
+import traceback
 from django.http import JsonResponse
 from django.http import HttpResponse
 from django.utils import timezone  # 현재 시간 저장을 위해 추가
@@ -3252,12 +3253,16 @@ def delete_memo(request):
 
 #     teams = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀']
 #     result_data = {
-#         team: { 'receipt': [0] * last_index, 'issue': [0] * last_index } 
+#         team: { 
+#             'receipt': [0] * last_index, 
+#             'issue': [0] * last_index,
+#             'matched_issue': [0] * last_index  # ⬅️ 팀별로 담을 바구니 새로 생성
+#         } 
 #         for team in teams
 #     }
 
 #     with connection.cursor() as cursor:
-#         # 1. [접수 기준] 선택 기간 내 배정된 총건수 (csi_receipts 단독)
+#         # 1. [접수 기준] - 기존 코드 유지
 #         receipt_query = f"""
 #             SELECT {date_func}(STR_TO_DATE(배정일자, '%Y-%m-%d')) as idx, 담당자, COUNT(의뢰번호)
 #             FROM csi_receipts
@@ -3266,12 +3271,12 @@ def delete_memo(request):
 #         """
 #         cursor.execute(receipt_query)
 #         for idx, team, cnt in cursor.fetchall():
-#             if team in result_data and idx:
+#             clean_team = team.strip() if team else ""
+#             if clean_team in result_data and idx:
 #                 if 0 <= int(idx)-1 < last_index:
-#                     result_data[team]['receipt'][int(idx)-1] = cnt
+#                     result_data[clean_team]['receipt'][int(idx)-1] = cnt
 
-#         # 2. [발급 기준] 선택 기간 내 발급된 건수 (csi_issue_results + csi_receipts 매칭)
-#         # 발급일 기준으로 뽑되, 담당자(팀) 정보는 receipts 테이블에서 가져옵니다.
+#         # 2. [단순 발급 기준] - 기존 코드 (발급일자 기준 시계열)
 #         issue_query = f"""
 #             SELECT 
 #                 {date_func}(STR_TO_DATE(I.발급일자, '%Y-%m-%d')) as idx, 
@@ -3284,173 +3289,111 @@ def delete_memo(request):
 #         """
 #         cursor.execute(issue_query)
 #         for idx, team, cnt in cursor.fetchall():
-#             if team in result_data and idx:
+#             clean_team = team.strip() if team else ""
+#             if clean_team in result_data and idx:
 #                 if 0 <= int(idx)-1 < last_index:
-#                     result_data[team]['issue'][int(idx)-1] = cnt
+#                     result_data[clean_team]['issue'][int(idx)-1] = cnt
+
+#         # 3. [의뢰번호 매칭 기준] ⬅️ 🎯 새로 추가된 핵심 로직
+#         # 해당 기간에 '접수(배정)'된 의뢰번호 중 발급까지 완료된 건수를 똑같이 팀별로 담습니다.
+#         matched_query = f"""
+#             SELECT 
+#                 {date_func}(STR_TO_DATE(R.배정일자, '%Y-%m-%d')) as idx, 
+#                 R.담당자, 
+#                 COUNT(I.의뢰번호)
+#             FROM csi_receipts R
+#             INNER JOIN csi_issue_results I ON R.의뢰번호 = I.의뢰번호
+#             WHERE R.배정일자 LIKE '{date_filter}'
+#             GROUP BY idx, R.담당자
+#         """
+#         cursor.execute(matched_query)
+#         for idx, team, cnt in cursor.fetchall():
+#             clean_team = team.strip() if team else ""
+#             if clean_team in result_data and idx:
+#                 if 0 <= int(idx)-1 < last_index:
+#                     # ✅ 이제 프론트엔드에서 녹색선을 그릴 수 있도록 팀별 배열에 저장합니다.
+#                     result_data[clean_team]['matched_issue'][int(idx)-1] = cnt
 
 #     return JsonResponse(result_data)
-
-
-
-# def get_stats(request):
-#     year = request.GET.get('year', '2025')
-#     month = request.GET.get('month', '12') # 기본값을 이미지에 나온 12월로 설정
-#     mode = request.GET.get('mode', 'daily')
-
-#     teams_list = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀']
-#     y_int, m_int = int(year), int(month)
-
-#     # 1. 그래프 배열 크기 결정 (Yearly면 12개, Daily면 해당 월의 일수만큼)
-#     if mode == 'yearly':
-#         size = 12
-#     else:
-#         # 12월이면 31이 됩니다.
-#         size = calendar.monthrange(y_int, m_int)[1]
-
-#     # 팀별 바구니 초기화 (이 구조가 틀리면 그래프가 안 나옵니다)
-#     result_data = {
-#         team: { 'receipt': [0] * size, 'issue': [0] * size } 
-#         for team in teams_list
-#     }
-
-#     print(f"\n🚀 [단일 통로 실행] 모드: {mode} / 대상: {year}년 {month if mode=='daily' else ''}")
-
-#     with connection.cursor() as cursor:
-#         # [발급 데이터] 연도 전체(2025%) 조회
-#         cursor.execute("""
-#             SELECT I.발급일자, R.담당자, COUNT(I.의뢰번호)
-#             FROM csi_issue_results I
-#             INNER JOIN csi_receipts R ON I.의뢰번호 = R.의뢰번호
-#             WHERE I.발급일자 LIKE %s
-#             GROUP BY I.발급일자, R.담당자
-#         """, [f"{year}%"])
-        
-#         raw_rows = cursor.fetchall()
-#         print(f"📦 DB Raw 데이터: {sum(row[2] for row in raw_rows)}건 수신")
-
-#         for date_str, team, cnt in raw_rows:
-#             clean_name = team.strip() if team else ""
-#             if clean_name in result_data and date_str:
-#                 try:
-#                     # 날짜 파싱 (2025-12-01)
-#                     parts = date_str.split('-')
-#                     row_m, row_d = int(parts[1]), int(parts[2])
-
-#                     if mode == 'yearly':
-#                         result_data[clean_name]['issue'][row_m - 1] += cnt
-#                     elif mode == 'daily' and row_m == m_int:
-#                         # 일일 모드일 때만 12월 데이터를 0~30 인덱스에 넣음
-#                         if 1 <= row_d <= size:
-#                             result_data[clean_name]['issue'][row_d - 1] += cnt
-#                 except (IndexError, ValueError):
-#                     continue
-
-#         # [접수 데이터] 동일 로직 적용
-#         cursor.execute("""
-#             SELECT 배정일자, 담당자, COUNT(의뢰번호)
-#             FROM csi_receipts
-#             WHERE 배정일자 LIKE %s
-#             GROUP BY 배정일자, 담당자
-#         """, [f"{year}%"])
-        
-#         for date_str, team, cnt in cursor.fetchall():
-#             clean_name = team.strip() if team else ""
-#             if clean_name in result_data and date_str:
-#                 try:
-#                     parts = date_str.split('-')
-#                     row_m, row_d = int(parts[1]), int(parts[2])
-#                     if mode == 'yearly':
-#                         result_data[clean_name]['receipt'][row_m - 1] += cnt
-#                     elif mode == 'daily' and row_m == m_int:
-#                         if 1 <= row_d <= size:
-#                             result_data[clean_name]['receipt'][row_d - 1] += cnt
-#                 except (IndexError, ValueError):
-#                     continue
-
-#     # 2. 최종 합계 (현재 바구니에 담긴 값만 합산 -> 오차 해결)
-#     f_issue_total = sum(sum(result_data[t]['issue']) for t in teams_list)
-#     f_receipt_total = sum(sum(result_data[t]['receipt']) for t in teams_list)
-
-#     print(f"🎯 화면 전송 합계: {f_issue_total}건 (정상 분류 완료)")
-
-#     result_data['total_issue'] = f_issue_total
-#     result_data['total_receipt'] = f_receipt_total
-
-#     return JsonResponse(result_data)
-
 
 
 def get_stats(request):
-    year = request.GET.get('year')
-    month = request.GET.get('month', '1').zfill(2)
-    mode = request.GET.get('mode', 'daily')
+    try:
+        # 1. 파라미터 수집
+        year = request.GET.get('year')
+        month = request.GET.get('month', '1').zfill(2)
+        mode = request.GET.get('mode', 'daily')
 
-    # 필터 조건 설정
-    date_filter = f"{year}%" if mode == 'yearly' else f"{year}-{month}%"
-    last_index = 12 if mode == 'yearly' else calendar.monthrange(int(year), int(month))[1]
-    date_func = "MONTH" if mode == 'yearly' else "DAY"
+        # 2. 필터 조건 설정 (사용자님 지침 반영)
+        # MySQL: 하이픈 있음 (예: 2026-01%)
+        mysql_filter = f"{year}%" if mode == 'yearly' else f"{year}-{month}%"
+        # MSSQL: 하이픈 없음 (예: 202601%)
+        mssql_filter = f"{year}" if mode == 'yearly' else f"{year}{month}"
+        
+        last_index = 12 if mode == 'yearly' else calendar.monthrange(int(year), int(month))[1]
+        date_func = "MONTH" if mode == 'yearly' else "DAY"
 
-    teams = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀']
-    result_data = {
-        team: { 
-            'receipt': [0] * last_index, 
-            'issue': [0] * last_index,
-            'matched_issue': [0] * last_index  # ⬅️ 팀별로 담을 바구니 새로 생성
-        } 
-        for team in teams
-    }
+        teams = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀']
+        result_data = {
+            team: { 
+                'receipt': [0] * last_index, 
+                'issue': [0] * last_index,           # 파란색 선 (발급 총건수)
+                'matched_issue': [0] * last_index,   # 녹색 선 (매칭 발급건수)
+                'sales': [0] * last_index, 
+                'deposit': [0] * last_index 
+            } for team in teams
+        }
 
-    with connection.cursor() as cursor:
-        # 1. [접수 기준] - 기존 코드 유지
-        receipt_query = f"""
-            SELECT {date_func}(STR_TO_DATE(배정일자, '%Y-%m-%d')) as idx, 담당자, COUNT(의뢰번호)
-            FROM csi_receipts
-            WHERE 배정일자 LIKE '{date_filter}'
-            GROUP BY idx, 담당자
-        """
-        cursor.execute(receipt_query)
-        for idx, team, cnt in cursor.fetchall():
-            clean_team = team.strip() if team else ""
-            if clean_team in result_data and idx:
-                if 0 <= int(idx)-1 < last_index:
-                    result_data[clean_team]['receipt'][int(idx)-1] = cnt
+        # 3. [MySQL] 발급/접수 (하이픈 있는 mysql_filter 사용)
+        mapping_dict = {}
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT 의뢰번호, 담당자 FROM csi_receipts WHERE 담당자 IS NOT NULL")
+            for req_no, owner in cursor.fetchall():
+                mapping_dict[req_no] = owner.strip()
 
-        # 2. [단순 발급 기준] - 기존 코드 (발급일자 기준 시계열)
-        issue_query = f"""
-            SELECT 
-                {date_func}(STR_TO_DATE(I.발급일자, '%Y-%m-%d')) as idx, 
-                R.담당자, 
-                COUNT(I.의뢰번호)
-            FROM csi_issue_results I
-            INNER JOIN csi_receipts R ON I.의뢰번호 = R.의뢰번호
-            WHERE I.발급일자 LIKE '{date_filter}'
-            GROUP BY idx, R.담당자
-        """
-        cursor.execute(issue_query)
-        for idx, team, cnt in cursor.fetchall():
-            clean_team = team.strip() if team else ""
-            if clean_team in result_data and idx:
-                if 0 <= int(idx)-1 < last_index:
-                    result_data[clean_team]['issue'][int(idx)-1] = cnt
+            # (1) 접수 건수
+            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(배정일자, '%Y-%m-%d')) as idx, 담당자, COUNT(*) FROM csi_receipts WHERE 배정일자 LIKE '{mysql_filter}' GROUP BY idx, 담당자")
+            for idx, team, cnt in cursor.fetchall():
+                t = team.strip() if team else ""
+                if t in result_data and idx:
+                    result_data[t]['receipt'][int(idx)-1] = cnt
 
-        # 3. [의뢰번호 매칭 기준] ⬅️ 🎯 새로 추가된 핵심 로직
-        # 해당 기간에 '접수(배정)'된 의뢰번호 중 발급까지 완료된 건수를 똑같이 팀별로 담습니다.
-        matched_query = f"""
-            SELECT 
-                {date_func}(STR_TO_DATE(R.배정일자, '%Y-%m-%d')) as idx, 
-                R.담당자, 
-                COUNT(I.의뢰번호)
-            FROM csi_receipts R
-            INNER JOIN csi_issue_results I ON R.의뢰번호 = I.의뢰번호
-            WHERE R.배정일자 LIKE '{date_filter}'
-            GROUP BY idx, R.담당자
-        """
-        cursor.execute(matched_query)
-        for idx, team, cnt in cursor.fetchall():
-            clean_team = team.strip() if team else ""
-            if clean_team in result_data and idx:
-                if 0 <= int(idx)-1 < last_index:
-                    # ✅ 이제 프론트엔드에서 녹색선을 그릴 수 있도록 팀별 배열에 저장합니다.
-                    result_data[clean_team]['matched_issue'][int(idx)-1] = cnt
+            # (2) 발급 총건수 (파란색 선)
+            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(I.발급일자, '%Y-%m-%d')) as idx, R.담당자, COUNT(*) FROM csi_issue_results I INNER JOIN csi_receipts R ON I.의뢰번호 = R.의뢰번호 WHERE I.발급일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
+            for idx, team, cnt in cursor.fetchall():
+                t = team.strip() if team else ""
+                if t in result_data and idx:
+                    result_data[t]['issue'][int(idx)-1] = cnt
 
-    return JsonResponse(result_data)
+            # (3) 매칭 발급건수 (녹색 선)
+            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(R.배정일자, '%Y-%m-%d')) as idx, R.담당자, COUNT(*) FROM csi_receipts R INNER JOIN csi_issue_results I ON R.의뢰번호 = I.의뢰번호 WHERE R.배정일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
+            for idx, team, cnt in cursor.fetchall():
+                t = team.strip() if team else ""
+                if t in result_data and idx:
+                    result_data[t]['matched_issue'][int(idx)-1] = cnt
+
+        # 4. [MSSQL] 매출/입금 (하이픈 없는 mssql_filter 사용)
+        with connections['mssql'].cursor() as mssql_cursor:
+            # 매출액 (계산서 발행일 기준)
+            s_idx = "MONTH(T.issue_date)" if mode == 'yearly' else "DAY(T.issue_date)"
+            mssql_cursor.execute(f"SELECT {s_idx}, R.request_code, SUM(ISNULL(E.supply_value, 0) + ISNULL(E.vat, 0)) FROM dbo.Tax_Manager T INNER JOIN dbo.Receipt R ON T.receipt_code = R.receipt_code LEFT JOIN dbo.Estimate E ON T.receipt_code = E.receipt_code WHERE T.issue_date LIKE '{mssql_filter}%' GROUP BY {s_idx}, R.request_code")
+            for idx, req_code, val in mssql_cursor.fetchall():
+                team = mapping_dict.get(req_code)
+                if team in result_data and idx:
+                    result_data[team]['sales'][int(idx)-1] += int(val or 0)
+
+            # 입금액 (입금일 기준 - 하이픈 없음)
+            d_idx = "CAST(SUBSTRING(D.deposit_day, 5, 2) AS INT)" if mode == 'yearly' else "CAST(SUBSTRING(D.deposit_day, 7, 2) AS INT)"
+            mssql_cursor.execute(f"SELECT {d_idx}, R.request_code, SUM(ISNULL(D.deposit, 0)) FROM dbo.Deposit D INNER JOIN dbo.Receipt R ON D.receipt_code = R.receipt_code WHERE D.deposit_day LIKE '{mssql_filter}%' GROUP BY {d_idx}, R.request_code")
+            for idx, req_code, val in mssql_cursor.fetchall():
+                team = mapping_dict.get(req_code)
+                if team in result_data and idx:
+                    result_data[team]['deposit'][int(idx)-1] += int(val or 0)
+
+        return JsonResponse(result_data)
+
+    except Exception as e:
+        print(traceback.format_exc())
+        return JsonResponse({'error': str(e)}, status=500)
+
+

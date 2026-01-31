@@ -130,16 +130,14 @@
             <div class="d-flex flex-column gap-3">
                 <h5 class="fw-bold mb-2">실적 요약(Q,T,E건 제외)</h5>
                 
-                <div class="card stat-card active" onclick="changeViewMode('daily', this)" style="cursor: pointer;">
+                <!-- <div class="card stat-card active" onclick="changeViewMode('daily', this)" style="cursor: pointer;">
                     <div class="card-body">
-                        <h6 class="text-muted small">일일 업무 현황</h6>                      
+                        <h6 class="text-muted small">일일 업무 현황</h6>                       
                         <h3 class="fw-bold mb-0">
                             <span id="dailyCountValue">0건 / 발급 0건</span> 
-                            <span class="text-success small" style="font-size: 0.5em;"></span>
                         </h3>    
-                        
                     </div>
-                </div>
+                </div> -->
 
                 <div class="card stat-card" onclick="changeViewMode('yearly', this)" style="cursor: pointer;">
                     <div class="card-body">
@@ -151,19 +149,12 @@
                     </div>
                 </div>
 
-                <!-- <div class="card stat-card shadow-sm border-0" onclick="changeViewMode('invoice', this)" style="cursor: pointer;">
-                    <div class="card-body">
-                        <h6 class="text-muted small">작업중</h6>
-                        <h3 class="fw-bold mb-0">₩128.5M <span class="text-warning small" style="font-size: 0.5em;">이달의 매출</span></h3>
-                    </div>
-                </div>
-
                 <div class="card stat-card shadow-sm border-0" onclick="changeViewMode('payment', this)" style="cursor: pointer;">
                     <div class="card-body">
-                        <h6 class="text-muted small">작업중</h6>
-                        <h3 class="fw-bold mb-0">₩92.0M <span class="text-info small" style="font-size: 0.5em;">회수율 71%</span></h3>
+                        <h6 class="text-muted small">월별 입금액 실적 </h6>
+                        <h3 class="fw-bold mb-0">월별 입금액 확인<span class="text-info small" style="font-size: 0.5em;"></span></h3>
                     </div>
-                </div> -->
+                </div>
             </div>
         </div>
 
@@ -185,7 +176,7 @@
                                 <option value="2030">2030년</option>
                             </select>
                             <select id="monthSelect" class="form-select form-select-sm" onchange="updateChartData()">
-                                <option value="1" selected>1월</option>
+                                <!-- <option value="1" selected>1월</option>
                                 <option value="2">2월</option>
                                 <option value="3">3월</option>
                                 <option value="4">4월</option>
@@ -196,7 +187,7 @@
                                 <option value="9">9월</option>
                                 <option value="10">10월</option>
                                 <option value="11">11월</option>
-                                <option value="12">12월</option>                                
+                                <option value="12">12월</option>                                 -->
                             </select>
                         </div>
                     </div>
@@ -207,8 +198,40 @@
                 </div>
             </div>
         </div>
-    </div>
-</div>
+    </div> <div class="row mt-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white py-3">
+                    <h5 class="fw-bold mb-0">상세 입금 데이터</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover align-middle text-center small">
+                            <thead class="table-light">
+                                <tr>
+                                    <th rowspan="2" class="align-middle" style="min-width: 80px;">팀명</th>
+                                    <th colspan="2">1월</th><th colspan="2">2월</th><th colspan="2">3월</th>
+                                    <th colspan="2">4월</th><th colspan="2">5월</th><th colspan="2">6월</th>
+                                    <th colspan="2">7월</th><th colspan="2">8월</th><th colspan="2">9월</th>
+                                    <th colspan="2">10월</th><th colspan="2">11월</th><th colspan="2">12월</th>
+                                </tr>
+                                <tr>
+                                    <th>매출</th><th>입금</th><th>매출</th><th>입금</th><th>매출</th><th>입금</th>
+                                    <th>매출</th><th>입금</th><th>매출</th><th>입금</th><th>매출</th><th>입금</th>
+                                    <th>매출</th><th>입금</th><th>매출</th><th>입금</th><th>매출</th><th>입금</th>
+                                    <th>매출</th><th>입금</th><th>매출</th><th>입금</th><th>매출</th><th>입금</th>
+                                </tr>
+                            </thead>
+                            <tbody id="depositTableBody">
+                                </tbody>
+                            <tfoot id="depositTableTotal" class="table-light fw-bold">
+                                </tfoot>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div> </div>
 
 
 
@@ -222,7 +245,7 @@
 
 
 let mainChart = null;
-let currentMode = 'daily'; // 현재 보고 있는 모드 (기본값: 일일)
+let currentMode = 'yearly'; // 현재 보고 있는 모드 (기본값: 일일)
 
 // 팀별 고유 색상 설정
 const teamColors = [
@@ -234,52 +257,107 @@ const teamColors = [
     '#DAA520'  // 6팀: 황색
 ];
 
+
+
 document.addEventListener('DOMContentLoaded', function() {
+    // 1. 현재 날짜에 맞춰 셀렉트 박스 초기값 설정
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+
+    const yearSelect = document.getElementById('yearSelect');
+    const monthSelect = document.getElementById('monthSelect');
+
+    if (yearSelect) yearSelect.value = currentYear;
+    if (monthSelect) monthSelect.value = currentMonth;
     initChart();
 });
 
-// 1. 차트 초기화
+// [추가 제안] 차트 리사이즈 이슈 방지
+window.addEventListener('resize', () => {
+    if (mainChart) mainChart.resize();
+});
+
+// 1. 차트 초기화 (건수 축과 금액 축 통합 버전)
 function initChart() {
     const ctx = document.getElementById('mainDashboardChart');
     if (!ctx) return;
 
     mainChart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: [],
-        datasets: [] 
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: {
-            x: { grid: { display: false } },
-            y: { 
-                beginAtZero: true, 
-                ticks: { 
-                    precision: 0,
-                    stepSize: 5  // ⬅️ 이 줄을 추가하세요! (눈금을 10단위로 고정)
-                },
-                suggestedMax: 80 // 데이터가 적어도 일단 100까지는 눈금을 그려줌 
-            }
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [] 
         },
-        plugins: {
-            legend: { position: 'top', align: 'end' }
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    grid: { display: false } 
+                },
+                y: { 
+                    // 왼쪽 축: 건수 (기존 설정 복구 + 확장)
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    beginAtZero: true, 
+                    ticks: { 
+                        precision: 0,
+                        stepSize: 5 // 눈금 5단위 고정
+                    },
+                    suggestedMax: 80, // 데이터가 없어도 최소 80까지 표시
+                    title: {
+                        display: true,
+                        text: '건수 (EA)',
+                        font: { weight: 'bold' }
+                    }
+                },
+                y1: {
+                    // 오른쪽 축: 금액 전용
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    beginAtZero: true,
+                    grid: { drawOnChartArea: false }, // 격자선 중첩 방지
+                    title: {
+                        display: true,
+                        text: '금액 (원)',
+                        font: { weight: 'bold' }
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            // 금액이 너무 크면 만원 단위로 표시하거나 콤마 추가
+                            return value.toLocaleString() + '원';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: { 
+                    position: 'top', 
+                    align: 'end' 
+                }
+            }
         }
-    }
-});
+    });
+    
+    // 차트 생성 후 바로 데이터를 불러옵니다.
     updateChartData();
 }
 
-// 2. 카드 클릭 시 모드 변경 (중요: 독립적 업데이트의 핵심)
+// 2. 카드 클릭 시 모드 변경 (UI 개선)
 window.changeViewMode = function(mode, element) {
     currentMode = mode;
 
-    // UI 활성화 처리 (카드 강조)
-    document.querySelectorAll('.stat-card').forEach(card => card.classList.remove('active'));
-    if (element) element.classList.add('active');
+    // UI 활성화 처리
+    document.querySelectorAll('.stat-card').forEach(card => {
+        card.classList.remove('active', 'shadow-sm');
+    });
+    if (element) {
+        element.classList.add('active');
+    }
 
-    // 타이틀 및 월 선택 드롭다운 제어
     const titleEl = document.getElementById('chartTitle');
     const monthEl = document.getElementById('monthSelect');
     const titles = {
@@ -290,245 +368,135 @@ window.changeViewMode = function(mode, element) {
     };
 
     if (titleEl) titleEl.innerText = titles[mode];
-    // 연간 모드일 때는 '월' 선택 창을 숨깁니다.
+    // 연간 모드일 때만 월 선택 숨김 (display 대신 visibility 유지로 레이아웃 고정)
     if (monthEl) monthEl.style.visibility = (mode === 'yearly') ? 'hidden' : 'visible';
 
-    // 해당 모드에 맞춰 데이터 새로고침
     updateChartData();
 };
 
-// function updateChartData() {
-//     const yearSelect = document.getElementById('yearSelect');
-//     const monthSelect = document.getElementById('monthSelect');
-//     if (!yearSelect) return;
 
-//     const year = yearSelect.value;
-//     const month = monthSelect ? monthSelect.value : "1";
 
-//     fetch(`/api/get-stats/?year=${year}&month=${month}&mode=${currentMode}`)
-//         .then(res => {
-//             if (!res.ok) throw new Error(`HTTP 에러! 상태: ${res.status}`);
-//             return res.json();
-//         })
-//         .then(data => {
-//             const stats = data || {};
-//             const teamNames = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀'];
-//             const lastDay = (currentMode === 'yearly') ? 12 : new Date(year, month, 0).getDate();
-            
-//             // -----------------------------------------------------------
-//             // [사용자님 아이디어 반영: 강제 합산 로직]
-//             // 백엔드가 준 합계(486)는 버리고, 그래프에 들어갈 숫자들만 직접 더합니다.
-//             // -----------------------------------------------------------
-//             let realIssueSum = 0;
-//             let realReceiptSum = 0;
-
-//             teamNames.forEach(team => {
-//                 const teamData = stats[team];
-//                 if (teamData) {
-//                     // 팀별 발급(issue) 배열의 합계를 구함 (예: 151 + 0 + ...)
-//                     if (Array.isArray(teamData.issue)) {
-//                         realIssueSum += teamData.issue.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-//                     }
-//                     // 팀별 접수(receipt) 배열의 합계를 구함
-//                     if (Array.isArray(teamData.receipt)) {
-//                         realReceiptSum += teamData.receipt.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-//                     }
-//                 }
-//             });
-
-//             // 1. UI 업데이트 (좌측 합계 메뉴)
-//             // 여기서 iSum 자리에 우리가 직접 계산한 realIssueSum(483)이 들어갑니다.
-//             const updateUI = (id, rSum, iSum, label, colorClass) => {
-//                 const el = document.getElementById(id);
-//                 if (el) {
-//                     el.innerHTML = `${rSum.toLocaleString()}건 / <span style="color:#2f55d4">발급 ${iSum.toLocaleString()}건</span> <span class="${colorClass} small" style="font-size: 0.5em; margin-left:5px;">${label}</span>`;
-//                 }
-//             };
-
-//             if (currentMode === 'daily') {
-//                 updateUI('dailyCountValue', realReceiptSum, realIssueSum, 'Today', 'text-success');
-//             } else if (currentMode === 'yearly') {
-//                 updateUI('yearlyCountValue', realReceiptSum, realIssueSum, `${year}년`, 'text-primary');
-//             }
-
-//             // 2. 차트(그래프) 업데이트 로직
-//             if (mainChart) {
-//                 const labels = Array.from({length: lastDay}, (_, i) => (currentMode === 'yearly' ? `${i+1}월` : `${i+1}일`));
-                
-//                 const newDatasets = teamNames.map((team, i) => ({
-//                     type: 'bar',
-//                     label: team,
-//                     data: (stats[team]?.receipt || Array(lastDay).fill(0)).slice(0, lastDay),
-//                     backgroundColor: teamColors[i],
-//                     borderRadius: 4,
-//                     order: 2
-//                 }));
-
-//                 let zigzagPoints = [];
-//                 for (let d = 0; d < lastDay; d++) {
-//                     teamNames.forEach((team, tIdx) => {
-//                         const val = Number(stats[team]?.issue?.[d] || 0);
-//                         const barOffset = (tIdx - (teamNames.length - 1) / 2) * (0.8 / teamNames.length);
-//                         zigzagPoints.push({ x: d + barOffset, y: val });
-//                     });
-//                 }
-
-//                 newDatasets.push({
-//                     type: 'line',
-//                     label: '발급 건수',
-//                     data: zigzagPoints,
-//                     borderColor: '#2f55d4',
-//                     borderWidth: 2,
-//                     pointBackgroundColor: 'red',
-//                     pointRadius: 4,
-//                     pointStyle: 'star',
-//                     fill: false,
-//                     tension: 0,
-//                     order: 1,
-//                     parsing: false
-//                 });
-
-//                 mainChart.data.labels = labels;
-//                 mainChart.data.datasets = newDatasets;
-//                 mainChart.update();
-//             }
-//         })
-//         .catch(err => {
-//             console.error("데이터 로딩 중 오류:", err);
-//         });
-// }
 
 function updateChartData() {
     const yearSelect = document.getElementById('yearSelect');
     const monthSelect = document.getElementById('monthSelect');
-    if (!yearSelect) return;
+    if (!yearSelect || !monthSelect || !mainChart) return;
 
     const year = yearSelect.value;
-    const month = monthSelect ? monthSelect.value : "1";
+    const month = monthSelect.value;
 
-    fetch(`/api/get-stats/?year=${year}&month=${month}&mode=${currentMode}`)
-        .then(res => {
-            if (!res.ok) throw new Error(`HTTP 에러! 상태: ${res.status}`);
-            return res.json();
-        })
+    const chartTitleEl = document.getElementById('chartTitle');
+    if (chartTitleEl) {
+        let modeName = (currentMode === 'daily') ? "일일 업무 현황" : 
+                       (currentMode === 'yearly') ? "연간 누적 실적" : "월별 입금액 확인";
+        chartTitleEl.innerText = (currentMode === 'yearly' || currentMode === 'payment') 
+            ? `${year}년 ${modeName}` : `${year}년 ${month}월 ${modeName}`;
+    }
+
+    // 🎯 포인트 1: 일일 현황 클릭 시 백엔드에 'daily' 모드로 요청하여 일별 데이터를 가져옵니다.
+    const requestMode = (currentMode === 'payment' || currentMode === 'yearly') ? 'yearly' : 'daily';
+    const apiUrl = `/api/get-stats/?year=${year}&month=${month}&mode=${requestMode}`;
+
+    fetch(apiUrl)
+        .then(res => res.json())
         .then(data => {
             const stats = data || {};
             const teamNames = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀'];
-            const lastDay = (currentMode === 'yearly') ? 12 : new Date(year, month, 0).getDate();
+            const isDaily = (currentMode === 'daily');
+            const lastIndex = isDaily ? new Date(year, month, 0).getDate() : 12;
+            const labels = Array.from({length: lastIndex}, (_, i) => isDaily ? `${i+1}일` : `${i+1}월`);
             
-            let realIssueSum = 0;
-            let realReceiptSum = 0;
-            let realMatchedSum = 0;
+            let totalReceipt = 0, totalIssue = 0, totalMatched = 0, totalSales = 0, totalDeposit = 0;
+            let monthlyTotals = Array.from({ length: 12 }, () => ({ sales: 0, deposit: 0 }));
 
+            // 1. 데이터 집계 및 표(Table) 생성
+            let tableHtml = "";
             teamNames.forEach(team => {
-                const teamData = stats[team];
-                if (teamData) {
-                    if (Array.isArray(teamData.issue)) {
-                        realIssueSum += teamData.issue.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-                    }
-                    if (Array.isArray(teamData.receipt)) {
-                        realReceiptSum += teamData.receipt.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-                    }
-                    if (Array.isArray(teamData.matched_issue)) {
-                        realMatchedSum += teamData.matched_issue.reduce((acc, curr) => acc + (Number(curr) || 0), 0);
-                    }
-                }
-            });
+                const t = stats[team] || {};
+                
+                // 카드용 건수 합산 (백엔드에서 넘어온 배열 전체 합산)
+                totalReceipt += (t.receipt || []).reduce((a, b) => a + Number(b || 0), 0);
+                totalIssue += (t.issue || []).reduce((a, b) => a + Number(b || 0), 0);
+                totalMatched += (t.matched_issue || []).reduce((a, b) => a + Number(b || 0), 0);
+                
+                // 표를 위한 12개월 데이터 (daily 모드여도 백엔드에서 yearly 데이터를 같이 주거나, 별도 처리 필요)
+                const sArr = t.sales || Array(12).fill(0);
+                const dArr = t.deposit || Array(12).fill(0);
 
-            // 1. UI 업데이트
-            const updateUI = (id, rSum, iSum, mSum, label, colorClass) => {
-                const el = document.getElementById(id);
-                if (el) {
-                    el.innerHTML = `
-                        ${rSum.toLocaleString()}건 / <span style="color:#2f55d4">발급 ${iSum.toLocaleString()}건</span>
-                        <div class="mt-1" style="color:#28a745; font-size: 0.75em; font-weight: bold;">
-                            [의뢰번호 매칭 발급완료 건수: ${mSum.toLocaleString()}건]
-                        </div>
-                        <span class="${colorClass} small" style="font-size: 0.5em; margin-left:5px;">${label}</span>
+                tableHtml += `<tr><td class="fw-bold bg-light">${team}</td>`;
+                for (let i = 0; i < 12; i++) {
+                    const sVal = Number(sArr[i] || 0);
+                    const dVal = Number(dArr[i] || 0);
+                    monthlyTotals[i].sales += sVal;
+                    monthlyTotals[i].deposit += dVal;
+                    if (!isDaily) { totalSales += sVal; totalDeposit += dVal; }
+
+                    tableHtml += `
+                        <td class="text-end">${sVal.toLocaleString()}</td>
+                        <td class="text-end text-primary fw-bold">${dVal.toLocaleString()}</td>
                     `;
                 }
-            };
+                tableHtml += `</tr>`;
+            });
 
-            if (currentMode === 'daily') {
-                updateUI('dailyCountValue', realReceiptSum, realIssueSum, realMatchedSum, 'Today', 'text-success');
-            } else if (currentMode === 'yearly') {
-                updateUI('yearlyCountValue', realReceiptSum, realIssueSum, realMatchedSum, `${year}년`, 'text-primary');
+            // 2. 카드 업데이트 (수치 동기화)
+            const countHtml = `${totalReceipt.toLocaleString()}건 / <span style="color:#2f55d4">발급 ${totalIssue.toLocaleString()}건</span><div class="mt-1" style="color:#28a745; font-size: 0.75em; font-weight: bold;">[의뢰번호 매칭 발급완료 건수: ${totalMatched.toLocaleString()}건]</div>`;
+            if(document.getElementById('dailyCountValue') && isDaily) document.getElementById('dailyCountValue').innerHTML = countHtml;
+            if(document.getElementById('yearlyCountValue') && !isDaily) document.getElementById('yearlyCountValue').innerHTML = countHtml;
+
+            // 3. 그래프 데이터셋 구성 (일일 그래프 복구 핵심)
+            const newDatasets = [];
+            teamNames.forEach((team, i) => {
+                const tData = stats[team] || {};
+                // 🎯 포인트 2: 백엔드에서 받은 배열(receipt)을 차트의 길이(lastIndex)에 맞춰 그대로 주입
+                newDatasets.push({
+                    type: 'bar', label: team, 
+                    data: (tData.receipt || Array(lastIndex).fill(0)).slice(0, lastIndex),
+                    backgroundColor: teamColors[i], yAxisID: 'y', order: 10
+                });
+            });
+
+            // 지그재그 경로 계산
+            let pathIssue = [], pathMatched = [], pathDeposit = [];
+            for (let d = 0; d < lastIndex; d++) {
+                teamNames.forEach((team, tIdx) => {
+                    const barOffset = (tIdx - (teamNames.length - 1) / 2) * (0.8 / teamNames.length);
+                    const xPos = d + barOffset;
+                    const tData = stats[team] || {};
+                    
+                    pathIssue.push({ x: xPos, y: Number(tData.issue?.[d] || 0) });
+                    pathMatched.push({ x: xPos, y: Number(tData.matched_issue?.[d] || 0) });
+                    pathDeposit.push({ x: xPos, y: Number(tData.deposit?.[d] || 0) });
+                });
             }
 
-            // 2. 차트 업데이트
-            if (mainChart) {
-                const labels = Array.from({length: lastDay}, (_, i) => (currentMode === 'yearly' ? `${i+1}월` : `${i+1}일`));
-                
-                // [막대] 팀별 접수
-                const newDatasets = teamNames.map((team, i) => ({
-                    type: 'bar',
-                    label: team,
-                    data: (stats[team]?.receipt || Array(lastDay).fill(0)).slice(0, lastDay),
-                    backgroundColor: teamColors[i],
-                    borderRadius: 4,
-                    order: 3
-                }));
-
-                // -----------------------------------------------------------
-                // [수정 포인트] 녹색선 지그재그 로직 (파란선과 동일한 방식)
-                // -----------------------------------------------------------
-                let matchedZigzag = [];
-                let issueZigzag = [];
-
-                for (let d = 0; d < lastDay; d++) {
-                    teamNames.forEach((team, tIdx) => {
-                        // 막대 위치 계산 (중앙 정렬 오프셋)
-                        const barOffset = (tIdx - (teamNames.length - 1) / 2) * (0.8 / teamNames.length);
-                        
-                        // 1. 녹색선 데이터 (의뢰 기준 매칭)
-                        const mVal = Number(stats[team]?.matched_issue?.[d] || 0);
-                        matchedZigzag.push({ x: d + barOffset, y: mVal });
-
-                        // 2. 파란선 데이터 (단순 발급 행위)
-                        const iVal = Number(stats[team]?.issue?.[d] || 0);
-                        issueZigzag.push({ x: d + barOffset, y: iVal });
-                    });
-                }
-
-                // 녹색선 추가
-                newDatasets.push({
-                    type: 'line',
-                    label: '의뢰번호 매칭 발급완료 건수(녹색)',
-                    data: matchedZigzag,
-                    borderColor: '#28a745',
-                    borderWidth: 2.5,
-                    pointBackgroundColor: '#28a745',
-                    pointRadius: 4,
-                    pointStyle: 'circle', // 파란선과 구분하기 위해 동그라미 사용
-                    fill: false,
-                    tension: 0,
-                    order: 1,
-                    parsing: false // 좌표 방식 사용 시 필수
-                });
-
-                // 파란선 추가
-                newDatasets.push({
-                    type: 'line',
-                    label: '해당일자 발급 총건수(파랑)',
-                    data: issueZigzag,
-                    borderColor: '#2f55d4',
-                    borderWidth: 2,
-                    pointBackgroundColor: 'red',
-                    pointRadius: 4,
-                    pointStyle: 'star',
-                    fill: false,
-                    tension: 0,
-                    order: 2,
-                    parsing: false
-                });
-
-                mainChart.data.labels = labels;
-                mainChart.data.datasets = newDatasets;
-                mainChart.update();
+            if (isDaily || currentMode === 'yearly') {
+                newDatasets.push({ type: 'line', label: '발급 총건수(파랑)', data: pathIssue, borderColor: '#2f55d4', borderWidth: 2, fill: false, yAxisID: 'y', parsing: false, order: 1 });
+                newDatasets.push({ type: 'line', label: '매칭 발급(녹색)', data: pathMatched, borderColor: '#28a745', borderWidth: 2, fill: false, yAxisID: 'y', parsing: false, order: 2 });
             }
+
+            if (currentMode === 'payment') {
+                newDatasets.push({ type: 'line', label: '팀별 입금총액(보라)', data: pathDeposit, borderColor: '#8e44ad', borderWidth: 3, fill: false, yAxisID: 'y1', parsing: false, order: 0 });
+            }
+
+            // 4. 차트 반영
+            mainChart.data.labels = labels;
+            mainChart.data.datasets = newDatasets;
+            mainChart.options.scales.y1.display = (currentMode === 'payment');
+            mainChart.update();
+
+            // 5. 표 업데이트
+            if(document.getElementById('depositTableBody')) document.getElementById('depositTableBody').innerHTML = tableHtml;
         })
-        .catch(err => console.error("오류:", err));
+        .catch(err => console.error("데이터 수집 오류:", err));
 }
+
+
+
+
+
+
+
 
 
 
