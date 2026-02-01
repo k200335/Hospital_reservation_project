@@ -20,6 +20,7 @@
     .stat-card {
         transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
         border-radius: 12px;
+        border: 1px solid #dee2e6; /* 테두리 추가 */
     }
 
     .stat-card:hover {
@@ -139,7 +140,7 @@
                     </div>
                 </div> -->
 
-                <div class="card stat-card" onclick="changeViewMode('yearly', this)" style="cursor: pointer;">
+                <div class="card stat-card shadow-sm" onclick="changeViewMode('yearly', this)" style="cursor: pointer;">
                     <div class="card-body">
                         <h6 class="text-muted small">연간 누적 실적</h6>
                         <h3 class="fw-bold mb-0">
@@ -149,7 +150,7 @@
                     </div>
                 </div>
 
-                <div class="card stat-card shadow-sm border-0" onclick="changeViewMode('payment', this)" style="cursor: pointer;">
+                <div class="card stat-card shadow-sm" onclick="changeViewMode('payment', this)" style="cursor: pointer;">
                     <div class="card-body">
                         <h6 class="text-muted small">월별 입금액 실적 </h6>
                         <h3 class="fw-bold mb-0">월별 입금액 확인<span class="text-info small" style="font-size: 0.5em;"></span></h3>
@@ -159,7 +160,7 @@
         </div>
 
         <div class="col-lg-9">
-            <div class="card shadow-sm border-0" style="min-height: 800px;">
+            <div class="card shadow-sm border-0" style="min-height: 400px;">
                 <div class="card-body p-4">
                     <div class="d-flex justify-content-between align-items-center mb-4">
                         <div>
@@ -167,7 +168,7 @@
                             <p class="text-muted small mb-0">실시간 데이터 분석 현황입니다.</p>
                         </div>
                         <div class="d-flex gap-2">
-                            <select id="yearSelect" class="form-select form-select-sm" onchange="updateChartData()">
+                            <select id="yearSelect" class="form-select form-select-sm" style="min-width: 90px;" onchange="updateChartData()">
                                 <option value="2025">2025년</option>
                                 <option value="2026" selected>2026년</option>
                                 <option value="2027">2027년</option>
@@ -192,7 +193,7 @@
                         </div>
                     </div>
                     
-                    <div style="position: relative; height: 650px; width: 100%;">
+                    <div style="position: relative; height: 400px; width: 100%;">
                         <canvas id="mainDashboardChart"></canvas>
                     </div>
                 </div>
@@ -202,7 +203,7 @@
         <div class="col-12">
             <div class="card shadow-sm border-0">
                 <div class="card-header bg-white py-3">
-                    <h5 class="fw-bold mb-0">상세 입금 데이터</h5>
+                    <h5 class="fw-bold mb-0">상세 입금 데이터(매출=공급가 기준)</h5>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -484,9 +485,30 @@ function updateChartData() {
             mainChart.data.datasets = newDatasets;
             mainChart.options.scales.y1.display = (currentMode === 'payment');
             mainChart.update();
+            
+            // 5. 표 업데이트 및 합계 행 생성
+            if(document.getElementById('depositTableBody')) {
+                document.getElementById('depositTableBody').innerHTML = tableHtml;
+            }
 
-            // 5. 표 업데이트
-            if(document.getElementById('depositTableBody')) document.getElementById('depositTableBody').innerHTML = tableHtml;
+            // --- [합계 행 추가 로직 시작] ---
+            const totalRowEl = document.getElementById('depositTableTotal');
+            if (totalRowEl) {
+                let totalRowHtml = `
+                    <tr class="table-secondary fw-bold">
+                        <td>합계</td>`;
+                
+                // 루프 내에서 이미 계산된 monthlyTotals 사용
+                for (let i = 0; i < 12; i++) {
+                    totalRowHtml += `
+                        <td class="text-end">${monthlyTotals[i].sales.toLocaleString()}</td>
+                        <td class="text-end text-primary">${monthlyTotals[i].deposit.toLocaleString()}</td>
+                    `;
+                }
+                
+                totalRowHtml += `</tr>`;
+                totalRowEl.innerHTML = totalRowHtml;
+            }
         })
         .catch(err => console.error("데이터 수집 오류:", err));
 }

@@ -3317,83 +3317,185 @@ def delete_memo(request):
 #     return JsonResponse(result_data)
 
 
+# def get_stats(request):
+#     try:
+#         # 1. 파라미터 수집
+#         year = request.GET.get('year')
+#         month = request.GET.get('month', '1').zfill(2)
+#         mode = request.GET.get('mode', 'daily')
+
+#         # 2. 필터 조건 설정 (사용자님 지침 반영)
+#         # MySQL: 하이픈 있음 (예: 2026-01%)
+#         mysql_filter = f"{year}%" if mode == 'yearly' else f"{year}-{month}%"
+#         # MSSQL: 하이픈 없음 (예: 202601%)
+#         mssql_filter = f"{year}" if mode == 'yearly' else f"{year}{month}"
+        
+#         last_index = 12 if mode == 'yearly' else calendar.monthrange(int(year), int(month))[1]
+#         date_func = "MONTH" if mode == 'yearly' else "DAY"
+
+#         teams = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀']
+#         result_data = {
+#             team: { 
+#                 'receipt': [0] * last_index, 
+#                 'issue': [0] * last_index,           # 파란색 선 (발급 총건수)
+#                 'matched_issue': [0] * last_index,   # 녹색 선 (매칭 발급건수)
+#                 'sales': [0] * last_index, 
+#                 'deposit': [0] * last_index 
+#             } for team in teams
+#         }
+
+#         # 3. [MySQL] 발급/접수 (하이픈 있는 mysql_filter 사용)
+#         mapping_dict = {}
+#         with connection.cursor() as cursor:
+#             cursor.execute("SELECT 의뢰번호, 담당자 FROM csi_receipts WHERE 담당자 IS NOT NULL")
+#             for req_no, owner in cursor.fetchall():
+#                 mapping_dict[req_no] = owner.strip()
+
+#             # (1) 접수 건수
+#             cursor.execute(f"SELECT {date_func}(STR_TO_DATE(배정일자, '%Y-%m-%d')) as idx, 담당자, COUNT(*) FROM csi_receipts WHERE 배정일자 LIKE '{mysql_filter}' GROUP BY idx, 담당자")
+#             for idx, team, cnt in cursor.fetchall():
+#                 t = team.strip() if team else ""
+#                 if t in result_data and idx:
+#                     result_data[t]['receipt'][int(idx)-1] = cnt
+
+#             # (2) 발급 총건수 (파란색 선)
+#             cursor.execute(f"SELECT {date_func}(STR_TO_DATE(I.발급일자, '%Y-%m-%d')) as idx, R.담당자, COUNT(*) FROM csi_issue_results I INNER JOIN csi_receipts R ON I.의뢰번호 = R.의뢰번호 WHERE I.발급일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
+#             for idx, team, cnt in cursor.fetchall():
+#                 t = team.strip() if team else ""
+#                 if t in result_data and idx:
+#                     result_data[t]['issue'][int(idx)-1] = cnt
+
+#             # (3) 매칭 발급건수 (녹색 선)
+#             cursor.execute(f"SELECT {date_func}(STR_TO_DATE(R.배정일자, '%Y-%m-%d')) as idx, R.담당자, COUNT(*) FROM csi_receipts R INNER JOIN csi_issue_results I ON R.의뢰번호 = I.의뢰번호 WHERE R.배정일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
+#             for idx, team, cnt in cursor.fetchall():
+#                 t = team.strip() if team else ""
+#                 if t in result_data and idx:
+#                     result_data[t]['matched_issue'][int(idx)-1] = cnt
+
+#         # 4. [MSSQL] 매출/입금 (하이픈 없는 mssql_filter 사용)
+#         with connections['mssql'].cursor() as mssql_cursor:
+#             # 매출액 (계산서 발행일 기준)
+#             s_idx = "MONTH(T.issue_date)" if mode == 'yearly' else "DAY(T.issue_date)"
+#             mssql_cursor.execute(f"SELECT {s_idx}, R.request_code, SUM(ISNULL(E.supply_value, 0) + ISNULL(E.vat, 0)) FROM dbo.Tax_Manager T INNER JOIN dbo.Receipt R ON T.receipt_code = R.receipt_code LEFT JOIN dbo.Estimate E ON T.receipt_code = E.receipt_code WHERE T.issue_date LIKE '{mssql_filter}%' GROUP BY {s_idx}, R.request_code")
+#             for idx, req_code, val in mssql_cursor.fetchall():
+#                 team = mapping_dict.get(req_code)
+#                 if team in result_data and idx:
+#                     result_data[team]['sales'][int(idx)-1] += int(val or 0)
+
+#             # 입금액 (입금일 기준 - 하이픈 없음)
+#             d_idx = "CAST(SUBSTRING(D.deposit_day, 5, 2) AS INT)" if mode == 'yearly' else "CAST(SUBSTRING(D.deposit_day, 7, 2) AS INT)"
+#             mssql_cursor.execute(f"SELECT {d_idx}, R.request_code, SUM(ISNULL(D.deposit, 0)) FROM dbo.Deposit D INNER JOIN dbo.Receipt R ON D.receipt_code = R.receipt_code WHERE D.deposit_day LIKE '{mssql_filter}%' GROUP BY {d_idx}, R.request_code")
+#             for idx, req_code, val in mssql_cursor.fetchall():
+#                 team = mapping_dict.get(req_code)
+#                 if team in result_data and idx:
+#                     result_data[team]['deposit'][int(idx)-1] += int(val or 0)
+
+#         return JsonResponse(result_data)
+
+#     except Exception as e:
+#         print(traceback.format_exc())
+#         return JsonResponse({'error': str(e)}, status=500)
+
+
+
+
 def get_stats(request):
     try:
         # 1. 파라미터 수집
-        year = request.GET.get('year')
-        month = request.GET.get('month', '1').zfill(2)
+        year_str = request.GET.get('year')
+        month_str = request.GET.get('month', '1').zfill(2)
+        year = int(year_str)
+        month = int(month_str)
         mode = request.GET.get('mode', 'daily')
 
-        # 2. 필터 조건 설정 (사용자님 지침 반영)
-        # MySQL: 하이픈 있음 (예: 2026-01%)
-        mysql_filter = f"{year}%" if mode == 'yearly' else f"{year}-{month}%"
-        # MSSQL: 하이픈 없음 (예: 202601%)
-        mssql_filter = f"{year}" if mode == 'yearly' else f"{year}{month}"
+        # 2. 필터 조건 설정
+        mysql_filter = f"{year}%" if mode == 'yearly' else f"{year}-{month_str}%"
+        mssql_filter_no_hyphen = f"{year}" if mode == 'yearly' else f"{year}{month_str}"
         
-        last_index = 12 if mode == 'yearly' else calendar.monthrange(int(year), int(month))[1]
+        last_index = 12 if mode == 'yearly' else calendar.monthrange(year, month)[1]
         date_func = "MONTH" if mode == 'yearly' else "DAY"
 
         teams = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀']
         result_data = {
             team: { 
                 'receipt': [0] * last_index, 
-                'issue': [0] * last_index,           # 파란색 선 (발급 총건수)
-                'matched_issue': [0] * last_index,   # 녹색 선 (매칭 발급건수)
+                'issue': [0] * last_index,           # 파란색 선
+                'matched_issue': [0] * last_index,   # 녹색 선
                 'sales': [0] * last_index, 
                 'deposit': [0] * last_index 
             } for team in teams
         }
 
-        # 3. [MySQL] 발급/접수 (하이픈 있는 mysql_filter 사용)
+        # 3. [MySQL] 접수/발급 데이터 (그래프 선 데이터 포함)
         mapping_dict = {}
         with connection.cursor() as cursor:
-            cursor.execute("SELECT 의뢰번호, 담당자 FROM csi_receipts WHERE 담당자 IS NOT NULL")
+            cursor.execute("SELECT TRIM(의뢰번호), TRIM(담당자) FROM csi_receipts WHERE 담당자 IS NOT NULL")
             for req_no, owner in cursor.fetchall():
-                mapping_dict[req_no] = owner.strip()
+                mapping_dict[req_no] = owner
 
             # (1) 접수 건수
-            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(배정일자, '%Y-%m-%d')) as idx, 담당자, COUNT(*) FROM csi_receipts WHERE 배정일자 LIKE '{mysql_filter}' GROUP BY idx, 담당자")
+            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(배정일자, '%Y-%m-%d')) as idx, TRIM(담당자), COUNT(*) FROM csi_receipts WHERE 배정일자 LIKE '{mysql_filter}' GROUP BY idx, 담당자")
             for idx, team, cnt in cursor.fetchall():
-                t = team.strip() if team else ""
-                if t in result_data and idx:
-                    result_data[t]['receipt'][int(idx)-1] = cnt
+                if team in result_data and idx:
+                    result_data[team]['receipt'][int(idx)-1] = cnt
 
             # (2) 발급 총건수 (파란색 선)
-            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(I.발급일자, '%Y-%m-%d')) as idx, R.담당자, COUNT(*) FROM csi_issue_results I INNER JOIN csi_receipts R ON I.의뢰번호 = R.의뢰번호 WHERE I.발급일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
+            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(I.발급일자, '%Y-%m-%d')) as idx, TRIM(R.담당자), COUNT(*) FROM csi_issue_results I INNER JOIN csi_receipts R ON I.의뢰번호 = R.의뢰번호 WHERE I.발급일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
             for idx, team, cnt in cursor.fetchall():
-                t = team.strip() if team else ""
-                if t in result_data and idx:
-                    result_data[t]['issue'][int(idx)-1] = cnt
+                if team in result_data and idx:
+                    result_data[team]['issue'][int(idx)-1] = cnt
 
             # (3) 매칭 발급건수 (녹색 선)
-            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(R.배정일자, '%Y-%m-%d')) as idx, R.담당자, COUNT(*) FROM csi_receipts R INNER JOIN csi_issue_results I ON R.의뢰번호 = I.의뢰번호 WHERE R.배정일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
+            cursor.execute(f"SELECT {date_func}(STR_TO_DATE(R.배정일자, '%Y-%m-%d')) as idx, TRIM(R.담당자), COUNT(*) FROM csi_receipts R INNER JOIN csi_issue_results I ON R.의뢰번호 = I.의뢰번호 WHERE R.배정일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
             for idx, team, cnt in cursor.fetchall():
-                t = team.strip() if team else ""
-                if t in result_data and idx:
-                    result_data[t]['matched_issue'][int(idx)-1] = cnt
+                if team in result_data and idx:
+                    result_data[team]['matched_issue'][int(idx)-1] = cnt
 
-        # 4. [MSSQL] 매출/입금 (하이픈 없는 mssql_filter 사용)
+        # 4. [MSSQL] 매출(공급가만)/입금 처리
         with connections['mssql'].cursor() as mssql_cursor:
-            # 매출액 (계산서 발행일 기준)
-            s_idx = "MONTH(T.issue_date)" if mode == 'yearly' else "DAY(T.issue_date)"
-            mssql_cursor.execute(f"SELECT {s_idx}, R.request_code, SUM(ISNULL(E.supply_value, 0) + ISNULL(E.vat, 0)) FROM dbo.Tax_Manager T INNER JOIN dbo.Receipt R ON T.receipt_code = R.receipt_code LEFT JOIN dbo.Estimate E ON T.receipt_code = E.receipt_code WHERE T.issue_date LIKE '{mssql_filter}%' GROUP BY {s_idx}, R.request_code")
-            for idx, req_code, val in mssql_cursor.fetchall():
-                team = mapping_dict.get(req_code)
-                if team in result_data and idx:
-                    result_data[team]['sales'][int(idx)-1] += int(val or 0)
+            
+            # --- [매출액: 실접수일 기준 + 부가세 제외] ---
+            s_idx = "MONTH(R.save_date)" if mode == 'yearly' else "DAY(R.save_date)"
+            sales_where = f"YEAR(R.save_date) = {year}"
+            if mode != 'yearly':
+                sales_where += f" AND MONTH(R.save_date) = {month}"
 
-            # 입금액 (입금일 기준 - 하이픈 없음)
-            d_idx = "CAST(SUBSTRING(D.deposit_day, 5, 2) AS INT)" if mode == 'yearly' else "CAST(SUBSTRING(D.deposit_day, 7, 2) AS INT)"
-            mssql_cursor.execute(f"SELECT {d_idx}, R.request_code, SUM(ISNULL(D.deposit, 0)) FROM dbo.Deposit D INNER JOIN dbo.Receipt R ON D.receipt_code = R.receipt_code WHERE D.deposit_day LIKE '{mssql_filter}%' GROUP BY {d_idx}, R.request_code")
+            # 🎯 수정 포인트: E.vat를 더하지 않고 ISNULL(E.supply_value, 0)만 합산
+            sales_sql = f"""
+                SELECT {s_idx}, LTRIM(RTRIM(R.request_code)), SUM(ISNULL(E.supply_value, 0)) 
+                FROM dbo.Receipt R 
+                LEFT JOIN dbo.Estimate E ON R.receipt_code = E.receipt_code 
+                WHERE {sales_where}
+                GROUP BY {s_idx}, R.request_code
+            """
+            mssql_cursor.execute(sales_sql)
             for idx, req_code, val in mssql_cursor.fetchall():
                 team = mapping_dict.get(req_code)
                 if team in result_data and idx:
-                    result_data[team]['deposit'][int(idx)-1] += int(val or 0)
+                    idx_val = int(idx) - 1
+                    if 0 <= idx_val < last_index:
+                        result_data[team]['sales'][idx_val] += int(val or 0)
+
+            # --- [입금액: 기존 유지] ---
+            d_idx = "CAST(SUBSTRING(D.deposit_day, 5, 2) AS INT)" if mode == 'yearly' else "CAST(SUBSTRING(D.deposit_day, 7, 2) AS INT)"
+            deposit_sql = f"""
+                SELECT {d_idx}, LTRIM(RTRIM(R.request_code)), SUM(ISNULL(D.deposit, 0)) 
+                FROM dbo.Deposit D 
+                INNER JOIN dbo.Receipt R ON D.receipt_code = R.receipt_code 
+                WHERE D.deposit_day LIKE '{mssql_filter_no_hyphen}%' 
+                GROUP BY {d_idx}, R.request_code
+            """
+            mssql_cursor.execute(deposit_sql)
+            for idx, req_code, val in mssql_cursor.fetchall():
+                team = mapping_dict.get(req_code)
+                if team in result_data and idx:
+                    idx_val = int(idx) - 1
+                    if 0 <= idx_val < last_index:
+                        result_data[team]['deposit'][idx_val] += int(val or 0)
 
         return JsonResponse(result_data)
 
     except Exception as e:
         print(traceback.format_exc())
         return JsonResponse({'error': str(e)}, status=500)
-
 
