@@ -98,3 +98,32 @@ class TaskReservation(models.Model):
     description = models.CharField(max_length=255)
     is_completed = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # -----------------------------여기서부터입출금관리페이지---------
+class transactions(models.Model):
+    id = models.AutoField(primary_key=True)
+    date = models.DateField()
+    category_id = models.IntegerField(null=True, blank=True) # 입금(1)/지출(2) 구분
+    client_name = models.CharField(max_length=45, null=True, blank=True)
+    
+    # 수량 및 단가
+    unit_price = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    quantity = models.IntegerField(default=1)
+    
+    # 추가 추천 필드
+    account_name = models.CharField(max_length=50, null=True, blank=True)
+    category_main = models.CharField(max_length=50, null=True, blank=True)
+    
+    # 금액 정보
+    supply_value = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    vat = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=0, default=0)
+    
+    # 메모 및 증빙
+    description = models.CharField(max_length=255, null=True, blank=True) # 이제 '적요'만 저장
+    note = models.TextField(null=True, blank=True) # '비고' 전용 컬럼 추가
+    receipt_img = models.ImageField(upload_to='receipts/', null=True, blank=True)
+
+    class Meta:
+        db_table = 'transactions'
+        managed = False

@@ -5,6 +5,8 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib import messages
 from django.contrib.auth import views as auth_views
 from django.views.generic import TemplateView
+from django.conf import settings
+from django.conf.urls.static import static
 
 # board 앱의 views를 정확하게 가져옵니다.
 from board import views 
@@ -130,4 +132,17 @@ urlpatterns = [
     # # 현장 저장/수정 관련 (추가할 부분)
     # path('save_client_project/', views.save_client_project, name='save_client_project'),
     path('api/get-stats/', views.get_stats, name='get_stats'),
+
+    # 입출금 내역 리스트 및 메인 화면
+    path('transactions/', views.transaction_list, name='transaction_list'),
+    
+# 자바스크립트에서 '/transactions/save/'로 보낸다면 여기서도 똑같이 맞춰야 합니다.
+    path('transactions/save/', views.transactions_save, name='transactions_save'),
+
+    path('transactions/delete/<int:pk>/', views.transaction_delete, name='transaction_delete'),
+    path('transactions/get/<int:pk>/', views.get_transaction_detail, name='get_transaction_detail'),
+    path('transactions/update/<int:pk>/', views.transaction_update, name='transaction_update'),
 ]
+# 아래 내용을 반드시 추가
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -38,6 +38,11 @@ import uuid # 고유 파일명을 위해 추가
 from .models import ClientProject
 from .models import ConsultMemo
 
+from django.db.models import Sum
+from .models import transactions
+from django.shortcuts import render, get_object_or_404, redirect
+
+
 
 
 
@@ -3498,4 +3503,141 @@ def get_stats(request):
     except Exception as e:
         print(traceback.format_exc())
         return JsonResponse({'error': str(e)}, status=500)
+    
+    # ----------------여기서부터 입출금 관리 페이지 시작입니다.----------
 
+def transaction_list(request):
+    db_data = transactions.objects.all().order_by('-date')
+    
+    # 합계 계산 로직 (category_id 1: 입금, 2: 지출)
+    income_total = transactions.objects.filter(category_id=1).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+    expense_total = transactions.objects.filter(category_id=2).aggregate(Sum('total_amount'))['total_amount__sum'] or 0
+    balance = income_total - expense_total
+
+    context = {
+        'transactions_data': db_data,
+        'income_total': f"{income_total:,}", # 콤마 표시
+        'expense_total': f"{expense_total:,}",
+        'balance': f"{balance:,}",
+    }
+    return render(request, 'transactions.html', context)
+
+
+def transactions_save(request):
+    if request.method == 'POST':
+        try:
+            # 1. 수집 및 저장
+            transactions.objects.create(
+                date=request.POST.get('date'),
+                category_id=request.POST.get('type'),  # 입금(1)/지출(2) 구분
+                client_name=request.POST.get('client'),
+                
+                # 수량과 단가
+                unit_price=request.POST.get('unit_price', 0),
+                quantity=request.POST.get('qty', 1),
+                
+                # 결제 수단 및 분류
+                account_name=request.POST.get('account_name'),
+                category_main=request.POST.get('category_main'),
+                
+                # 금액 정보
+                supply_value=request.POST.get('supply', 0),
+                vat=request.POST.get('vat', 0),
+                total_amount=request.POST.get('total', 0),
+                
+                # [수정된 부분] 적요와 비고를 각각의 컬럼에 따로 저장
+                description=request.POST.get('summary'), # 적요만 저장
+                note=request.POST.get('note'),           # 비고(메모) 따로 저장
+                
+                # 영수증 파일
+                receipt_img=request.FILES.get('file_path') 
+            )
+            return JsonResponse({'status': 'success'})
+            
+        except Exception as e:
+            print(f"Error saving transaction: {e}")
+            return JsonResponse({'status': 'error', 'message': str(e)})
+        
+        #---------------수정 및 삭제 기능----------------STR
+        # 1. 내역 삭제
+# 삭제 처리 함수
+def transaction_delete(request, pk):
+    if request.method == 'POST':
+        try:
+            # pk(아이디)값으로 데이터를 찾아서 삭제합니다.
+            item = get_object_or_404(transactions, pk=pk)
+            item.delete()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+            
+    return JsonResponse({'status': 'error', 'message': '잘못된 접근입니다.'})
+
+# 모달에 채울 데이터를 서버에서 보내주는 부분
+def get_transaction_detail(request, pk):
+    try:
+        # 1. 데이터 가져오기 (없으면 404 에러)
+        item = get_object_or_404(transactions, pk=pk)
+        
+        # 2. 이미지 URL 안전하게 추출
+        receipt_url = None
+        try:
+            if item.receipt_img and hasattr(item.receipt_img, 'url'):
+                receipt_url = item.receipt_img.url
+        except ValueError:
+            # 파일 필드에 이름은 있는데 실제 파일이 서버에 없을 경우 에러 방지
+            receipt_url = None
+
+        # 3. 데이터 조립 (데이터가 하나라도 None이면 에러날 수 있으므로 getattr 사용)
+        data = {
+            'date': item.date.strftime('%Y-%m-%d') if item.date else '',
+            'type': item.category_id,
+            'category_main': getattr(item, 'category_main', ''),
+            'account_name': getattr(item, 'account_name', ''),
+            'client': getattr(item, 'client_name', ''),
+            'summary': getattr(item, 'description', ''),
+            'note': getattr(item, 'note', ''),
+            'unit_price': item.unit_price or 0,
+            'qty': item.quantity or 0,
+            'supply': item.supply_value or 0,
+            'vat': item.vat or 0,
+            'total': item.total_amount or 0,
+            'receipt_url': receipt_url, # 안전하게 추출된 URL
+        }
+        print(f"ID {pk}의 이미지 경로: {receipt_url}")
+        return JsonResponse(data)
+
+    except Exception as e:
+        # 에러 발생 시 터미널(CMD) 창에 에러 내용을 상세히 출력합니다.
+        print("--- 서버 에러 상세 발생 ---")
+        print(traceback.format_exc()) 
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+    
+    # [수정 저장] 실제 DB 데이터를 업데이트하는 함수
+def transaction_update(request, pk):
+    if request.method == 'POST':
+        try:
+            item = get_object_or_404(transactions, pk=pk)
+            
+            # 일반 텍스트 데이터 업데이트
+            item.date = request.POST.get('date')
+            item.category_id = request.POST.get('type')
+            item.category_main = request.POST.get('category_main')
+            item.account_name = request.POST.get('account_name')
+            item.client_name = request.POST.get('client')
+            item.description = request.POST.get('summary')
+            item.note = request.POST.get('note')
+            item.unit_price = request.POST.get('unit_price', 0)
+            item.quantity = request.POST.get('qty', 1)
+            item.supply_value = request.POST.get('supply', 0)
+            item.vat = request.POST.get('vat', 0)
+            item.total_amount = request.POST.get('total', 0)
+            
+            # [이미지 처리 핵심] 새로운 파일이 넘어왔을 때만 업데이트
+            if request.FILES.get('file_path'):
+                item.receipt_img = request.FILES.get('file_path')
+            
+            item.save()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
