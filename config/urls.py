@@ -142,6 +142,11 @@ urlpatterns = [
     path('transactions/delete/<int:pk>/', views.transaction_delete, name='transaction_delete'),
     path('transactions/get/<int:pk>/', views.get_transaction_detail, name='get_transaction_detail'),
     path('transactions/update/<int:pk>/', views.transaction_update, name='transaction_update'),
+    
+    path('api/add-category/', views.add_category, name='add_category'),
+path('api/update-category/', views.update_category, name='update_category'),
+path('api/get-categories/', views.get_categories, name='get_categories'),
+path('api/delete-category/', views.delete_category, name='delete_category'),
 ]
 # 아래 내용을 반드시 추가
 if settings.DEBUG:

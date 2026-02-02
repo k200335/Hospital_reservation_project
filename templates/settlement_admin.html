@@ -85,6 +85,9 @@
             <button onclick="onExcelDownload()" class="btn btn-outline-success btn-sm px-3">
                 <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
             </button>
+            <button onclick="onExcelDownloadSupport()" class="btn btn-outline-success btn-sm px-3">
+                <i class="bi bi-file-earmark-excel-fill"></i> 엑셀 다운로드(지원)
+            </button>
             <div class="d-flex align-items-center ms-auto gap-3 px-3 py-1 bg-white border rounded shadow-sm" style="min-width: 500px;">
                 <div class="text-nowrap"><span class="small text-muted">총:</span> <b id="stat-count" class="text-dark">0</b><span class="small">건</span></div>
                 <div class="vr"></div>
@@ -460,6 +463,122 @@ async function onExcelDownload() {
 
     const buffer = await workbook.xlsx.writeBuffer();
     saveAs(new Blob([buffer]), `정산보고서_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+async function onExcelDownloadSupport() {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('정산보고서_지원');
+
+    worksheet.properties.defaultRowHeight = 24.75;
+
+    // 1. 틀고정
+    worksheet.views = [
+        { 
+            state: 'frozen', 
+            xSplit: 6, // F열까지 고정
+            ySplit: 1  // 첫 번째 행 고정
+        }
+    ];
+
+    const headers = [
+        "담당자", "미인정", "의뢰번호", "지원", "영업담당", "QT번호", "실접수일", 
+        "의뢰기관명", "사업명", "봉인명", "시료량", "공급가액", "부가세", "합계", 
+        "출장비구분", "출장비", "기본료", "정보처리비", "시편제작비", "지게차운임", 
+        "시료수거비", "청구위탁시험비", "적용금액", "인센티브", "입금일", "입금액", 
+        "계산서발행회사명", "계산서발행일", "계산서담당자", "계산서hp", "계산서tel", 
+        "계산서fax", "계산서email", "계산서발행자", "의뢰인성명", "현장전화", 
+        "시료채취자", "품질담당자", "현장담당", "시료명", "공수", "지급액합계"
+    ];
+
+    const colWidths = [
+        6, 6, 14, 6, 8, 10, 10, 30, 60, 30, 18, 13, 9, 13, 9, 9, 9, 9, 9, 9, 9, 9, 15, 12, 12, 15, 20, 15, 12, 15, 15, 15, 20, 12, 12, 15, 12, 12, 12, 20, 10, 15
+    ];
+
+    const moneyCols = ['L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Z', 'AP'];
+
+    // 컬럼 설정
+    worksheet.columns = headers.map((h, i) => {
+        const colLetter = worksheet.getColumn(i + 1).letter;
+        const isExceptCol = ['H', 'I', 'J', 'AA'].includes(colLetter);
+        const isMoneyCol = moneyCols.includes(colLetter);
+        
+        return {
+            header: h,
+            key: h,
+            width: colWidths[i] || 15,
+            style: { 
+                font: { size: 10 },
+                alignment: { 
+                    vertical: 'middle', 
+                    horizontal: isMoneyCol ? 'right' : (isExceptCol ? 'left' : 'center'),
+                    wrapText: isExceptCol 
+                } 
+            }
+        };
+    });
+
+    // 헤더 행 스타일
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 24.75;
+    headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
+        cell.font = { bold: true, size: 10 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+    });
+
+    // 데이터 가져오기 (그룹화 없이 바로 사용)
+    const rowData = [];
+    gridApi.forEachNodeAfterFilterAndSort(node => rowData.push(node.data));
+
+    const blueKeywords = ["현대", "두산", "GS", "지에스", "극동", "금광", "남광", "대우", "포스코", "가나개발", "케이티에이", "롯데", "대방", "쌍용", "가새재", "가설", "동바리", "비계", "파이프", "서포"];
+
+    let currentRow = 2;
+    rowData.forEach(data => {
+        const row = worksheet.addRow([
+            data['담당자'], data['미인정'], data['의뢰번호'], data['지원'], data['영업담당'], 
+            data['QT번호'], (data['실접수일'] || "").split('T')[0], data['의뢰기관명'], 
+            data['사업명'], data['봉인명'], data['시료량'],
+            Number(data['공급가액'] || 0), Number(data['부가세'] || 0), 0,
+            data['출장비구분'] == '1' ? "본원" : "지원",
+            Number(data['출장비'] || 0), Number(data['기본료'] || 0), Number(data['정보처리비'] || 0), 
+            Number(data['시편제작비'] || 0), Number(data['지게차운임'] || 0), Number(data['시료수거비'] || 0), 
+            Number(data['청구위탁시험비'] || 0), 0,
+            Number(data['인센티브'] || 0), data['입금일'], Number(data['입금액'] || 0),
+            data['계산서발행회사명'], data['계산서발행일'], data['계산서담당자'], data['계산서hp'], data['계산서tel'], 
+            data['계산서fax'], data['계산서email'], data['계산서발행자'], data['의뢰인성명'], data['현장전화'], 
+            data['시료채취자'], data['품질담당자'], data['현장담당'], data['시료명'], data['공수'], 
+            Number(data['지급액합계'] || 0)
+        ]);
+
+        row.height = 24.75;
+
+        // 숫자 형식 적용
+        moneyCols.forEach(col => {
+            const cell = row.getCell(col);
+            cell.numFmt = '#,##0';
+        });
+
+        // 수식 적용 (N: 합계, W: 적용금액)
+        row.getCell('N').value = { formula: `L${currentRow}+M${currentRow}` };
+        row.getCell('W').value = { formula: `L${currentRow}-(P${currentRow}+Q${currentRow}+R${currentRow}+S${currentRow}+T${currentRow}+U${currentRow}+V${currentRow})` };
+        
+        // 적용금액 빨간색 스타일
+        row.getCell('W').font = { color: { argb: 'FFFF0000' }, bold: false, size: 10 };
+
+        // 특정 키워드 파란색 강조
+        ['H', 'J'].forEach(colKey => {
+            const cell = row.getCell(colKey);
+            if (blueKeywords.some(k => String(cell.value || "").includes(k))) {
+                cell.font = { color: { argb: 'FF0D6EFD' }, bold: true, size: 10 };
+            }
+        });
+        
+        currentRow++;
+    });
+
+    const buffer = await workbook.xlsx.writeBuffer();
+    saveAs(new Blob([buffer]), `정산보고서(지원)_${new Date().toISOString().slice(0,10)}.xlsx`);
 }
 </script>
 

@@ -127,3 +127,15 @@ class transactions(models.Model):
     class Meta:
         db_table = 'transactions'
         managed = False
+        
+class TransactionCategory(models.Model):  # <-- 이 이름이 views.py의 이름과 토씨 하나 안 틀리고 같아야 함
+    name = models.CharField(max_length=50, unique=True)
+    icon = models.CharField(max_length=10, default="📂")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'transactioncategory'
+        managed = False
+
+    def __str__(self):
+        return self.name

@@ -41,7 +41,7 @@ from .models import ConsultMemo
 from django.db.models import Sum
 from .models import transactions
 from django.shortcuts import render, get_object_or_404, redirect
-
+from .models import TransactionCategory
 
 
 
@@ -3641,3 +3641,52 @@ def transaction_update(request, pk):
             return JsonResponse({'status': 'success'})
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
+        
+        
+def get_categories(request):
+    # MySQL의 transactioncategory 테이블에서 모든 데이터를 가져옵니다.
+    categories = TransactionCategory.objects.all().order_by('name')
+    data = [{'name': cat.name, 'icon': cat.icon} for cat in categories]
+    return JsonResponse(data, safe=False)
+        
+        # 1. 분류 추가 (Create)
+def add_category(request):
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        icon = request.POST.get('icon', '📂') # 아이콘 없으면 기본값
+        
+        if name:
+            # get_or_create는 이미 있으면 가져오고, 없으면 만듭니다 (중복 방지)
+            category, created = TransactionCategory.objects.get_or_create(
+                name=name, 
+                defaults={'icon': icon}
+            )
+            if created:
+                return JsonResponse({'status': 'success', 'message': '새 분류가 등록되었습니다.'})
+            else:
+                return JsonResponse({'status': 'error', 'message': '이미 존재하는 분류입니다.'})
+    return JsonResponse({'status': 'error', 'message': '잘못된 요청입니다.'})
+
+# 1. 분류 수정
+def update_category(request):
+    if request.method == 'POST':
+        old_name = request.POST.get('old_name')
+        new_name = request.POST.get('new_name')
+        try:
+            category = TransactionCategory.objects.get(name=old_name)
+            category.name = new_name
+            category.save()
+            return JsonResponse({'status': 'success'})
+        except TransactionCategory.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': '존재하지 않는 분류입니다.'})
+
+# 2. 분류 삭제
+def delete_category(request):
+    if request.method == 'POST':
+        name = request.POST.get('name')
+        try:
+            category = TransactionCategory.objects.get(name=name)
+            category.delete()
+            return JsonResponse({'status': 'success'})
+        except TransactionCategory.DoesNotExist:
+            return JsonResponse({'status': 'error', 'message': '이미 삭제된 분류입니다.'})

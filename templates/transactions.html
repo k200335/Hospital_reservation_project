@@ -6,7 +6,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
-/* 1. 디자인 시스템 변수 정의 */
+
+
+/* 테이블이 찌그러지지 않고 전체 너비를 사용하도록 */
+.table-wrapper {
+    width: 100%;
+    overflow-x: auto; /* 내용이 너무 많아지면 가로 스크롤 생성 */
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
 /* 1. 디자인 시스템 변수 정의 (색상 반전 적용) */
 :root {
     --primary-color: #2563eb;
@@ -41,7 +52,7 @@ body {
 }
 
 .transactions-container { 
-    max-width: 1200px; 
+    max-width: 1500px; 
     margin: 50px auto; 
     padding: 0 20px; 
 }
@@ -236,14 +247,17 @@ body {
 }
 
 /* 너비 배분 (총 8개 열: 100% 맞춤) */
-.data-table th:nth-child(1), .data-table td:nth-child(1) { width: 10%; } /* 날짜 */
-.data-table th:nth-child(2), .data-table td:nth-child(2) { width: 10%; } /* 구분 */
-.data-table th:nth-child(3), .data-table td:nth-child(3) { width: 30%; } /* 거래처 */
-.data-table th:nth-child(4), .data-table td:nth-child(4) { width: 10%; } /* 공급가액 */
-.data-table th:nth-child(5), .data-table td:nth-child(5) { width: 10%; } /* 부가세 */
-.data-table th:nth-child(6), .data-table td:nth-child(6) { width: 10%; } /* 합계금액 */
-.data-table th:nth-child(7), .data-table td:nth-child(7) { width: 10%; } /* 영수증 (추가) */
-.data-table th:nth-child(8), .data-table td:nth-child(8) { width: 10%; } /* 관리 */
+.data-table th:nth-child(1), .data-table td:nth-child(1) { width: 9%; } /* 날짜 */
+.data-table th:nth-child(2), .data-table td:nth-child(2) { width: 9%; } /* 구분 */
+.data-table th:nth-child(3), .data-table td:nth-child(3) { width: 9%; } /* 분류 */
+.data-table th:nth-child(4), .data-table td:nth-child(4) { width: 9%; } /* 적요 */
+.data-table th:nth-child(5), .data-table td:nth-child(5) { width: 14%; } /* 거래처 */
+.data-table th:nth-child(6), .data-table td:nth-child(6) { width: 10%; } /* 공급가액 */
+.data-table th:nth-child(7), .data-table td:nth-child(7) { width: 9%; } /* 부가세 */
+.data-table th:nth-child(8), .data-table td:nth-child(8) { width: 10%; } /* 합계금액 */
+.data-table th:nth-child(9), .data-table td:nth-child(9) { width: 9%; } /* 영수증 */
+.data-table th:nth-child(10), .data-table td:nth-child(10) { width: 13%; } /* 비고 */
+.data-table th:nth-child(11), .data-table td:nth-child(11) { width: 9%; } /* 관리 */
 
 .data-table td { 
     padding: 16px 12px; 
@@ -302,6 +316,15 @@ body {
 .btn-save-mode {
     background-color: #1a73e8 !important;
 }
+
+.btn-sm {
+        background: #f3f4f6;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        padding: 0 8px;
+        cursor: pointer;
+        height: 40px;
+    }
 </style>
 
 <div class="transactions-container">
@@ -337,17 +360,31 @@ body {
                                     <option value="1">📈 입금</option>
                                     <option value="2">📉 지출</option>
                                 </select>
-                            </div>
-                            <div class="input-container">
-                                <label>분류</label>
-                                <select id="modal-category-main" name="category_main" class="erp-input select-styled">
-                                    <option value="급여">👤 급여</option>
-                                    <option value="식비">🍽️ 식비</option>
-                                    <option value="임대료">🏠 임대료</option>
-                                    <option value="매출">💰 매출</option>                                    
-                                    <option value="기타">기타</option>
-                                </select>
-                                <button type="button" class="btn-icon" onclick="addNewCategory()" style="background: #f3f4f6; border: 1px solid #ddd; border-radius: 4px; padding: 0 8px;">+ 분류항목 추가</button>
+                            </div>                            
+                            <div class="input-container" style="display: flex; flex-direction: column; gap: 8px;">
+                                <label style="font-weight: bold; font-size: 14px; color: #374151;">분류</label>
+                                
+                                <div style="display: flex; gap: 6px; width: 100%;">
+                                    <select id="modal-category-main" name="category_main" class="erp-input select-styled" 
+                                            style="flex: 1; min-width: 0; height: 40px; border: 1px solid #d1d5db; border-radius: 6px; padding: 0 8px;">
+                                        </select>
+                                    <button type="button" onclick="addNewCategory()" 
+                                            style="background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 6px; padding: 0 12px; height: 40px; white-space: nowrap; cursor: pointer;">
+                                        + 분류추가
+                                    </button>
+                                </div>
+
+                                <div style="display: flex; gap: 6px; justify-content: flex-end;">
+                                    <span style="font-size: 12px; color: #6b7280; align-self: center; margin-right: auto;">선택한 항목 관리:</span>
+                                    <button type="button" onclick="editCategory()" 
+                                            style="background: #ffffff; border: 1px solid #d1d5db; border-radius: 6px; width: 40px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="수정">
+                                        📝
+                                    </button>
+                                    <button type="button" onclick="deleteCategory()" 
+                                            style="background: #ffffff; border: 1px solid #d1d5db; border-radius: 6px; width: 40px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center;" title="삭제">
+                                        🗑️
+                                    </button>
+                                </div>
                             </div>
                         </div>
 
@@ -444,12 +481,12 @@ body {
                 <tr>
                     <th class="text-center">날짜</th>
                     <th class="text-center">구분</th>
-                    <th>거래처</th>
+                    <th>분류</th> <th>적요</th> <th>거래처</th>
                     <th class="text-right">공급가액</th>
                     <th class="text-right">부가세</th>
                     <th class="text-right">합계금액</th>
-                    <th>영수증</th>
-                    <th class="text-center">관리</th>
+                    <th class="text-center">영수증</th>
+                    <th>비고</th> <th class="text-center">관리</th>
                 </tr>
             </thead>
             <tbody>
@@ -460,6 +497,10 @@ body {
                         <span class="badge {% if item.category_id == 1 %}in{% else %}out{% endif %}">
                             {% if item.category_id == 1 %}📈 입금{% else %}📉 지출{% endif %}
                         </span>
+                    </td>
+                    <td>{{ item.category_main|default:"-" }}</td>
+                    <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ item.description|default:"-" }}
                     </td>
                     <td>{{ item.client_name|default:"-" }}</td>
                     <td class="text-right">₩ {{ item.supply_value|floatformat:0 }}</td>
@@ -475,6 +516,9 @@ body {
                             <span class="text-muted" style="color: #ccc;">-</span>
                         {% endif %}
                     </td>
+                    <td style="font-size: 0.9em; color: #666; max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                        {{ item.note|default:"" }}
+                    </td>
                     <td class="text-center">
                         <div class="action-buttons">
                             <button type="button" onclick="openEditModal('{{ item.id }}')" class="btn-icon" title="수정" style="color: #3b82f6;">📝</button>
@@ -484,8 +528,7 @@ body {
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center no-data">데이터가 없습니다.</td>
-                </tr>
+                    <td colspan="11" class="text-center no-data">데이터가 없습니다.</td> </tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -752,31 +795,99 @@ function deleteTransaction(pk) {
     });
 }
 
+// 2. 분류 추가 버튼 함수
 function addNewCategory() {
-    const newCat = prompt("추가할 새로운 분류명을 입력하세요 (예: 유류비, 사무용품):");
-    
-    if (newCat && newCat.trim() !== "") {
-        const select = document.getElementById('modal-category-main');
-        
-        // 중복 체크
-        for (let i = 0; i < select.options.length; i++) {
-            if (select.options[i].value === newCat) {
-                alert("이미 존재하는 분류입니다.");
-                return;
-            }
+    const newCat = prompt("영구 추가할 분류명을 입력하세요 (예: 주유비):");
+    if (!newCat || newCat.trim() === "") return;
+
+    const formData = new FormData();
+    formData.append('name', newCat);
+    const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    fetch('/api/add-category/', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-CSRFToken': csrfToken }
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('✅ DB에 저장되었습니다.');
+            loadCategories(); // 추가 후 즉시 목록 갱신
+        } else {
+            alert('❌ 실패: ' + data.message);
         }
-        
-        // 새 옵션 추가 (이모지는 기본으로 '📂' 를 붙여줌)
-        const option = document.createElement('option');
-        option.value = newCat;
-        option.text = "📂 " + newCat;
-        select.add(option);
-        
-        // 방금 추가한 항목으로 자동 선택
-        select.value = newCat;
-        
-        alert(`'${newCat}' 분류가 임시 추가되었습니다. 저장 시 적용됩니다.`);
-    }
+    });
+}
+
+// 페이지 로드 시 실행
+document.addEventListener('DOMContentLoaded', function() {
+    loadCategories(); // 카테고리 불러오기 실행
+});
+
+// DB에서 카테고리 목록을 가져와 드롭다운에 채우는 함수
+function loadCategories() {
+    fetch('/api/get-categories/')
+        .then(res => res.json())
+        .then(data => {
+            const select = document.getElementById('modal-category-main');
+            if (!select) return;
+            
+            select.innerHTML = ''; // 기존 정적 옵션들 비우기
+            data.forEach(cat => {
+                const opt = document.createElement('option');
+                opt.value = cat.name;
+                opt.text = `${cat.icon} ${cat.name}`;
+                select.add(opt);
+            });
+        })
+        .catch(err => console.error("카테고리 로딩 실패:", err));
+}
+
+// 분류 수정 함수
+function editCategory() {
+    const select = document.getElementById('modal-category-main');
+    const oldName = select.value;
+    if (!oldName) return;
+
+    const newName = prompt(`'${oldName}'을(를) 무엇으로 수정하시겠습니까?`, oldName);
+    if (!newName || newName === oldName) return;
+
+    const formData = new FormData();
+    formData.append('old_name', oldName);
+    formData.append('new_name', newName);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch('/api/update-category/', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('수정되었습니다.');
+            loadCategories();
+        }
+    });
+}
+
+// 분류 삭제 함수
+function deleteCategory() {
+    const select = document.getElementById('modal-category-main');
+    const name = select.value;
+    if (!name) return;
+
+    if (!confirm(`'${name}' 분류를 삭제하시겠습니까?\n(이 분류로 저장된 기존 내역은 이름만 남게 됩니다.)`)) return;
+
+    const formData = new FormData();
+    formData.append('name', name);
+    formData.append('csrfmiddlewaretoken', document.querySelector('[name=csrfmiddlewaretoken]').value);
+
+    fetch('/api/delete-category/', { method: 'POST', body: formData })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert('삭제되었습니다.');
+            loadCategories();
+        }
+    });
 }
 </script>
 {% endblock %}
