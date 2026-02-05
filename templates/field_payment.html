@@ -443,12 +443,19 @@ const columnDefs = [
     { 
         headerName: "제목",
         field: "title",     // 백엔드에서 주는 키 값 (중요!) 
-        // flex: 1, 
-        // pinned: 'left' 
+        // flex: 1,        
         width: 700, // flex를 빼고 충분히 넓은 값을 줍니다.
         filter: 'agTextColumnFilter',
         // 내용이 길면 말줄임표(...) 표시
         cellStyle: { 'text-overflow': 'ellipsis', 'white-space': 'nowrap', 'overflow': 'hidden' }
+    },
+    {
+        headerName: "번호",
+        field: "no", // [수정] 이제 자동 계산이 아니라 데이터의 "no" 값을 보여줍니다.
+        width: 70,       
+        lockPosition: 'left',
+        pinned: 'right',
+        cellClass: 'text-center'
     }
 ];
 
@@ -637,7 +644,8 @@ function downloadExcel() {
             exportData.push({
                 "날짜": node.data.date || "",     // 백엔드 키: date
                 "범주": node.data.category || "", // 백엔드 키: category
-                "제목": node.data.title || ""    // 백엔드 키: title
+                "제목": node.data.title || "",   // 백엔드 키: title
+                "no": row["번호"] || ""
             });
         }
     });
@@ -671,7 +679,7 @@ function uploadExcel() {
 
     const input = document.createElement("input");
     input.type = "file";
-    input.accept = ".xlsx, .xls"; // 엑셀 파일만 선택 가능하도록 제한
+    input.accept = ".xlsx, .xls";
     
     input.onchange = (e) => {
         const file = e.target.files[0];
@@ -683,20 +691,31 @@ function uploadExcel() {
                 const data = new Uint8Array(ev.target.result);
                 const wb = XLSX.read(data, { type: "array" });
                 
-                // 1. 첫 번째 시트 데이터 가져오기
-                const rawData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                // 1. 엑셀 데이터 파싱 (행 순서대로 가져옴)
+                const rawData = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
                 
-                // 2. [핵심] 엑셀의 한글 헤더를 영문 필드명으로 매핑 (데이터 변환)
-                const mappedData = rawData.map(row => ({
-                    date: row["날짜"] || "",      // 엑셀의 '날짜' 열 -> date 필드
-                    category: row["범주"] || "",  // 엑셀의 '범주' 열 -> category 필드
-                    title: row["제목"] || ""      // 엑셀의 '제목' 열 -> title 필드
+                // 2. 데이터 매핑 (사용자님이 수정한 'no' 필드 적용)
+                const mappedData = rawData.map(row => ({                    
+                    "date": row["날짜"] || "", 
+                    "category": row["범주"] || "",
+                    "title": row["제목"] || "",
+                    "no": row["번호"] || ""  // 엑셀의 '번호' 열을 'no' 필드에 담음
                 }));
 
-                // 3. 그리드에 데이터 적용 (최신 버전 방식)
+                // [순서 보장을 위한 핵심 단계]
+                // 3. 모든 필터 초기화
+                gridApi.setFilterModel(null);
+
+                // 4. 모든 정렬 상태를 강제로 완전히 해제 (sort: null)
+                // 이 처리를 안 하면 이전에 눌렀던 정렬 기준대로 데이터 순서가 다시 섞입니다.
+                gridApi.applyColumnState({
+                    defaultState: { sort: null },
+                });
+
+                // 5. 데이터 삽입
                 gridApi.setGridOption('rowData', mappedData);
                 
-                alert(`총 ${mappedData.length}건의 데이터를 가져왔습니다.`);
+                alert(`총 ${mappedData.length}건의 데이터를 원본 순서대로 가져왔습니다.`);
             } catch (err) {
                 console.error("파일 읽기 오류:", err);
                 alert("엑셀 파일을 읽는 중 오류가 발생했습니다.");
