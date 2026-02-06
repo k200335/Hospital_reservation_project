@@ -303,70 +303,186 @@
         fileInput.click();
     };
 
-    // 2. CSI 불러오기 (처리자 인덱스 수정 완료)
-    window.fetchCsiData = function(event) {
-        const selected = document.querySelectorAll('.row-checkbox:checked');
-        if (selected.length === 0) return alert("대상을 선택해주세요.");
+    // // 2. CSI 불러오기 (처리자 인덱스 수정 완료)
+    // window.fetchCsiData = function(event) {
+    //     const selected = document.querySelectorAll('.row-checkbox:checked');
+    //     if (selected.length === 0) return alert("대상을 선택해주세요.");
 
-        const rqNumbers = [];
-        const targetRows = [];
+    //     const rqNumbers = [];
+    //     const targetRows = [];
         
-        selected.forEach(cb => {
-            const row = cb.closest('tr');
-            const rq = row.querySelectorAll('.edit-input')[1].value; 
-            if (rq) { 
-                rqNumbers.push(rq); 
-                targetRows.push(row); 
-            }
-        });
+    //     selected.forEach(cb => {
+    //         const row = cb.closest('tr');
+    //         const rq = row.querySelectorAll('.edit-input')[1].value; 
+    //         if (rq) { 
+    //             rqNumbers.push(rq); 
+    //             targetRows.push(row); 
+    //         }
+    //     });
+
+    //     overlay.style.display = 'flex';
+    //     loadingText.innerText = "CSI 데이터를 가져오는 중입니다...\n(서버 상태에 따라 1분 이상 소요될 수 있습니다.)";
+    //     progressBar.style.width = '20%';
+
+    //     fetch("{% url 'fetch_csi_data' %}", { 
+    //         method: 'POST',
+    //         headers: { 
+    //             'Content-Type': 'application/json', 
+    //             'X-CSRFToken': '{{ csrf_token }}' 
+    //         },
+    //         body: JSON.stringify({ rq_numbers: rqNumbers })
+    //     })
+    //     .then(res => {
+    //         if (!res.ok) throw new Error('서버 응답 오류 (URL 설정 또는 서버 상태 확인)');
+    //         return res.json();
+    //     })
+    //     .then(data => {
+    //         if (data.status === 'success') {
+    //             data.results.forEach((resData, idx) => {
+    //                 const inputs = targetRows[idx].querySelectorAll('.edit-input');
+                    
+    //                 // 백엔드 데이터(resData) 순서: [접수번호, 접수일시, 상태, 사업명, 의뢰기관, 채취자, 봉인명, 특정처리자]
+    //                 // 표의 입력칸(inputs) 인덱스 매핑:
+    //                 // inputs[3]: 접수번호, inputs[4]: 접수일시, inputs[5]: 진행상태, inputs[6]: 사업명,
+    //                 // inputs[7]: 의뢰기관명, inputs[8]: 채취자, inputs[9]: 봉인명, inputs[10]: 처리자
+                    
+    //                 for(let i=0; i < resData.length; i++) {
+    //                     if(resData[i] !== undefined && inputs[i+2]) {
+    //                         inputs[i+2].value = resData[i];
+    //                     }
+    //                 }
+    //             });
+                
+    //             progressBar.style.width = '100%';
+    //             setTimeout(() => { 
+    //                 overlay.style.display = 'none'; 
+    //                 alert(data.message || "성공적으로 불러왔습니다."); 
+    //             }, 300);
+    //         } else {
+    //             throw new Error(data.message);
+    //         }
+    //     })
+    //     .catch(err => {
+    //         overlay.style.display = 'none';
+    //         alert("실패 사유: " + err.message);
+    //     });
+    // };
+
+
+window.handleExcelImport = function(event) {
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = '.xlsx, .xls';
+
+    fileInput.onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
 
         overlay.style.display = 'flex';
-        loadingText.innerText = "CSI 데이터를 가져오는 중입니다...\n(서버 상태에 따라 1분 이상 소요될 수 있습니다.)";
-        progressBar.style.width = '20%';
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                // cellDates: true로 설정하여 날짜 객체를 안전하게 받아옵니다.
+                const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
 
-        fetch("{% url 'fetch_csi_data' %}", { 
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'X-CSRFToken': '{{ csrf_token }}' 
-            },
-            body: JSON.stringify({ rq_numbers: rqNumbers })
-        })
-        .then(res => {
-            if (!res.ok) throw new Error('서버 응답 오류 (URL 설정 또는 서버 상태 확인)');
-            return res.json();
-        })
-        .then(data => {
-            if (data.status === 'success') {
-                data.results.forEach((resData, idx) => {
-                    const inputs = targetRows[idx].querySelectorAll('.edit-input');
-                    
-                    // 백엔드 데이터(resData) 순서: [접수번호, 접수일시, 상태, 사업명, 의뢰기관, 채취자, 봉인명, 특정처리자]
-                    // 표의 입력칸(inputs) 인덱스 매핑:
-                    // inputs[3]: 접수번호, inputs[4]: 접수일시, inputs[5]: 진행상태, inputs[6]: 사업명,
-                    // inputs[7]: 의뢰기관명, inputs[8]: 채취자, inputs[9]: 봉인명, inputs[10]: 처리자
-                    
-                    for(let i=0; i < resData.length; i++) {
-                        if(resData[i] !== undefined && inputs[i+2]) {
-                            inputs[i+2].value = resData[i];
-                        }
-                    }
+                // 4행(인덱스 3)을 헤더로 사용하여 JSON 변환
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+                    range: 3, 
+                    defval: '' 
                 });
-                
-                progressBar.style.width = '100%';
-                setTimeout(() => { 
-                    overlay.style.display = 'none'; 
-                    alert(data.message || "성공적으로 불러왔습니다."); 
-                }, 300);
-            } else {
-                throw new Error(data.message);
+
+                const tbody = document.getElementById('table-body');
+                tbody.innerHTML = ''; 
+
+                jsonData.forEach((row) => {
+                    // 필수 값인 '의뢰번호'가 없으면 데이터가 없는 행으로 간주
+                    if (!row['의뢰번호']) return;
+
+                    const tr = document.createElement('tr');
+                    tr.className = 'text-center';
+                    
+                    // 헤더명 기반 안전 매핑 (순번, 배정현황 포함)
+                    const map = {
+                        index: row['순번'] || '',            // 순번 (A열)
+                        u_id: row['의뢰번호'] || '',          // 의뢰번호 (B열)
+                        receipt_id: row['접수번호'] || '',    // 접수번호 (C열)
+                        receipt_date: row['접수일시'] || '',  // 접수일시 (D열)
+                        status: row['진행상태'] || '',        // 진행상태 (E열)
+                        project: row['사업명'] || '',         // 사업명 (F열)
+                        client: row['의뢰기관명'] || '',      // 의뢰기관명 (G열)
+                        sampler: row['채취자'] || '',         // 채취자 (H열)
+                        seal: row['봉인명'] || '',           // 봉인명 (I열)
+                        processor: row['처리자'] || '',       // 처리자 (J열)
+                        sales_type: row['영업구분'] || '',     // 영업구분 (K열)
+                        team: (row['담당자'] || '').toString().trim(), // 담당자-팀 (L열)
+                        check: row['확인'] || '',            // 확인 (M열)
+                        amount: row['시료량'] || '',          // 시료량 (N열)
+                        type: row['구분'] || '',             // 구분 (O열)
+                        manager_info: row['현장 담당자'] || '', // 현장 담당자 (P열)
+                        assign_date: row['배정일자'] || '',    // 배정일자 (Q열)
+                        assign_status: row['배정현황'] || ''   // 배정현황 (R열)
+                    };
+
+                    tr.innerHTML = `
+                        <td><input type="checkbox" class="form-check-input row-checkbox"></td>
+                        <td><input type="text" class="edit-input" data-name="index" value="${map.index}"></td>
+                        <td><input type="text" class="edit-input" data-name="u_id" value="${map.u_id}"></td>
+                        <td><input type="text" class="edit-input" data-name="receipt_id" value="${map.receipt_id}"></td> 
+                        <td><input type="text" class="edit-input" data-name="receipt_date" value="${map.receipt_date}"></td> 
+                        <td><input type="text" class="edit-input" data-name="status" value="${map.status}"></td>
+                        <td><input type="text" class="edit-input" data-name="project" value="${map.project}"></td> 
+                        <td><input type="text" class="edit-input" data-name="client" value="${map.client}"></td> 
+                        <td><input type="text" class="edit-input" data-name="sampler" value="${map.sampler}"></td> 
+                        <td><input type="text" class="edit-input" data-name="seal" value="${map.seal}"></td> 
+                        <td><input type="text" class="edit-input" data-name="processor" value="${map.processor}"></td> 
+                        <td><input type="text" class="edit-input" data-name="sales_type" value="${map.sales_type}"></td> 
+                        <td>
+                            <select class="edit-input team-select" data-name="manager" onchange="changeTeamColor(this)">
+                                <option value="">선택</option>
+                                ${['1팀','2팀','3팀','4팀','5팀','6팀'].map(t => 
+                                    `<option value="${t}" ${map.team.includes(t) ? 'selected' : ''}>${t}</option>`
+                                ).join('')}
+                            </select>
+                        </td>
+                        <td><input type="text" class="edit-input" data-name="check_col" value="${map.check}"></td> 
+                        <td><input type="text" class="edit-input" data-name="amount" value="${map.amount}"></td> 
+                        <td><input type="text" class="edit-input" data-name="type_col" value="${map.type}"></td> 
+                        <td><input type="text" class="edit-input" data-name="manager_name" value="${map.manager_info}"></td> 
+                        <td>
+                            <input type="date" class="edit-input date-picker" data-name="assign_date" 
+                                   value="${formatDateToISO(map.assign_date)}"
+                                   onchange="this.style.backgroundColor='#99ff99'">
+                        </td>
+                        <td><input type="text" class="edit-input" data-name="assignment_history" value="${map.assign_status}"></td>`;
+                    
+                    tbody.appendChild(tr);
+                });
+                overlay.style.display = 'none';
+            } catch (err) {
+                overlay.style.display = 'none';
+                console.error(err);
+                alert("불러오기 실패: " + err.message);
             }
-        })
-        .catch(err => {
-            overlay.style.display = 'none';
-            alert("실패 사유: " + err.message);
-        });
+        };
+        reader.readAsArrayBuffer(file);
     };
+    fileInput.click();
+};
+
+function formatDateToISO(val) {
+    if (!val) return '';
+    const date = new Date(val);
+    if (isNaN(date.getTime())) return val;
+    
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 
     // 1. 담당자 선택 시 배경색 변경 (사진 image_3d5729.png 기준)
         function changeTeamColor(selectElement) {

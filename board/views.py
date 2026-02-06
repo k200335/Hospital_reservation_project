@@ -2426,25 +2426,23 @@ def save_field_team_data(request):
 
 # ---------------------------------여기서 부터 settlement_admin 시작입니다.---------------str
 
-# views.py
 
 # def settlement_report(request):
-#     # [A] 화면 초기 접속 (주소창에 엔터 쳤을 때)
+#     # [A] 화면 초기 접속
 #     start_date = request.GET.get('start_date')
 #     if not start_date:
-#         # 지우셨던 settlement_admin.html 파일명을 정확히 적으세요.
 #         return render(request, 'settlement_admin.html')
 
-#     # [B] 조회 버튼 클릭 시 (JSON 데이터 처리)
+#     # [B] 조회 버튼 클릭 시
 #     try:
 #         end_date = request.GET.get('end_date')
-#         date_type = request.GET.get('date_type') # 실접수일기준 / 입금일기준
+#         date_type = request.GET.get('date_type') 
 #         search_type = request.GET.get('search_type')
 #         search_text = request.GET.get('search_text', '').strip()
 
 #         final_results = []
         
-#         # 1. MSSQL 조회 (날짜 및 하이픈 처리)
+#         # 1. MSSQL 조회
 #         with connections['mssql'].cursor() as mssql_cursor:
 #             if date_type == "deposit":
 #                 target_col = "e.deposit_day"
@@ -2457,18 +2455,13 @@ def save_field_team_data(request):
 #             mssql_params = [q_start, q_end]
 
 #             if search_text:
-#                 if search_type == 'req_no':        # 의뢰번호
-#                     mssql_where += " AND c.request_code LIKE %s"
-#                 elif search_type == 'receipt_no':  # QT번호
-#                     mssql_where += " AND a.receipt_code LIKE %s"
-#                 elif search_type == 'client':      # 의뢰기관명
-#                     mssql_where += " AND a.builder LIKE %s"
-#                 elif search_type == 'project':     # 사업명
-#                     mssql_where += " AND a.construction LIKE %s"
-                
+#                 if search_type == 'req_no': mssql_where += " AND c.request_code LIKE %s"
+#                 elif search_type == 'receipt_no': mssql_where += " AND a.receipt_code LIKE %s"
+#                 elif search_type == 'client': mssql_where += " AND a.builder LIKE %s"
+#                 elif search_type == 'project': mssql_where += " AND a.construction LIKE %s"
 #                 mssql_params.append(f"%{search_text}%")
 
-#             # 지게차운임 서브쿼리 포함 (RTRIM으로 공백 제거 필수)
+#             # 쿼리문은 그대로 유지 (단, SQL 에러 방지를 위해 LIKE 절의 %는 하드코딩하지 않고 파라미터로 넘기는 게 좋지만 일단 그대로 둡니다)
 #             mssql_query = f"""
 #                 SELECT 
 #                     RTRIM(c.request_code) as [의뢰번호], RTRIM(a.receipt_code) as [QT번호],
@@ -2500,56 +2493,61 @@ def save_field_team_data(request):
 #             columns = [col[0] for col in mssql_cursor.description]
 #             mssql_rows = [dict(zip(columns, row)) for row in mssql_cursor.fetchall()]
 
-#         # 2. MySQL 매칭 (의뢰번호/QT번호 각각의 Key로 매칭)
+#         # 2. 데이터 매칭 및 중복 제거 (핵심 로직)
 #         if mssql_rows:
 #             req_codes = [r['의뢰번호'] for r in mssql_rows if r['의뢰번호']]
 #             qt_codes = [r['QT번호'] for r in mssql_rows if r['QT번호']]
 #             csi_map, field_map = {}, {}
 
 #             with connections['default'].cursor() as my_cursor:
-#                 if req_codes: # 의뢰번호 기준: 담당자
+#                 if req_codes:
 #                     placeholders = ', '.join(['%s'] * len(req_codes))
 #                     my_cursor.execute(f"SELECT 의뢰번호, 담당자, 미인정 FROM csi_receipts WHERE 의뢰번호 IN ({placeholders})", req_codes)
 #                     for row in my_cursor.fetchall():
 #                         csi_map[str(row[0]).strip()] = {'담당자': row[1], '미인정': row[2]}
 
-#                 # 2. MySQL 매칭 부분 (시료명 추가됨)
-#                 if qt_codes: # QT번호 기준: 현장팀
+#                 if qt_codes:
 #                     placeholders = ', '.join(['%s'] * len(qt_codes))
-#                     # row[2]가 시료명, row[3]이 공수, row[4]가 합계
 #                     my_cursor.execute(f"SELECT 접수번호, 현장담당, 시료명, 공수, (출장비 + 추가) FROM winapps_현장팀 WHERE 접수번호 IN ({placeholders})", qt_codes)
 #                     for row in my_cursor.fetchall():
 #                         field_map[str(row[0]).strip()] = {
-#                             '현장담당': row[1],
-#                             '시료명': row[2], 
-#                             '공수': row[3], 
-#                             '지급액합계': row[4]
+#                             '현장담당': row[1], '시료명': row[2], '공수': row[3], '지급액합계': row[4]
 #                         }
 
-#                 # 3. 데이터 결합 부분
-#                 for row in mssql_rows:
-#                     r_key, q_key = row['의뢰번호'], row['QT번호']
-#                     c_info = csi_map.get(r_key, {'담당자': '-', '미인정': '0'})
-                    
-#                     # [수정 포인트] 여기에 '시료명': '-' 을 추가해줘야 안전합니다.
-#                     f_info = field_map.get(q_key, {'현장담당': '-', '시료명': '-', '공수': 0, '지급액합계': 0})
-                    
-#                     row.update({
-#                         '담당자': c_info['담당자'], 
-#                         '미인정': c_info['미인정'],
-#                         '현장담당': f_info['현장담당'], 
-#                         '시료명': f_info['시료명'], # 이제 여기서 안전하게 가져옵니다.
-#                         '공수': f_info['공수'], 
-#                         '지급액합계': f_info['지급액합계'],
-#                         '사업명': row['사업명']
-#                     })
-#                     final_results.append(row)
+#             # -------------------------------------------------------
+#             # [중복 제거 포인트] 중복 체크를 위한 Set 변수 생성
+#             # -------------------------------------------------------
+#             seen_qt = set() 
+            
+#             for row in mssql_rows:
+#                 q_key = row['QT번호']
+                
+#                 # 이미 리스트에 담긴 QT번호라면 그냥 건너뛰기 (첫 번째 데이터만 살림)
+#                 if q_key in seen_qt:
+#                     continue
+                
+#                 r_key = row['의뢰번호']
+#                 c_info = csi_map.get(r_key, {'담당자': '-', '미인정': '0'})
+#                 f_info = field_map.get(q_key, {'현장담당': '-', '시료명': '-', '공수': 0, '지급액합계': 0})
+                
+#                 row.update({
+#                     '담당자': c_info['담당자'], 
+#                     '미인정': c_info['미인정'],
+#                     '현장담당': f_info['현장담당'], 
+#                     '시료명': f_info['시료명'], 
+#                     '공수': f_info['공수'], 
+#                     '지급액합계': f_info['지급액합계']
+#                 })
+                
+#                 # 결과 리스트에 추가하고 seen_qt에 기록
+#                 final_results.append(row)
+#                 seen_qt.add(q_key)
+#             # -------------------------------------------------------
 
 #         return JsonResponse(final_results, safe=False)
 
 #     except Exception as e:
 #         return JsonResponse({"error": str(e)}, status=500)
-
 
 def settlement_report(request):
     # [A] 화면 초기 접속
@@ -2585,7 +2583,6 @@ def settlement_report(request):
                 elif search_type == 'project': mssql_where += " AND a.construction LIKE %s"
                 mssql_params.append(f"%{search_text}%")
 
-            # 쿼리문은 그대로 유지 (단, SQL 에러 방지를 위해 LIKE 절의 %는 하드코딩하지 않고 파라미터로 넘기는 게 좋지만 일단 그대로 둡니다)
             mssql_query = f"""
                 SELECT 
                     RTRIM(c.request_code) as [의뢰번호], RTRIM(a.receipt_code) as [QT번호],
@@ -2617,11 +2614,11 @@ def settlement_report(request):
             columns = [col[0] for col in mssql_cursor.description]
             mssql_rows = [dict(zip(columns, row)) for row in mssql_cursor.fetchall()]
 
-        # 2. 데이터 매칭 및 중복 제거 (핵심 로직)
+        # 2. 데이터 매칭 및 중복 제거
         if mssql_rows:
             req_codes = [r['의뢰번호'] for r in mssql_rows if r['의뢰번호']]
             qt_codes = [r['QT번호'] for r in mssql_rows if r['QT번호']]
-            csi_map, field_map = {}, {}
+            csi_map, field_map, incentive_map = {}, {}, {} # incentive_map 추가
 
             with connections['default'].cursor() as my_cursor:
                 if req_codes:
@@ -2632,11 +2629,17 @@ def settlement_report(request):
 
                 if qt_codes:
                     placeholders = ', '.join(['%s'] * len(qt_codes))
+                    # 1) 기존 field_map용 쿼리
                     my_cursor.execute(f"SELECT 접수번호, 현장담당, 시료명, 공수, (출장비 + 추가) FROM winapps_현장팀 WHERE 접수번호 IN ({placeholders})", qt_codes)
                     for row in my_cursor.fetchall():
                         field_map[str(row[0]).strip()] = {
                             '현장담당': row[1], '시료명': row[2], '공수': row[3], '지급액합계': row[4]
                         }
+                    
+                    # 2) 신규 인센티브 매칭용 쿼리 (qt_issue 테이블)
+                    my_cursor.execute(f"SELECT `QT번호`, `금액` FROM `qt_issue` WHERE `QT번호` IN ({placeholders})", qt_codes)
+                    for row in my_cursor.fetchall():
+                        incentive_map[str(row[0]).strip()] = row[1] # 금액 저장
 
             # -------------------------------------------------------
             # [중복 제거 포인트] 중복 체크를 위한 Set 변수 생성
@@ -2646,13 +2649,13 @@ def settlement_report(request):
             for row in mssql_rows:
                 q_key = row['QT번호']
                 
-                # 이미 리스트에 담긴 QT번호라면 그냥 건너뛰기 (첫 번째 데이터만 살림)
                 if q_key in seen_qt:
                     continue
                 
                 r_key = row['의뢰번호']
                 c_info = csi_map.get(r_key, {'담당자': '-', '미인정': '0'})
                 f_info = field_map.get(q_key, {'현장담당': '-', '시료명': '-', '공수': 0, '지급액합계': 0})
+                incentive_val = incentive_map.get(q_key, 0) # 인센티브 금액 가져오기
                 
                 row.update({
                     '담당자': c_info['담당자'], 
@@ -2660,10 +2663,10 @@ def settlement_report(request):
                     '현장담당': f_info['현장담당'], 
                     '시료명': f_info['시료명'], 
                     '공수': f_info['공수'], 
-                    '지급액합계': f_info['지급액합계']
+                    '지급액합계': f_info['지급액합계'],
+                    '인센티브': incentive_val # 최종 데이터에 추가
                 })
                 
-                # 결과 리스트에 추가하고 seen_qt에 기록
                 final_results.append(row)
                 seen_qt.add(q_key)
             # -------------------------------------------------------
@@ -2672,6 +2675,7 @@ def settlement_report(request):
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
 
 # ---------------------------------여기까지 settlement_admin 끝입니다.---------------end
 
@@ -2779,23 +2783,7 @@ def register_client(request):
             return JsonResponse({"status": "error", "message": str(e)})
         
         
-# def search_clients(request):
-#     keyword = request.GET.get('keyword', '')
-    
-#     try:
-#         with connections['default'].cursor() as cursor:
-#             # 이름(reg_name)으로 검색
-#             sql = "SELECT reg_name, reg_phone, reg_company, reg_project_name FROM client_projects WHERE reg_name LIKE %s"
-#             cursor.execute(sql, [f"%{keyword}%"])
-            
-#             # 결과 가공
-#             columns = [col[0] for col in cursor.description]
-#             data = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            
-#             return JsonResponse({'status': 'success', 'data': data})
-            
-#     except Exception as e:
-#         return JsonResponse({'status': 'error', 'message': str(e)})
+
     
 def search_clients(request):
     keyword = request.GET.get('keyword', '').strip()
@@ -3244,164 +3232,6 @@ def delete_memo(request):
             return JsonResponse({'status': 'error', 'message': str(e)})
         
         # ---------------------챠트시작-------------------str
-
-
-# def get_stats(request):
-#     year = request.GET.get('year')
-#     month = request.GET.get('month', '1').zfill(2)
-#     mode = request.GET.get('mode', 'daily')
-
-#     # 필터 조건 설정
-#     date_filter = f"{year}%" if mode == 'yearly' else f"{year}-{month}%"
-#     last_index = 12 if mode == 'yearly' else calendar.monthrange(int(year), int(month))[1]
-#     date_func = "MONTH" if mode == 'yearly' else "DAY"
-
-#     teams = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀']
-#     result_data = {
-#         team: { 
-#             'receipt': [0] * last_index, 
-#             'issue': [0] * last_index,
-#             'matched_issue': [0] * last_index  # ⬅️ 팀별로 담을 바구니 새로 생성
-#         } 
-#         for team in teams
-#     }
-
-#     with connection.cursor() as cursor:
-#         # 1. [접수 기준] - 기존 코드 유지
-#         receipt_query = f"""
-#             SELECT {date_func}(STR_TO_DATE(배정일자, '%Y-%m-%d')) as idx, 담당자, COUNT(의뢰번호)
-#             FROM csi_receipts
-#             WHERE 배정일자 LIKE '{date_filter}'
-#             GROUP BY idx, 담당자
-#         """
-#         cursor.execute(receipt_query)
-#         for idx, team, cnt in cursor.fetchall():
-#             clean_team = team.strip() if team else ""
-#             if clean_team in result_data and idx:
-#                 if 0 <= int(idx)-1 < last_index:
-#                     result_data[clean_team]['receipt'][int(idx)-1] = cnt
-
-#         # 2. [단순 발급 기준] - 기존 코드 (발급일자 기준 시계열)
-#         issue_query = f"""
-#             SELECT 
-#                 {date_func}(STR_TO_DATE(I.발급일자, '%Y-%m-%d')) as idx, 
-#                 R.담당자, 
-#                 COUNT(I.의뢰번호)
-#             FROM csi_issue_results I
-#             INNER JOIN csi_receipts R ON I.의뢰번호 = R.의뢰번호
-#             WHERE I.발급일자 LIKE '{date_filter}'
-#             GROUP BY idx, R.담당자
-#         """
-#         cursor.execute(issue_query)
-#         for idx, team, cnt in cursor.fetchall():
-#             clean_team = team.strip() if team else ""
-#             if clean_team in result_data and idx:
-#                 if 0 <= int(idx)-1 < last_index:
-#                     result_data[clean_team]['issue'][int(idx)-1] = cnt
-
-#         # 3. [의뢰번호 매칭 기준] ⬅️ 🎯 새로 추가된 핵심 로직
-#         # 해당 기간에 '접수(배정)'된 의뢰번호 중 발급까지 완료된 건수를 똑같이 팀별로 담습니다.
-#         matched_query = f"""
-#             SELECT 
-#                 {date_func}(STR_TO_DATE(R.배정일자, '%Y-%m-%d')) as idx, 
-#                 R.담당자, 
-#                 COUNT(I.의뢰번호)
-#             FROM csi_receipts R
-#             INNER JOIN csi_issue_results I ON R.의뢰번호 = I.의뢰번호
-#             WHERE R.배정일자 LIKE '{date_filter}'
-#             GROUP BY idx, R.담당자
-#         """
-#         cursor.execute(matched_query)
-#         for idx, team, cnt in cursor.fetchall():
-#             clean_team = team.strip() if team else ""
-#             if clean_team in result_data and idx:
-#                 if 0 <= int(idx)-1 < last_index:
-#                     # ✅ 이제 프론트엔드에서 녹색선을 그릴 수 있도록 팀별 배열에 저장합니다.
-#                     result_data[clean_team]['matched_issue'][int(idx)-1] = cnt
-
-#     return JsonResponse(result_data)
-
-
-# def get_stats(request):
-#     try:
-#         # 1. 파라미터 수집
-#         year = request.GET.get('year')
-#         month = request.GET.get('month', '1').zfill(2)
-#         mode = request.GET.get('mode', 'daily')
-
-#         # 2. 필터 조건 설정 (사용자님 지침 반영)
-#         # MySQL: 하이픈 있음 (예: 2026-01%)
-#         mysql_filter = f"{year}%" if mode == 'yearly' else f"{year}-{month}%"
-#         # MSSQL: 하이픈 없음 (예: 202601%)
-#         mssql_filter = f"{year}" if mode == 'yearly' else f"{year}{month}"
-        
-#         last_index = 12 if mode == 'yearly' else calendar.monthrange(int(year), int(month))[1]
-#         date_func = "MONTH" if mode == 'yearly' else "DAY"
-
-#         teams = ['1팀', '2팀', '3팀', '4팀', '5팀', '6팀']
-#         result_data = {
-#             team: { 
-#                 'receipt': [0] * last_index, 
-#                 'issue': [0] * last_index,           # 파란색 선 (발급 총건수)
-#                 'matched_issue': [0] * last_index,   # 녹색 선 (매칭 발급건수)
-#                 'sales': [0] * last_index, 
-#                 'deposit': [0] * last_index 
-#             } for team in teams
-#         }
-
-#         # 3. [MySQL] 발급/접수 (하이픈 있는 mysql_filter 사용)
-#         mapping_dict = {}
-#         with connection.cursor() as cursor:
-#             cursor.execute("SELECT 의뢰번호, 담당자 FROM csi_receipts WHERE 담당자 IS NOT NULL")
-#             for req_no, owner in cursor.fetchall():
-#                 mapping_dict[req_no] = owner.strip()
-
-#             # (1) 접수 건수
-#             cursor.execute(f"SELECT {date_func}(STR_TO_DATE(배정일자, '%Y-%m-%d')) as idx, 담당자, COUNT(*) FROM csi_receipts WHERE 배정일자 LIKE '{mysql_filter}' GROUP BY idx, 담당자")
-#             for idx, team, cnt in cursor.fetchall():
-#                 t = team.strip() if team else ""
-#                 if t in result_data and idx:
-#                     result_data[t]['receipt'][int(idx)-1] = cnt
-
-#             # (2) 발급 총건수 (파란색 선)
-#             cursor.execute(f"SELECT {date_func}(STR_TO_DATE(I.발급일자, '%Y-%m-%d')) as idx, R.담당자, COUNT(*) FROM csi_issue_results I INNER JOIN csi_receipts R ON I.의뢰번호 = R.의뢰번호 WHERE I.발급일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
-#             for idx, team, cnt in cursor.fetchall():
-#                 t = team.strip() if team else ""
-#                 if t in result_data and idx:
-#                     result_data[t]['issue'][int(idx)-1] = cnt
-
-#             # (3) 매칭 발급건수 (녹색 선)
-#             cursor.execute(f"SELECT {date_func}(STR_TO_DATE(R.배정일자, '%Y-%m-%d')) as idx, R.담당자, COUNT(*) FROM csi_receipts R INNER JOIN csi_issue_results I ON R.의뢰번호 = I.의뢰번호 WHERE R.배정일자 LIKE '{mysql_filter}' GROUP BY idx, R.담당자")
-#             for idx, team, cnt in cursor.fetchall():
-#                 t = team.strip() if team else ""
-#                 if t in result_data and idx:
-#                     result_data[t]['matched_issue'][int(idx)-1] = cnt
-
-#         # 4. [MSSQL] 매출/입금 (하이픈 없는 mssql_filter 사용)
-#         with connections['mssql'].cursor() as mssql_cursor:
-#             # 매출액 (계산서 발행일 기준)
-#             s_idx = "MONTH(T.issue_date)" if mode == 'yearly' else "DAY(T.issue_date)"
-#             mssql_cursor.execute(f"SELECT {s_idx}, R.request_code, SUM(ISNULL(E.supply_value, 0) + ISNULL(E.vat, 0)) FROM dbo.Tax_Manager T INNER JOIN dbo.Receipt R ON T.receipt_code = R.receipt_code LEFT JOIN dbo.Estimate E ON T.receipt_code = E.receipt_code WHERE T.issue_date LIKE '{mssql_filter}%' GROUP BY {s_idx}, R.request_code")
-#             for idx, req_code, val in mssql_cursor.fetchall():
-#                 team = mapping_dict.get(req_code)
-#                 if team in result_data and idx:
-#                     result_data[team]['sales'][int(idx)-1] += int(val or 0)
-
-#             # 입금액 (입금일 기준 - 하이픈 없음)
-#             d_idx = "CAST(SUBSTRING(D.deposit_day, 5, 2) AS INT)" if mode == 'yearly' else "CAST(SUBSTRING(D.deposit_day, 7, 2) AS INT)"
-#             mssql_cursor.execute(f"SELECT {d_idx}, R.request_code, SUM(ISNULL(D.deposit, 0)) FROM dbo.Deposit D INNER JOIN dbo.Receipt R ON D.receipt_code = R.receipt_code WHERE D.deposit_day LIKE '{mssql_filter}%' GROUP BY {d_idx}, R.request_code")
-#             for idx, req_code, val in mssql_cursor.fetchall():
-#                 team = mapping_dict.get(req_code)
-#                 if team in result_data and idx:
-#                     result_data[team]['deposit'][int(idx)-1] += int(val or 0)
-
-#         return JsonResponse(result_data)
-
-#     except Exception as e:
-#         print(traceback.format_exc())
-#         return JsonResponse({'error': str(e)}, status=500)
-
-
 
 
 def get_stats(request):
