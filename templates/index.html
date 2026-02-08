@@ -554,7 +554,7 @@ function checkAdminAccess(url) {
     const currentUserId = "{{ user.username }}"; // 현재 로그인한 아이디
     
     // 2. 허용된 아이디 리스트
-    const allowedIds = ["admin_work", "admin_home","안월숙","서버확인중"];
+    const allowedIds = ["admin_work", "admin_home","안월숙","서버확인중","kcqt"];
 
     if (!isAuthenticated) {
         alert("로그인이 필요한 서비스입니다.");
@@ -569,6 +569,16 @@ function checkAdminAccess(url) {
     }
 
     if (url.includes('/field_payment/') && currentUserId !== 'admin_home') {
+        alert("해당 메뉴에 대한 접근 권한이 없습니다.");
+        return;
+    }
+
+    if (url.includes('/board/csi_issue/') && currentUserId !== 'admin_home') {
+        alert("해당 메뉴에 대한 접근 권한이 없습니다.");
+        return;
+    }
+
+    if (url.includes('/board/csi_pending/') && currentUserId !== 'admin_home') {
         alert("해당 메뉴에 대한 접근 권한이 없습니다.");
         return;
     }
