@@ -83,7 +83,9 @@ urlpatterns = [
     # 정산 완료 저장
     path('api/save-settlement/', views.save_settlement_data, name='save_settlement'),
     
-    path('receipt_settle_admin/', views.receipt_settle_admin, name='receipt_settle_admin'),
+    path('receipt_settle_admin/', views.receipt_settle_report, name='receipt_settle_admin'),
+    path('save_manager_mapping/', views.save_manager_mapping, name='save_manager_mapping'),
+    path('get_manager_mappings/', views.get_manager_mappings, name='get_manager_mappings'),
     
     # 3번 영역: 데이터 불러오기 (MySQL 조회)
     path('get_panel3_data/', views.get_panel3_data, name='get_panel3_data'),
@@ -144,9 +146,16 @@ urlpatterns = [
     path('transactions/update/<int:pk>/', views.transaction_update, name='transaction_update'),
     
     path('api/add-category/', views.add_category, name='add_category'),
-path('api/update-category/', views.update_category, name='update_category'),
-path('api/get-categories/', views.get_categories, name='get_categories'),
-path('api/delete-category/', views.delete_category, name='delete_category'),
+    path('api/update-category/', views.update_category, name='update_category'),
+    path('api/get-categories/', views.get_categories, name='get_categories'),
+    path('api/delete-category/', views.delete_category, name='delete_category'),
+
+# 5번 패널 전용 데이터 조회 URL
+    path('fetch_panel5_data/', views.fetch_panel5_data, name='fetch_panel5_data'),
+    
+    # 만약 저장 로직도 구현하신다면 미리 추가해두세요 (선택사항)
+    path('save_panel5_data/', views.save_panel5_data, name='save_panel5_data'),
+
 ]
 # 아래 내용을 반드시 추가
 if settings.DEBUG:

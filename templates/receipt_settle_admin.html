@@ -1,551 +1,1474 @@
 {% extends "base.html" %}
 {% block content %}
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>    
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>    
-</head>    
-<div class="container-fluid py-3">
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-light py-3">
-            <form id="searchForm" class="row g-2 align-items-center">
-                <div class="col-auto">
-                    <select class="form-select form-select-sm" id="dateType">
-                        <option value="deposit">입금일 기준</option>
-                        <option value="receipt">실접수일 기준</option>
-                    </select>
-                </div>
-                
-                <div class="col-auto d-flex align-items-center">
-                    <input type="date" class="form-control form-select-sm" id="startDate">
-                    <span class="mx-1">~</span>
-                    <input type="date" class="form-control form-select-sm" id="endDate">
-                </div>
 
-                <div class="col-auto">
-                    <select class="form-select form-select-sm" id="searchType">
-                        <option value="sales_man">영업담당</option>
-                        <option value="qt_no">QT번호</option>
-                        <option value="agency">의뢰기관명</option>
-                        <option value="project">공사명</option>
-                        <option value="seal">봉인명</option>
-                    </select>
-                </div>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.1/styles/ag-grid.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.1/styles/ag-theme-balham.css">
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.0.1/dist/ag-grid-community.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+    #main-layout { display: flex; flex-direction: column; height: 92vh; gap: 10px; padding: 10px; }
+    .top-section { flex: 6; display: flex; flex-direction: column; min-height: 0; }
+    .bottom-section { flex: 4; background-color: #ffffff; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; overflow-y: auto; }
+    .search-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px; background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; margin-bottom: 8px; }
+    #myGrid { flex: 1; width: 100%; }
+    .fw-bold-small { font-weight: bold; font-size: 0.85rem; }
+    /* 수정 가능한 셀 강조 스타일 */
+    .editable-cell { background-color: #fff9db !important; cursor: pointer; }
+</style>
 
-                <div class="col-auto">
-                    <input type="text" class="form-control form-select-sm" id="searchText" placeholder="검색어 입력" style="width: 200px;">
-                </div>
+<div id="main-layout">
+    <div class="top-section">
+        <div class="search-bar">
+            <select id="dateTarget" class="form-select form-select-sm" style="width: 130px;">
+                <option value="receipt">실접수일 기준</option>
+                <option value="deposit">입금일 기준</option>
+            </select>
 
-                <div class="col-auto">
-                    <button type="button" class="btn btn-primary btn-sm px-3" onclick="onSearch()">조회</button>
-                </div>
-                <input type="file" id="excelFileInput" style="display: none;" accept=".xlsx, .xls" onchange="processExcelFile(event)">
-                <div class="col-auto ms-auto d-flex gap-2"> 
-                    <button type="button" class="btn btn-warning btn-sm px-3" onclick="importAppliedAmounts()">
-                        <i class="bi bi-download"></i> 엑셀 가져오기
-                    </button>
-                    <button type="button" class="btn btn-primary btn-sm px-3" onclick="onSaveToDB()">
-                        <i class="bi bi-cloud-upload"></i> 마감하기
-                    </button>
-                    <button type="button" class="btn btn-success btn-sm px-3" onclick="onBtExport()">
-                        <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
-                    </button>
-                </div>
-            </form>
+            <div class="d-flex align-items-center gap-1">
+                <input type="date" id="startDate" class="form-control form-control-sm" style="width: 140px;">
+                <span>~</span>
+                <input type="date" id="endDate" class="form-control form-control-sm" style="width: 140px;">
+            </div>
+
+            <select id="searchType" class="form-select form-select-sm" style="width: 120px;">                
+                <option value="req_no">의뢰번호</option>
+                <option value="receipt_no">QT번호</option>                
+                <option value="client">의뢰기관명</option>
+                <option value="project">사업명</option>
+            </select>
+
+            <input type="text" id="searchText" class="form-control form-control-sm" style="width: 180px;" placeholder="검색어 입력">
+
+            <button onclick="onSearch()" class="btn btn-primary btn-sm px-3">
+                <i class="bi bi-search"></i> 실적 조회
+            </button>
+            <button onclick="onVerifyPerformance()" class="btn btn-info btn-sm px-3 text-white">
+                <i class="bi bi-check-circle"></i> 실적확인
+            </button>
+            <button onclick="onDeleteSelected()" class="btn btn-danger btn-sm px-3">
+                <i class="bi bi-trash"></i> 선택 삭제
+            </button>
+            <button onclick="openManagerModal()" class="btn btn-dark btn-sm px-3">
+                <i class="bi bi-person-plus"></i> 실장 매칭 설정
+            </button>
+            <button onclick="onExcelDownloadSupport()" class="btn btn-outline-success btn-sm px-3">
+                <i class="bi bi-file-earmark-excel"></i> 엑셀 다운로드
+            </button>
+
+            <div class="d-flex align-items-center ms-auto gap-3 px-3 py-1 bg-white border rounded shadow-sm" style="min-width: 500px;">
+                <div class="text-nowrap"><span class="small text-muted">총:</span> <b id="stat-count" class="text-dark">0</b><span class="small">건</span></div>
+                <div class="vr"></div>
+                <div class="text-nowrap"><span class="small text-muted">공급가:</span> <b id="stat-supply" class="text-primary">0</b></div>
+                <div class="vr"></div>
+                <div class="text-nowrap"><span class="small text-muted">합계:</span> <b id="stat-total" class="text-danger">0</b></div>
+                <div class="vr"></div>
+                <div class="text-nowrap"><span class="small text-muted">입금액:</span> <b id="stat-deposit" class="text-success">0</b></div>
+            </div>
         </div>
 
-        <div class="card-body p-0">
-            <div id="myGrid" style="height: 600px; width: 100%;" class="ag-theme-alpine"></div>
+        <div id="myGrid" class="ag-theme-balham"></div>
+    </div>
+
+    <div class="bottom-section">
+        <h6 class="fw-bold-small border-bottom pb-2 mb-3">
+            <i class="bi bi-graph-up"></i> 영업 실적 상세 정보 및 통계
+        </h6>
+        
+        <div id="statistics-container" style="display: none;">
+            <div class="d-flex justify-content-end align-items-center mb-3 gap-2">
+                <span class="small fw-bold">연도 선택:</span>
+                <select id="yearSelect" class="form-select form-select-sm" style="min-width: 90px; width: auto;" onchange="updateChartData()">
+                    <option value="all">전체보기</option>
+                    <option value="2025">2025년</option>
+                    <option value="2026" selected>2026년</option>
+                    <option value="2027">2027년</option>
+                    <option value="2028">2028년</option>
+                    <option value="2029">2029년</option>
+                    <option value="2030">2030년</option>
+                </select>
+            </div>
+            
+            <div class="chart-container" style="position: relative; height:400px; width:100%; margin-bottom: 30px;">
+                <canvas id="performanceChart"></canvas>
+            </div>
+            
+            <div class="table-responsive mt-4">
+                <table class="table table-bordered table-sm text-center" id="statTable" style="font-size: 0.85rem;">
+                    <thead class="table-light"></thead>
+                    <tbody id="statTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="detail-content" class="text-muted text-center mt-5">
+            그리드에서 행을 선택하거나 실적 조회를 시작하세요.
         </div>
     </div>
 
-    <div class="row g-3">
-        <div class="col-md-3"><div class="card p-3 shadow-sm border-0 bg-primary text-white text-center"><h6>총 공급가액</h6><h4 id="stat-supply">0</h4></div></div>
-        <div class="col-md-3"><div class="card p-3 shadow-sm border-0 bg-success text-white text-center"><h6>총 입금액</h6><h4 id="stat-deposit">0</h4></div></div>
-        <div class="col-md-3"><div class="card p-3 shadow-sm border-0 bg-danger text-white text-center"><h6>총 미수금</h6><h4 id="stat-unpaid">0</h4></div></div>
-        <div class="col-md-3"><div class="card p-3 shadow-sm border-0 bg-info text-white text-center"><h6>조회 건수</h6><h4 id="stat-count">0건</h4></div></div>
+
+</div>
+
+<div class="modal fade" id="managerModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-md">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h6 class="modal-title fw-bold">현장 실장 매칭 설정</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">대상 사업명 (체크된 항목)</label>
+                    <textarea id="modalProjectList" class="form-control form-control-sm bg-light" rows="4" readonly style="resize: none;"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">현장 실장 이름 입력</label>
+                    <input type="text" id="modalManagerInput" class="form-control form-control-sm" placeholder="이름을 직접 입력하세요 (예: 심재호)">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">취소</button>
+                <button type="button" onclick="saveManagerMapping()" class="btn btn-primary btn-sm">DB 저장</button>
+            </div>
+        </div>
     </div>
 </div>
 
-
 <script>
-    // 1. 전역 변수 선언
+    let myChart = null; // 차트 인스턴스 전역 관리
     let gridApi;
 
-    // 2. [기억 사항] 방대한 컬럼 정의 (누락 없이 전체 복구)
     const columnDefs = [
-        { headerName: "담당자", field: "담당자", width: 100, pinned: 'left' },
-        { 
-            headerName: "미인정", 
-            field: "미인정", 
-            width: 80, pinned: 'left',
-            // 만약 데이터가 1이면 '미인정', 0이면 '인정'으로 표시하고 싶을 때 사용
-            valueFormatter: p => p.value == '1' ? '미인정' : (p.value == '0' ? '인정' : p.value)
-        },
-        { headerName: "의뢰번호", field: "의뢰번호", width: 150, pinned: 'left' },
-        { headerName: "지원", field: "지원", width: 80 }, 
-        { headerName: "영업담당", field: "영업담당", width: 100 },
-        { headerName: "QT번호", field: "QT번호", width: 140 },
-        // { headerName: "실접수일", field: "실접수일", width: 140 },
-        { headerName: "실접수일", field: "실접수일", width: 120,
-            // 🌟 '2025-12-17T14:16:03.130' -> '2025-12-17'로 변환
-            valueFormatter: p => {
-                if (p.value && p.value.includes('T')) {
-                    return p.value.split('T')[0];
-                }
-                return p.value || "";
-            }
-        },
-        { headerName: "의뢰기관명", field: "의뢰기관명", width: 220 },
-        { headerName: "공사명", field: "사업명", width: 300 },
-        { headerName: "봉인명", field: "봉인명", width: 220 },
-        { headerName: "시료량", field: "시료량", width: 100 },
-        
-        // 금액 관련 (숫자 포맷팅: Math.floor + toLocaleString)
-        { headerName: "공급가액", field: "공급가액", width: 120, type: 'numericColumn', valueFormatter: p => Math.floor(p.value || 0).toLocaleString() },
-        { headerName: "부가세", field: "부가세", width: 110, type: 'numericColumn', valueFormatter: p => Math.floor(p.value || 0).toLocaleString() },
-        { headerName: "합계", valueGetter: p => (Number(p.data.공급가액 || 0) + Number(p.data.부가세 || 0)), width: 120, type: 'numericColumn', valueFormatter: p => p.value.toLocaleString() },
-        
-        // 추가 비용 항목들
-        // { headerName: "출장비구분", field: "출장비구분", width: 120 },
-        { headerName: "출장비구분", field: "출장비구분", width: 100,
-        // 🌟 이 부분이 핵심입니다! 🌟
-        valueFormatter: p => {
-            if (p.value == '1') return "본원";
-            if (p.value == '2') return "지원";
-            return p.value || ""; // 1, 2가 아니면 원래 값 출력
-            }
-        },
-        { headerName: "출장비", field: "출장비", width: 100, valueFormatter: p => (p.value || 0).toLocaleString() },        
-        { headerName: "기본료", field: "기본료", width: 100, valueFormatter: p => (p.value || 0).toLocaleString() },
-        { headerName: "정보처리비", field: "정보처리비", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
-        { headerName: "시편제작비", field: "시편제작비", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
-        { headerName: "지게차운임", field: "지게차운임", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
-        { headerName: "시료수거비", field: "시료수거비", width: 110 },
-        { headerName: "청구위탁시험비", field: "청구위탁시험비", width: 130, valueFormatter: p => (p.value || 0).toLocaleString() },
-        
-        // 정산 및 입금 정보 (입금액 배경색 유지)
-        { headerName: "적용금액", field: "적용금액", width: 120 },
-        {
-            headerName: "인센티브",
-            field: "인센티브",
-            valueFormatter: params => {
-                if (!params.value) return 0;
-                // 소수점 반올림 후 천단위 콤마 포맷팅
-                return Math.round(params.value).toLocaleString();
-            }
-        },
-        { headerName: "입금일", field: "입금일", width: 120 },
-        { headerName: "입금액", field: "입금액", width: 120, cellStyle: {'background-color': '#e6fffa'}, valueFormatter: p => (p.value || 0).toLocaleString() },
-        
-        // 계산서 및 연락처 정보
-        { headerName: "계산서발행회사명", field: "계산서발행회사명", width: 180 },
-        { headerName: "계산서발행일", field: "계산서발행일", width: 120 },
-        { headerName: "계산서담당자", field: "계산서담당자", width: 120 },
-        { headerName: "계산서hp", field: "계산서hp", width: 130 },
-        { headerName: "계산서tel", field: "계산서tel", width: 130 },
-        { headerName: "계산서fax", field: "계산서fax", width: 130 },
-        { headerName: "계산서email", field: "계산서email", width: 180 },
-        { headerName: "계산서발행자", field: "계산서발행자", width: 120 },
-        
-        // 의뢰인 상세
-        { headerName: "의뢰인성명", field: "의뢰인성명", width: 120 },
-        { headerName: "현장전화", field: "현장전화", width: 130 },
-        { headerName: "시료채취자", field: "시료채취자", width: 120 },
-        { headerName: "품질담당자", field: "품질담당자", width: 120 },
-        { headerName: "현장담당", field: "현장담당", width: 100 },
-        { headerName: "시료명", field: "시료명", width: 150 },
-        { 
-            headerName: "공수", 
-            field: "공수", 
-            width: 80, 
-            type: 'numericColumn' 
-        },
-        { 
-            headerName: "지급액합계", 
-            field: "지급액합계", 
-            width: 120, 
-            type: 'numericColumn',
-            valueFormatter: p => Math.floor(p.value || 0).toLocaleString() + "원"
-        },
-    ];
-
-    // columnDefs 배열 내부의 출장비구분 컬럼을 찾아서 수정하세요
-    
-    // 1. 그리드 옵션 설정 부분 수정
-const gridOptions = {
-    columnDefs: columnDefs,
-    rowData: [], 
-    // --- 높이 조절 속성 추가 ---
-    headerHeight: 30,      // 헤더 높이 줄임
-    rowHeight: 33,         // 행 높이 줄임
-    // -----------------------
-    defaultColDef: {
-        resizable: true,
-        sortable: true,
-        filter: true,
-        flex: 0,
-        minWidth: 100
+    { 
+        headerName: "", 
+        checkboxSelection: true, 
+        headerCheckboxSelection: true, 
+        width: 50, 
+        pinned: 'left', 
+        // suppressHeaderMenuButton: true, // <- 이 줄을 지우고 아래로 교체
+        suppressMenu: true,               // 대부분의 버전에서 동작
+        suppressSizeToFit: true           // 크기 조절 방지도 추가하면 좋음
     },
-    pagination: false,
-    overlayLoadingTemplate: '<span class="ag-overlay-loading-center">데이터를 불러오는 중입니다...</span>',
-    onGridReady: (params) => {
-        gridApi = params.api; // 기존 gridApi 변수 활용
-        window.finishedGridApi = params.api;
-        console.log("그리드 API 연결 완료");
+    { headerName: "담당자", field: "담당자", width: 60, pinned: 'left' },
+    { headerName: "미인정", field: "미인정", width: 60,
+        valueFormatter: p => (p.value != null && p.value !== "" && p.value != '0') ? p.value : "-",
+        cellStyle: { 'text-align': 'center' }
+    },        
+    { headerName: "의뢰번호", field: "의뢰번호", width: 150},        
+    { headerName: "영업담당", field: "영업담당", width: 100 },
+    { headerName: "QT번호", field: "QT번호", width: 140 },
+    { headerName: "실접수일", field: "실접수일", width: 120, valueFormatter: p => p.value ? p.value.split('T')[0] : "" },
+    { headerName: "의뢰기관명", field: "의뢰기관명", width: 220,
+        cellStyle: params => {
+            const companies = ["현대엔지니어링", "두산건설", "두산중공업", "GS건설", "지에스건설", "극동건설", "금광기업", "남광토건", "대우건설","포스코", "가나개발", "케이티에이", "현대건설", "현대 건설", "롯데 건설", "롯데건설", "대방건설", "쌍용건설"];
+            if (params.value && companies.some(company => params.value.includes(company))) {
+                return { color: '#0d6efd', fontWeight: 'bold' };
+            }
+            return null;
+        }
     },
-};
+    { headerName: "사업명", field: "사업명", width: 300 },
+    { headerName: "봉인명", field: "봉인명", width: 220,
+        cellStyle: params => {
+            const keywords = ["가새재", "가설받침", "수직재", "수평재", "멍에", "장선", "동바리", "비계용", "강관조인트", "연결조인트", "조립형 비계", "조입철물", "파이프서포", "파이프써포", "받침철물", "가설자재", "가세재", "가설재", "강관 조인", "강관서포", "대각재", "비계파이프", "서포트", "트러스", "수직제", "수평제", "각형강", "각관", "작업대", "작업계단", "발판", "클램프", "크램프"];
+            if (params.value && keywords.some(keyword => params.value.includes(keyword))) {
+                return { color: '#0d6efd', fontWeight: 'bold' };
+            }
+            return null;
+        }  
+    },
+    { headerName: "시료량", field: "시료량", width: 100 },
+    { headerName: "공급가액", field: "공급가액", width: 120, type: 'numericColumn', valueFormatter: p => Math.floor(p.value || 0).toLocaleString() },
+    { headerName: "부가세", field: "부가세", width: 110, type: 'numericColumn', valueFormatter: p => Math.floor(p.value || 0).toLocaleString() },
+    { headerName: "합계", valueGetter: p => (Number(p.data.공급가액 || 0) + Number(p.data.부가세 || 0)), width: 120, type: 'numericColumn', valueFormatter: p => p.value.toLocaleString() },
+    { headerName: "출장비구분", field: "출장비구분", width: 100, valueFormatter: p => p.value == '1' ? "본원" : "지원" },
+    { headerName: "출장비", field: "출장비", width: 100, valueFormatter: p => (p.value || 0).toLocaleString() },
+    { headerName: "기본료", field: "기본료", width: 100, valueFormatter: p => (p.value || 0).toLocaleString() },
+    { headerName: "정보처리비", field: "정보처리비", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
+    { headerName: "시편제작비", field: "시편제작비", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
+    { headerName: "지게차운임", field: "지게차운임", width: 110, valueFormatter: p => (p.value || 0).toLocaleString() },
+    { headerName: "시료수거비", field: "시료수거비", width: 110 },
+    { headerName: "청구위탁시험비", field: "청구위탁시험비", width: 130, valueFormatter: p => (p.value || 0).toLocaleString() },
+    { 
+        headerName: "적용금액", 
+        field: "적용금액", 
+        width: 120, 
+        type: 'numericColumn',
+        valueGetter: p => {
+            const d = p.data;
+            const supply = Number(d.공급가액 || 0);
+            const expenses = 
+                Number(d.출장비 || 0) + 
+                Number(d.기본료 || 0) + 
+                Number(d.정보처리비 || 0) + 
+                Number(d.시편제작비 || 0) + 
+                Number(d.지게차운임 || 0) + 
+                Number(d.시료수거비 || 0) + 
+                Number(d.청구위탁시험비 || 0);
+            return Math.floor(supply - expenses);
+        },
+        valueFormatter: p => Math.floor(p.value || 0).toLocaleString() 
+    },
+    { 
+        headerName: "요율(지원)", 
+        field: "요율지원", 
+        width: 90, 
+        editable: true, 
+        cellClass: 'editable-cell',
+        cellStyle: { 'text-align': 'center' },
+        valueFormatter: p => p.value || "0"
+    },
+    { 
+        headerName: "인센(예상)", 
+        field: "인센예상", 
+        width: 110, 
+        type: 'numericColumn', 
+        valueGetter: p => {
+            const d = p.data;
+            const name = (d.영업담당 || "").trim();
+            const rate = Number(d.요율지원 || 0);
+            const supply = Number(d.공급가액 || 0);
+            const allExpenses = Number(d.출장비 || 0) + Number(d.기본료 || 0) + Number(d.정보처리비 || 0) + Number(d.시편제작비 || 0) + Number(d.지게차운임 || 0) + Number(d.시료수거비 || 0) + Number(d.청구위탁시험비 || 0);
+            const appliedAmount = supply - allExpenses;
 
-// 2. 통합된 window.onload 로직
-window.onload = function() {
-    // 날짜 자동 설정
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 2).toISOString().split('T')[0].substring(0, 8) + '01';
-    
-    document.getElementById('startDate').value = firstDay;
-    document.getElementById('endDate').value = today;
+            if (name === "이동규" || name === "김태식") {
+                const incentiveBase = appliedAmount * rate;
+                const bonus = Number(d.출장비 || 0) + Number(d.시료수거비 || 0);
+                return Math.floor(incentiveBase + bonus);
+            } else {
+                return Math.floor(appliedAmount * rate);
+            }
+        },
+        valueFormatter: p => Math.floor(p.value || 0).toLocaleString() 
+    },      
+    { headerName: "인센티브", field: "인센티브", width: 110, type: 'numericColumn', valueFormatter: p => Math.round(p.value || 0).toLocaleString() },        
+    { 
+        headerName: "요율(본원)", 
+        field: "요율(본원)", 
+        width: 90, 
+        editable: true, 
+        cellClass: 'editable-cell',
+        cellStyle: { 'text-align': 'center' },
+        valueFormatter: p => p.value || "0"
+    },
+    { 
+        headerName: "본원분", 
+        field: "본원분", 
+        width: 110, 
+        type: 'numericColumn', 
+        valueGetter: p => {
+            const price = Number(p.data.공급가액 || 0);
+            const rate = Number(p.data['요율(본원)'] || 0);
+            return Math.floor(price * rate);
+        },
+        valueFormatter: p => Math.floor(p.value || 0).toLocaleString() 
+    },
+    { headerName: "입금일", field: "입금일", width: 120 },
+    { headerName: "입금액", field: "입금액", width: 120, cellStyle: {'background-color': '#e6fffa'}, valueFormatter: p => (p.value || 0).toLocaleString() },        
+    { headerName: "시료채취자", field: "시료채취자", width: 120 },
+    { headerName: "현장담당", field: "현장담당", width: 100 },
+    { headerName: "시료명", field: "시료명", width: 150 },
+    { headerName: "공수", field: "공수", width: 80, cellStyle: { 'text-align': 'center' }, valueFormatter: p => (p.value === null || p.value === undefined) ? "" : p.value },                    
+    { headerName: "지급액합계", field: "지급액합계", width: 120, type: 'numericColumn', valueFormatter: p => Math.floor(p.value || 0).toLocaleString() + "원" },
+    // [신규 추가] 팀별성과금
+    {
+        headerName: "팀별성과금",
+        field: "팀별성과금",
+        width: 130,
+        type: 'numericColumn',
+        cellStyle: {'background-color': '#fff9db', 'font-weight': 'bold'},
+        valueGetter: p => {
+            const d = p.data;
+            const supply = Number(d.공급가액 || 0);
+            
+            // 인센(예상) 계산 로직 (기존 필드가 valueGetter이므로 직접 계산식 참조)
+            const name = (d.영업담당 || "").trim();
+            const rate = Number(d.요율지원 || 0);
+            const allExpenses = Number(d.출장비 || 0) + Number(d.기본료 || 0) + Number(d.정보처리비 || 0) + Number(d.시편제작비 || 0) + Number(d.지게차운임 || 0) + Number(d.시료수거비 || 0) + Number(d.청구위탁시험비 || 0);
+            const appliedAmount = supply - allExpenses;
+            let incentiveExpected = 0;
+            if (name === "이동규" || name === "김태식") {
+                incentiveExpected = (appliedAmount * rate) + Number(d.출장비 || 0) + Number(d.시료수거비 || 0);
+            } else {
+                incentiveExpected = appliedAmount * rate;
+            }
 
-    // 그리드 생성
-    const gridDiv = document.querySelector('#myGrid');
-    if (gridDiv) {
+            // 본원분 계산
+            const bonRate = Number(d['요율(본원)'] || 0);
+            const bonwonAmount = supply * bonRate;
+
+            // 지급액합계 판단: 시료명에 '시료수거' 포함 시 0으로 처리
+            const specimenName = d.시료명 || "";
+            const finalPayment = specimenName.includes("시료수거") ? 0 : Number(d.지급액합계 || 0);
+
+            // 공식: 공급가액 - (인센(예상) + 본원분 + 지급액합계)
+            return Math.floor(supply - (incentiveExpected + bonwonAmount + finalPayment));
+        },
+        valueFormatter: p => Math.floor(p.value || 0).toLocaleString() + "원"
+    }
+];
+
+    const gridOptions = {
+        columnDefs: columnDefs,
+        rowData: [],
+        defaultColDef: { resizable: true, sortable: true, filter: true, headerClass: 'text-center' },
+        rowSelection: 'multiple',
+        suppressRowClickSelection: true,
+        headerHeight: 32,
+        rowHeight: 28,
+        onCellValueChanged: (params) => {
+            if (params.column.colId === '요율지원') {
+                gridApi.refreshCells({ rowNodes: [params.node], columns: ['적용금액', '본원분'] });
+            }
+            if (params.column.colId === '적용요율') {
+                gridApi.refreshCells({ rowNodes: [params.node], columns: ['본원분'] });
+            }
+        },
+        onRowClicked: (params) => { showDetail(params.data); }
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const gridDiv = document.querySelector('#myGrid');
         gridApi = agGrid.createGrid(gridDiv, gridOptions);
         
-        // 초기 데이터 로드
-        const rawData = `{{ final_results|safe }}` || '[]';
-        try {
-            const initialData = JSON.parse(rawData);
-            if (initialData.length > 0) {
-                gridApi.setGridOption('rowData', initialData);
-                updateSummaryCards(initialData);
-            }
-        } catch (e) {
-            console.warn("데이터 파싱 오류");
-        }
-    }
-};
-
-    // 5. 조회 함수 (Ajax)
-    function onSearch() {
-        if (!gridApi) {
-            alert("그리드가 아직 준비되지 않았습니다.");
-            return;
-        }
-
-        const params = new URLSearchParams({
-            date_type: document.getElementById('dateType').value,
-            start_date: document.getElementById('startDate').value,
-            end_date: document.getElementById('endDate').value,
-            search_type: document.getElementById('searchType').value,
-            search_text: document.getElementById('searchText').value
-        });
-
-        gridApi.setGridOption('loading', true);
-
-        fetch(`/receipt_settle_admin/?${params.toString()}`)
-            .then(response => response.json())
-            .then(data => {
-                gridApi.setGridOption('rowData', data);
-                updateSummaryCards(data);
-                gridApi.setGridOption('loading', false);
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                gridApi.setGridOption('loading', false);
-                alert("데이터 조회 중 오류가 발생했습니다.");
-            });
-    }
-
-    // 6. 하단 요약 카드 업데이트 (정산 수식 포함)
-    function updateSummaryCards(data) {
-        let totalSupply = 0;
-        let totalDeposit = 0;
-
-        data.forEach(row => {
-            totalSupply += (Number(row.공급가액) || 0);
-            totalDeposit += (Number(row.입금액) || 0);
-        });
-
-        // 미수금: (공급가액 * 1.1) - 입금액
-        let totalUnpaid = (totalSupply * 1.1) - totalDeposit;
-
-        document.getElementById('stat-supply').innerText = totalSupply.toLocaleString() + '원';
-        document.getElementById('stat-deposit').innerText = totalDeposit.toLocaleString() + '원';
-        document.getElementById('stat-unpaid').innerText = Math.floor(totalUnpaid).toLocaleString() + '원';
-        document.getElementById('stat-count').innerText = data.length.toLocaleString() + '건';
-    }
-
-
-async function onBtExport() {
-    if (!gridApi) return;
-
-    const templatePath = '/static/excel_templates/my_template.xlsx';
-
-    try {
-        const response = await fetch(templatePath);
-        if (!response.ok) throw new Error("엑셀 양식 파일을 찾을 수 없습니다.");
-
-        const arrayBuffer = await response.arrayBuffer();
-        const workbook = new ExcelJS.Workbook();
-        await workbook.xlsx.load(arrayBuffer);
-        const worksheet = workbook.getWorksheet(1);
-
-        let rowData = [];
-        gridApi.forEachNodeAfterFilterAndSort((node) => {
-            if (node.data) rowData.push({ ...node.data });
-        });
-
-        rowData.sort((a, b) => (a.사업명 || "").localeCompare(b.사업명 || ""));
-
-        let currentProject = "";
-        let currentRowIndex = 2; 
-        let groupStartRow = 2;   
+        // --- 시작일/종료일 초기 설정 수정 ---
+        const now = new Date();
+        const todayStr = now.toISOString().split('T')[0];
         
-        // 🌟 [수정] 1. subtotal 변수 초기화 (이 부분이 누락되어 에러 발생)
-        let subtotal = { supply: 0, vat: 0, deposit: 0, payment: 0, applied_amount: 0, incentive: 0 };
+        // 현재 연도와 월을 가져와서 1일로 설정
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        
+        // 한국 시간 기준(KST) 보정 (UTC 변환 시 날짜 어긋남 방지)
+        const year = firstDay.getFullYear();
+        const month = String(firstDay.getMonth() + 1).padStart(2, '0');
+        const day = '01';
+        const firstDayStr = `${year}-${month}-${day}`;
+        
+        document.getElementById('endDate').value = todayStr;
+        document.getElementById('startDate').value = firstDayStr;
+        // ---------------------------------
+    });
 
-        rowData.forEach((data, index) => {
-            if (currentProject !== "" && currentProject !== data.사업명) {
-                // 소계 삽입
-                insertSubtotalRow(worksheet, currentProject, groupStartRow, currentRowIndex - 1, currentRowIndex);
-                currentRowIndex++;
-                groupStartRow = currentRowIndex;
-                
-                // 🌟 [수정] 2. 다음 그룹을 위해 subtotal 초기화
-                subtotal = { supply: 0, vat: 0, deposit: 0, payment: 0, applied_amount: 0, incentive: 0 };
-            }
+let originSearchedData = [];
 
-            const supply = Number(data.공급가액 || 0);
-            const vat = Number(data.부가세 || 0);
-            const deposit = Number(data.입금액 || 0);
-            const payment = Number(data.지급액합계 || 0);
-            const appliedPrice = Number(data.적용금액 || 0);
-            const incentive = Math.round(Number(data.인센티브 || 0)); // 🌟 인센티브 소수점 제거
-            const row = worksheet.getRow(currentRowIndex);
+function onSearch() {
+    const start = document.getElementById('startDate').value;
+    const end = document.getElementById('endDate').value;
+    const dateType = document.getElementById('dateTarget').value === 'receipt' ? 'save' : 'deposit';
+    const searchType = document.getElementById('searchType').value;
+    const searchText = document.getElementById('searchText').value;
 
-            // 실접수일 및 출장비구분 포맷팅
-            const formattedDate = (data.실접수일 && String(data.실접수일).includes('T'))
-                ? data.실접수일.split('T')[0]
-                : (data.실접수일 || "");
-
-            const formattedTripType = data.출장비구분 == '1' ? "본원" : (data.출장비구분 == '2' ? "지원" : (data.출장비구분 || ""));
-
-            row.values = [
-                data.담당자,
-                data.미인정 == '1' ? '미인정' : (data.미인정 == '0' ? '인정' : data.미인정),
-                data.의뢰번호, data.지원, data.영업담당, data.QT번호,
-                formattedDate, data.의뢰기관명, data.사업명, data.봉인명, data.시료량,
-                supply, vat, supply + vat,
-                formattedTripType,
-                Number(data.출장비 || 0), Number(data.기본료 || 0), Number(data.정보처리비 || 0),
-                Number(data.시편제작비 || 0), Number(data.지게차운임 || 0), data.시료수거비,
-                Number(data.청구위탁시험비 || 0), Number(appliedPrice || 0), // 23번째: 적용금액
-                Number(data.인센티브 || 0), data.입금일, deposit,
-                data.계산서발행회사명, data.계산서발행일, data.계산서담당자, data.계산서hp,
-                data.계산서tel, data.계산서fax, data.계산서email, data.계산서발행자,
-                data.의뢰인성명, data.현장전화, data.시료채취자, data.품질담당자,
-                data.현장담당, data.시료명, data.공수, Number(payment || 0)
-            ];
-
-            // 금액 컬럼 포맷팅
-            [12, 13, 14, 16, 17, 18, 19, 20, 22, 23, 24, 26, 42].forEach(col => {
-                row.getCell(col).numFmt = '#,##0';
-            });
-
-            currentRowIndex++;
-            currentProject = data.사업명;
-            
-            // 데이터 누적
-            subtotal.supply += supply;
-            subtotal.vat += vat;
-            subtotal.deposit += deposit;
-            subtotal.payment += payment;
-            subtotal.applied_amount += appliedPrice;
-            subtotal.incentive += incentive; // 🌟 인센티브 합계 누적
-
-            if (index === rowData.length - 1) {
-                insertSubtotalRow(worksheet, currentProject, groupStartRow, currentRowIndex - 1, currentRowIndex);
-                currentRowIndex++;
-            }
-        });
-
-        const buffer = await workbook.xlsx.writeBuffer();
-        saveAs(new Blob([buffer]), `영업정산현황_${new Date().toISOString().slice(0, 10)}.xlsx`);
-
-    } catch (error) {
-        console.error(error); // 브라우저 콘솔에서 더 자세한 에러 확인 가능
-        alert("에러: " + error.message);
+    if (!start || !end) { 
+        alert("조회 기간을 선택해주세요."); 
+        return; 
     }
+
+    gridApi.setGridOption('rowData', []);
+    const url = `/receipt_settle_admin/?start_date=${start}&end_date=${end}&date_type=${dateType}&search_type=${searchType}&search_text=${encodeURIComponent(searchText)}`;
+
+    fetch(url)
+        .then(res => res.json())
+        .then(data => {
+            // [수정] 원본 데이터를 전역 변수에 저장 (98건 전체)
+            originSearchedData = data.map(item => ({
+                ...item, 
+                요율지원: item.요율지원 || 0,
+                적용요율: item.적용요율 || 0,
+                인센예상: item.인센예상 || 0
+            }));
+
+            // 1. 그리드 업데이트
+            gridApi.setGridOption('rowData', originSearchedData);
+            
+            // 2. 상단 요약 업데이트 (여기서 59,778,120원이 계산됨)
+            if (typeof updateTopSummary === 'function') updateTopSummary(originSearchedData);
+            
+            // 3. [핵심] 가공 없이 원본 98건을 그대로 차트 처리 함수로 넘김
+            updateChartData(); 
+        })
+        .catch(err => alert("로드 실패: " + err));
 }
 
-function insertSubtotalRow(ws, projectName, startLine, endLine, targetRow) {
-    const row = ws.getRow(targetRow);
-    row.getCell(9).value = `[${projectName}] 소계`;
 
-    // L(12), M(13), N(14), W(23), Z(26), AP(42)
-    const sumCols = [
-        { idx: 12, col: 'L' }, { idx: 13, col: 'M' }, { idx: 14, col: 'N' },
-        { idx: 23, col: 'W' }, { idx: 24, col: 'X' }, { idx: 26, col: 'Z' }, 
-        { idx: 42, col: 'AP' }
+//     function onSearch() {
+//     const start = document.getElementById('startDate').value;
+//     const end = document.getElementById('endDate').value;
+//     const dateType = document.getElementById('dateTarget').value === 'receipt' ? 'save' : 'deposit';
+//     const searchType = document.getElementById('searchType').value;
+//     const searchText = document.getElementById('searchText').value;
+
+//     if (!start || !end) { 
+//         alert("조회 기간을 선택해주세요."); 
+//         return; 
+//     }
+
+//     gridApi.setGridOption('rowData', []);
+//     const url = `/receipt_settle_admin/?start_date=${start}&end_date=${end}&date_type=${dateType}&search_type=${searchType}&search_text=${encodeURIComponent(searchText)}`;
+
+//     fetch(url)
+//         .then(res => res.json())
+//         .then(data => {
+//             const processedData = data.map(item => ({
+//                 ...item, 
+//                 요율지원: item.요율지원 || 0,
+//                 적용요율: item.적용요율 || 0,
+//                 인센예상: item.인센예상 || 0
+//             }));
+
+//             // 1. 그리드 데이터 업데이트
+//             gridApi.setGridOption('rowData', processedData);
+            
+//             // 2. 상단 요약 업데이트 (기존 함수)
+//             if (typeof updateTopSummary === 'function') updateTopSummary(processedData);
+            
+//             // 3. 하단 통계 그래프 및 표 업데이트 (추가된 부분)
+//             updateStatistics(processedData);
+            
+//         })
+//         .catch(err => alert("로드 실패: " + err));
+// }
+
+// 실적확인 버튼 기능 최초 코드
+
+    // function onVerifyPerformance() {
+    //     const rowData = [];
+    //     gridApi.forEachNode(node => rowData.push(node.data));       
+
+    //     if (rowData.length === 0) {
+    //         alert("확인할 데이터가 없습니다.");
+    //         return;
+    //     }
+    //     const totalApplied = rowData.reduce((sum, r) => sum + (Number(r.공급가액 || 0) * Number(r.요율지원 || 0)), 0);
+    //     const totalBonwon = rowData.reduce((sum, r) => {
+    //         const applied = Number(r.공급가액 || 0) * Number(r.요율지원 || 0);
+    //         return sum + (applied * Number(r.적용요율 || 0));
+    //     }, 0);
+
+    //     document.getElementById('detail-content').innerHTML = `
+    //         <div class="alert alert-info text-start">
+    //             <h6 class="fw-bold"><i class="bi bi-check2-square"></i> 실적 가산출 결과 (총 ${rowData.length}건)</h6>
+    //             <hr>
+    //             <div class="row">
+    //                 <div class="col-md-4"><b>총 적용금액 합계:</b> ${Math.floor(totalApplied).toLocaleString()} 원</div>
+    //                 <div class="col-md-4"><b>총 본원분 합계:</b> ${Math.floor(totalBonwon).toLocaleString()} 원</div>
+    //                 <div class="col-md-4 text-danger"><b>* 화면에 표시된 요율 기준 산출값입니다.</b></div>
+    //             </div>
+    //         </div>
+    //     `;       
+
+    // }
+
+
+
+
+    function onDeleteSelected() {
+        const selectedNodes = gridApi.getSelectedNodes();
+        if (selectedNodes.length === 0) { alert("삭제할 항목을 선택해주세요."); return; }
+        if (confirm(`선택한 ${selectedNodes.length}건을 삭제하시겠습니까?`)) {
+            const selectedData = selectedNodes.map(node => node.data);
+            gridApi.applyTransaction({ remove: selectedData });
+            const allData = [];
+            gridApi.forEachNode(node => allData.push(node.data));
+            updateTopSummary(allData);
+        }
+    }
+
+    function updateTopSummary(data) {
+        const count = data.length;
+        const supply = data.reduce((sum, r) => sum + Number(r.공급가액 || 0), 0);
+        const vat = data.reduce((sum, r) => sum + Number(r.부가세 || 0), 0);
+        const deposit = data.reduce((sum, r) => sum + Number(r.입금액 || 0), 0);
+        document.getElementById('stat-count').innerText = count.toLocaleString();
+        document.getElementById('stat-supply').innerText = Math.floor(supply).toLocaleString();
+        document.getElementById('stat-total').innerText = Math.floor(supply + vat).toLocaleString();
+        document.getElementById('stat-deposit').innerText = Math.floor(deposit).toLocaleString();
+    }
+
+    function showDetail(data) {
+        document.getElementById('detail-content').innerHTML = `
+            <div class="row text-start p-2">
+                <div class="col-md-3"><b>의뢰번호:</b> ${data.의뢰번호}</div>
+                <div class="col-md-3"><b>영업담당:</b> ${data.영업담당}</div>
+                <div class="col-md-6"><b>의뢰기관:</b> ${data.의뢰기관명}</div>
+            </div>
+        `;
+    }
+
+    async function onExcelDownload() {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('영업실적정산');
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `영업실적정산_${new Date().toISOString().slice(0,10)}.xlsx`);
+    }
+
+// async function onVerifyPerformance() {
+//     // [1] 사용자님 원본 로직: DB 매칭 정보 가져오기
+//     let managerMap = {};
+//     try {
+//         const response = await fetch('/get_manager_mappings/');
+//         managerMap = await response.json();
+//     } catch (e) {
+//         console.error("매칭 데이터를 불러오지 못했습니다.", e);
+//     }
+
+//     const rowNodes = [];
+//     gridApi.forEachNode(node => rowNodes.push(node));
+
+//     if (rowNodes.length === 0) {
+//         alert("확인할 데이터가 없습니다.");
+//         return;
+//     }
+
+//     // [2] 사용자님 원본 로직: 각 행별 요율 계산 (수정 없음)
+//     rowNodes.forEach(node => {
+//         const data = node.data;
+//         const name = (data.영업담당 || "").trim();
+//         const client = (data.의뢰기관명 || "");
+//         const specimen = (data.봉인명 || "");
+//         const projectName = (data.사업명 || "").trim();
+
+//         const isPartner = PARTNER_COMPANIES.some(c => client.includes(c));
+//         const isScaffold = SCAFFOLD_KEYWORDS.some(k => specimen.includes(k));
+
+//         let rate = 0; 
+//         let checkName = name; 
+
+//         const bonwonRate = (name === "양호승") ? 0.35 : 0.25;
+//         node.setDataValue('요율(본원)', bonwonRate);
+
+//         if (name === "양호승") {
+//             const matchedManager = managerMap[projectName];
+//             if (matchedManager) { checkName = matchedManager; }
+//         }
+
+//         // 인물별 요율 판정 구간
+//         if (checkName === "이동규") {
+//             rate = (isScaffold || isPartner) ? 0.5 : 0.55;
+//         } else if (checkName === "홍민석") {
+//             rate = (isScaffold || isPartner) ? 0.4 : 0.6;
+//         } else if (checkName === "이은경") {
+//             rate = 0.35;
+//         } else if (checkName === "이승준") {
+//             rate = isPartner ? 0.35 : 0.5;
+//         } else if (["위재완", "엄덕용", "양지훈", "양재훈", "김은정"].includes(checkName)) {
+//             rate = 0.4;
+//         } else if (checkName === "김태식") {
+//             if (isPartner) rate = 0.4;
+//             else if (isScaffold) rate = 0.5;
+//             else rate = 0.55;
+//         } else if (checkName === "심재호") {
+//             rate = 0.3;
+//         } else if (["이우길", "박상우", "김신환", "정병철", "김충기", "설화종", "이임재"].includes(checkName)) {
+//             rate = 0.2;
+//         } else if (["김찬민", "손영배", "유영재", "임영균", "박정규", "김봉진", "장정근"].includes(checkName)) {
+//             rate = 0.3;
+//         } else if (checkName === "박찬용") {
+//             rate = 0.1;
+//         } else if (checkName === "김시완") {
+//             rate = 0.25;
+//         } else if (checkName === "조정아") {
+//             rate = 0.5;
+//         } else {
+//             rate = 0;
+//         }
+
+//         node.setDataValue('요율지원', rate);
+//     });
+
+//     // [3] 그래프 연동 로직: 0.1초 대기 후 최종값 추출 및 통계 반영
+//     setTimeout(() => {
+//         const finalRows = [];
+//         gridApi.forEachNode(node => {
+//             const row = { ...node.data };
+//             // 그리드 화면의 최종 계산값을 낚아챕니다 (핵심!)
+//             row["팀별성과금_최종"] = gridApi.getValue("팀별성과금", node) || 0;
+//             finalRows.push(row);
+//         });
+
+//         // 상단 UI 수치 계산
+//         const totalApplied = finalRows.reduce((sum, r) => sum + (Number(r.공급가액 || 0) * Number(r.요율지원 || 0)), 0);
+//         const totalBonwon = finalRows.reduce((sum, r) => sum + (Number(r.공급가액 || 0) * Number(r['요율(본원)'] || 0)), 0);
+//         const totalPerformance = finalRows.reduce((sum, r) => sum + Number(r["팀별성과금_최종"] || 0), 0);
+
+//         // 상단 HTML 요약 갱신
+//         document.getElementById('detail-content').innerHTML = `
+//             <div class="alert alert-info text-start">
+//                 <h6 class="fw-bold"><i class="bi bi-check2-square"></i> 실적 가산출 결과 (총 ${finalRows.length}건)</h6>
+//                 <hr>
+//                 <div class="row">
+//                     <div class="col-md-3"><b>총 적용금액:</b><br>${Math.floor(totalApplied).toLocaleString()} 원</div>
+//                     <div class="col-md-3"><b>총 본원분:</b><br>${Math.floor(totalBonwon).toLocaleString()} 원</div>
+//                     <div class="col-md-3 text-primary"><b>팀별성과금:</b><br><b>${totalPerformance.toLocaleString()} 원</b></div>
+//                     <div class="col-md-3 text-danger small"><b>* 최종값 그래프 반영 완료</b></div>
+//                 </div>
+//             </div>
+//         `;
+
+//         // 드디어 그래프 함수 호출!
+//         updateStatistics(finalRows);
+
+//         alert("실적 확인 및 그래프 반영이 완료되었습니다.");
+//     }, 150); 
+// }
+
+async function onVerifyPerformance() {
+    // 1. DB에서 매칭 정보 가져오기 (양호승 님 실장 매칭용)
+    let managerMap = {};
+    try {
+        const response = await fetch('/get_manager_mappings/');
+        managerMap = await response.json();
+    } catch (e) {
+        console.error("매칭 데이터를 불러오지 못했습니다.", e);
+    }
+
+    const rowNodes = [];
+    gridApi.forEachNode(node => rowNodes.push(node));
+
+    if (rowNodes.length === 0) {
+        alert("확인할 데이터가 없습니다.");
+        return;
+    }
+
+    // 2. 각 행별로 요율 계산 루프 시작 (사용자님 원본 로직 100% 보존)
+    rowNodes.forEach(node => {
+        const data = node.data;
+        const name = (data.영업담당 || "").trim();
+        const client = (data.의뢰기관명 || "");
+        const specimen = (data.봉인명 || "");
+        const projectName = (data.사업명 || "").trim();
+
+        const isPartner = PARTNER_COMPANIES.some(c => client.includes(c));
+        const isScaffold = SCAFFOLD_KEYWORDS.some(k => specimen.includes(k));
+
+        let rate = 0;        // 요율지원용
+        let checkName = name; // 실무자 판정용
+
+        // [로직 1] 요율(본원) 자동 설정: 양호승(0.35), 그 외(0.25)
+        const bonwonRate = (name === "양호승") ? 0.35 : 0.25;
+        node.setDataValue('요율(본원)', bonwonRate);
+
+        // [로직 2] 양호승 님일 경우 DB 매칭 실장으로 이름 스위칭 (요율지원 계산용)
+        if (name === "양호승") {
+            const matchedManager = managerMap[projectName];
+            if (matchedManager) {
+                checkName = matchedManager;
+            }
+        }
+
+        // [로직 3] 사용자 정의 요율 체계 적용 (checkName 기준)
+        if (checkName === "이동규") {
+            rate = (isScaffold || isPartner) ? 0.5 : 0.55;
+        } else if (checkName === "홍민석") {
+            rate = (isScaffold || isPartner) ? 0.4 : 0.6;
+        } else if (checkName === "이은경") {
+            rate = 0.35;
+        } else if (checkName === "이승준") {
+            rate = isPartner ? 0.35 : 0.5;
+        } else if (["위재완", "엄덕용", "양지훈", "양재훈", "김은정"].includes(checkName)) {
+            rate = 0.4;
+        } else if (checkName === "김태식") {
+            if (isPartner) rate = 0.4;
+            else if (isScaffold) rate = 0.5;
+            else rate = 0.55;
+        } else if (checkName === "심재호") {
+            rate = 0.3;
+        } else if (["이우길", "박상우", "김신환", "정병철", "김충기", "설화종", "이임재"].includes(checkName)) {
+            rate = 0.2;
+        } else if (["김찬민", "손영배", "유영재", "임영균", "박정규", "김봉진", "장정근"].includes(checkName)) {
+            rate = 0.3;
+        } else if (checkName === "박찬용") {
+            rate = 0.1;
+        } else if (checkName === "김시완") {
+            rate = 0.25;
+        } else if (checkName === "조정아") {
+            rate = 0.5;
+        } else {
+            rate = 0;
+        }
+
+        // 그리드에 요율지원 반영
+        node.setDataValue('요율지원', rate);
+    });
+
+    // 3. [중요] 연도 필터 적용 및 통계 업데이트
+    // setDataValue 이후 그리드의 계산이 완료될 시간을 위해 잠깐 대기합니다.
+    setTimeout(() => {
+        const allCalculatedRows = [];
+        gridApi.forEachNode(node => {
+            const row = { ...node.data };
+            // 화면상에 계산된 최종 '팀별성과금'을 강제로 가져와 새 필드에 저장
+            row["팀별성과금_최종"] = gridApi.getValue("팀별성과금", node) || 0;
+            allCalculatedRows.push(row);
+        });
+
+        // 현재 차트에서 선택된 연도 가져오기
+        const selectedYear = document.getElementById('yearSelect').value;
+        let filteredRows = allCalculatedRows;
+
+        // 선택된 연도가 'all'이 아닐 경우 필터링 수행
+        if (selectedYear !== 'all') {
+            filteredRows = allCalculatedRows.filter(item => {
+                const dateStr = item.실접수일 || item.입금일;
+                if (!dateStr) return false;
+                // 데이터의 연도와 선택된 연도(문자열)를 비교
+                return new Date(dateStr).getFullYear().toString() === selectedYear;
+            });
+        }
+
+        // 4. 상단 요약 UI 업데이트 (필터링된 데이터 기준)
+        const totalPerformance = filteredRows.reduce((sum, r) => sum + Number(r["팀별성과금_최종"] || 0), 0);
+        const totalApplied = filteredRows.reduce((sum, r) => sum + (Number(r.공급가액 || 0) * Number(r.요율지원 || 0)), 0);
+
+        if (document.getElementById('detail-content')) {
+            document.getElementById('detail-content').innerHTML = `
+                <div class="alert alert-info text-start">
+                    <h6 class="fw-bold"><i class="bi bi-check2-square"></i> ${selectedYear === 'all' ? '전체' : selectedYear + '년'} 실적 확정 결과</h6>
+                    <hr>
+                    <div class="row">
+                        <div class="col-md-5"><b>선택 연도 적용금액 합계:</b><br>${Math.floor(totalApplied).toLocaleString()} 원</div>
+                        <div class="col-md-5 text-primary"><b>선택 연도 팀별성과금 합계:</b><br><b>${totalPerformance.toLocaleString()} 원</b></div>
+                        <div class="col-md-2 text-end text-danger small"><b>* 갱신완료</b></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 5. 하단 통계 및 그래프 업데이트 (필터링된 데이터 전달)
+        updateStatistics(filteredRows);
+
+        alert(`${selectedYear === 'all' ? '전체' : selectedYear + '년'} 데이터로 실적 확인 및 그래프 반영이 완료되었습니다.`);
+    }, 200); // 안전하게 200ms 대기
+}
+
+
+    // -----------------------이 코드는 완성코드임 매우중요------END
+    // --------------------실적확인 관련---------------
+    // 1. 요율 판단을 위한 강조 키워드 상수 (기존 강조 로직과 동일)
+const PARTNER_COMPANIES = ["현대엔지니어링", "두산건설", "두산중공업", "GS건설", "지에스건설", "극동건설", "금광기업", "남광토건", "대우건설","포스코", "가나개발", "케이티에이", "현대건설", "현대 건설", "롯데 건설", "롯데건설", "대방건설", "쌍용건설"];
+const SCAFFOLD_KEYWORDS = ["가새재", "가설받침", "수직재", "수평재", "멍에", "장선", "동바리", "비계용", "강관조인트", "연결조인트", "조립형 비계", "조입철물", "파이프서포", "파이프써포", "받침철물", "가설자재", "가세재", "가설재", "강관 조인", "강관서포", "대각재", "비계파이프", "서포트", "트러스", "수직제", "수평제", "각형강", "각관", "작업대", "작업계단", "발판", "클램프", "크램프"];
+
+// 2. [실적확인] 버튼 클릭 시 호출되는 요율 자동 적용 함수
+// [실적확인] 버튼 클릭 시 호출되는 최종 함수 (전체 버전)
+// async function onVerifyPerformance() {
+//     // 1. DB에서 매칭 정보 가져오기 (양호승 님 실장 매칭용)
+//     let managerMap = {};
+//     try {
+//         const response = await fetch('/get_manager_mappings/');
+//         managerMap = await response.json();
+//     } catch (e) {
+//         console.error("매칭 데이터를 불러오지 못했습니다.", e);
+//     }
+
+//     const rowNodes = [];
+//     gridApi.forEachNode(node => rowNodes.push(node));
+
+//     if (rowNodes.length === 0) {
+//         alert("확인할 데이터가 없습니다.");
+//         return;
+//     }
+
+//     // 2. 각 행별로 요율 계산 루프 시작
+//     rowNodes.forEach(node => {
+//         const data = node.data;
+//         const name = (data.영업담당 || "").trim();
+//         const client = (data.의뢰기관명 || "");
+//         const specimen = (data.봉인명 || "");
+//         const projectName = (data.사업명 || "").trim();
+
+//         const isPartner = PARTNER_COMPANIES.some(c => client.includes(c));
+//         const isScaffold = SCAFFOLD_KEYWORDS.some(k => specimen.includes(k));
+
+//         let rate = 0;        // 요율지원용
+//         let checkName = name; // 실무자 판정용
+
+//         // [로직 1] 요율(본원) 자동 설정: 양호승(0.35), 그 외(0.25)
+//         const bonwonRate = (name === "양호승") ? 0.35 : 0.25;
+//         node.setDataValue('요율(본원)', bonwonRate);
+
+//         // [로직 2] 양호승 님일 경우 DB 매칭 실장으로 이름 스위칭 (요율지원 계산용)
+//         if (name === "양호승") {
+//             const matchedManager = managerMap[projectName];
+//             if (matchedManager) {
+//                 checkName = matchedManager;
+//                 // node.setDataValue('현장담당', matchedManager);
+//             }
+//         }
+
+//         // [로직 3] 사용자 정의 요율 체계 적용 (checkName 기준)
+//         if (checkName === "이동규") {
+//             rate = (isScaffold || isPartner) ? 0.5 : 0.55;
+//         } else if (checkName === "홍민석") {
+//             rate = (isScaffold || isPartner) ? 0.4 : 0.6;
+//         } else if (checkName === "이은경") {
+//             rate = 0.35;
+//         } else if (checkName === "이승준") {
+//             rate = isPartner ? 0.35 : 0.5;
+//         } else if (["위재완", "엄덕용", "양지훈", "양재훈", "김은정"].includes(checkName)) {
+//             rate = 0.4;
+//         } else if (checkName === "김태식") {
+//             if (isPartner) rate = 0.4;
+//             else if (isScaffold) rate = 0.5;
+//             else rate = 0.55;
+//         } else if (checkName === "심재호") {
+//             rate = 0.3;
+//         } else if (["이우길", "박상우", "김신환", "정병철", "김충기", "설화종", "이임재"].includes(checkName)) {
+//             rate = 0.2;
+//         } else if (["김찬민", "손영배", "유영재", "임영균", "박정규", "김봉진", "장정근"].includes(checkName)) {
+//             rate = 0.3;
+//         } else if (checkName === "박찬용") {
+//             rate = 0.1;
+//         } else if (checkName === "김시완") {
+//             rate = 0.25;
+//         } else if (checkName === "조정아") {
+//             rate = 0.5;
+//         } else {
+//             rate = 0;
+//         }
+
+//         // 그리드에 요율지원 반영
+//         node.setDataValue('요율지원', rate);
+//     });
+
+//     // 3. 통계 및 하단 요약 업데이트
+//     const updatedRows = [];
+//     gridApi.forEachNode(node => updatedRows.push(node.data));
+    
+//     if (typeof updateTopSummary === 'function') {
+//         updateTopSummary(updatedRows);
+//     }
+
+//     // [금액 계산식]
+//     // 총 적용금액 = 합계(공급가액 * 요율지원)
+//     const totalApplied = updatedRows.reduce((sum, r) => sum + (Number(r.공급가액 || 0) * Number(r.요율지원 || 0)), 0);
+//     // 총 본원분 합계 = 합계(공급가액 * 요율(본원))
+//     const totalBonwon = updatedRows.reduce((sum, r) => {
+//         const supplyPrice = Number(r.공급가액 || 0);
+//         const bonRate = Number(r['요율(본원)'] || 0);
+//         return sum + (supplyPrice * bonRate);
+//     }, 0);
+
+//     alert("실적 확인 및 요율 적용이 완료되었습니다.");
+// }
+// -----------------------이 코드는 완성코드이임 매우중요------END
+
+
+
+
+// 모달창 열기 함수
+function openManagerModal() {
+    const selectedNodes = gridApi.getSelectedNodes();
+    
+    // 1. 체크박스 선택 여부 확인
+    if (selectedNodes.length === 0) {
+        alert("매칭할 사업 항목을 체크박스로 먼저 선택해주세요.");
+        return;
+    }
+
+    // 2. 선택된 행들에서 중복되지 않은 '사업명'만 추출
+    const projectNames = [...new Set(selectedNodes.map(node => node.data.사업명))];
+    
+    // 3. 모달 안의 텍스트 영역에 사업명 리스트 표시
+    document.getElementById('modalProjectList').value = projectNames.join('\n');
+    
+    // 4. 모달 띄우기 (Bootstrap 5 기준)
+    const myModal = new bootstrap.Modal(document.getElementById('managerModal'));
+    myModal.show();
+}
+
+// [DB 저장 함수]
+function saveManagerMapping() {
+    // 1. 모달창에 떠 있는 데이터 가져오기
+    const projects = document.getElementById('modalProjectList').value.split('\n').filter(p => p.trim() !== "");
+    const manager = document.getElementById('modalManagerInput').value.trim();
+
+    // 2. 입력값 검증
+    if (!manager) {
+        alert("실장 이름을 입력해주세요.");
+        return;
+    }
+    if (projects.length === 0) {
+        alert("대상 사업명이 없습니다.");
+        return;
+    }
+
+    // 3. 서버 전송 (이 부분이 질문하신 코드입니다!)
+    fetch('/save_manager_mapping/', {  // 반드시 앞뒤 슬래시(/) 확인!
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken') // 아까 추가한 getCookie 함수를 여기서 사용함
+        },
+        body: JSON.stringify({
+            projects: projects,
+            manager: manager
+        })
+    })
+    .then(res => {
+        // 서버 응답이 JSON이 아닐 경우(404 등) 에러를 던짐
+        if (!res.ok) throw new Error('서버 응답 에러 (주소를 찾을 수 없거나 서버 내부 오류)');
+        return res.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            alert(`[${manager}] 실장 매칭 정보가 DB에 저장되었습니다.`);
+            
+            // 화면 그리드 실시간 반영
+            const selectedNodes = gridApi.getSelectedNodes();
+            selectedNodes.forEach(node => {
+                node.setDataValue('현장담당', manager);
+                if (typeof MANAGER_RATES !== 'undefined' && MANAGER_RATES[manager]) {
+                    node.setDataValue('요율지원', MANAGER_RATES[manager]);
+                }
+            });
+
+            // 모달 닫기
+            const modalInstance = bootstrap.Modal.getInstance(document.getElementById('managerModal'));
+            if(modalInstance) modalInstance.hide();
+            document.getElementById('modalManagerInput').value = "";
+        } else {
+            alert("저장 실패: " + data.message);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("저장 실패: urls.py 설정이나 서버 연결을 확인하세요.");
+    });
+}
+
+// [추가] Django CSRF 토큰을 가져오기 위한 함수
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            // 이름으로 시작하는 쿠키를 찾습니다.
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+async function onExcelDownloadSupport() {
+    // 1. 그리드 데이터 확인
+    const rowData = [];
+    if (!gridApi) {
+        alert("그리드가 초기화되지 않았습니다.");
+        return;
+    }
+
+    // 필터링되거나 정렬된 현재 화면의 데이터를 가져옴
+    gridApi.forEachNodeAfterFilterAndSort(node => {
+        if (node.data) rowData.push(node.data);
+    });
+
+    if (rowData.length === 0) {
+        alert("다운로드할 데이터가 없습니다. 먼저 조회를 해주세요.");
+        return;
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('실적정산보고서');
+
+    worksheet.properties.defaultRowHeight = 24.75;
+
+    // 2. 헤더 및 컬럼 정의
+    const headers = [
+        "담당자", "미인정", "의뢰번호", "영업담당", "QT번호", "실접수일", 
+        "의뢰기관명", "사업명", "봉인명", "시료량", "공급가액", "부가세", "합계", 
+        "출장비구분", "출장비", "기본료", "정보처리비", "시편제작비", "지게차운임", 
+        "시료수거비", "청구위탁시험비", "적용금액", "요율(지원)", "인센(예상)", 
+        "인센티브", "요율(본원)", "본원분", "입금일", "입금액", 
+        "시료채취자", "현장담당", "시료명", "공수", "지급액합계", "팀별성과금"
     ];
 
-    sumCols.forEach(item => {
-        row.getCell(item.idx).value = {
-            formula: `SUM(${item.col}${startLine}:${item.col}${endLine})`
-        };
-        row.getCell(item.idx).numFmt = '#,##0';
-    });
+    const colWidths = [6, 6, 18, 10, 18, 12, 25, 35, 30, 10, 15, 12, 15, 12, 10, 10, 10, 10, 10, 10, 12, 15, 10, 15, 12, 10, 15, 12, 15, 12, 12, 20, 8, 15, 18];
+    const moneyCols = ['K', 'L', 'M', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'X', 'Y', 'AA', 'AC', 'AH', 'AI'];
 
-    // 스타일 적용 (생략...)
-    for (let i = 1; i <= 42; i++) {
-        const cell = row.getCell(i);
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFD1DC' } };
+    worksheet.columns = headers.map((h, i) => ({
+        header: h,
+        key: h, // 데이터를 객체 형태로 넣기 위해 key를 헤더 이름과 동일하게 설정
+        width: colWidths[i] || 15
+    }));
+
+    // 헤더 행 스타일링
+    const headerRow = worksheet.getRow(1);
+    headerRow.eachCell((cell) => {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9EAD3' } };
         cell.font = { bold: true };
-    }
-}
-
-
-
-
-
-
-// 그리드에 적용금액 넣기
-
-/**
- * [적용금액 가져오기] 버튼 클릭 시 실행
- */
-window.importAppliedAmounts = function() {
-    // 파일 선택창 강제 클릭
-    const fileInput = document.getElementById('excelFileInput');
-    if (fileInput) {
-        fileInput.click();
-    } else {
-        alert("파일 선택 input(id='excelFileInput')을 찾을 수 없습니다.");
-    }
-};
-
-/**
- * 파일이 선택되었을 때 실행되는 실제 로직
- */
-window.processExcelFile = function(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, { type: 'array' });
-            const sheet = workbook.Sheets[workbook.SheetNames[0]];
-            const excelRows = XLSX.utils.sheet_to_json(sheet);
-            
-            updateGridWithExcelData(excelRows);
-        } catch (err) {
-            console.error("Excel Parsing Error:", err);
-            alert("엑셀 파일을 읽는 중 오류가 발생했습니다.");
-        } finally {
-            event.target.value = ''; // 같은 파일 재선택 가능하게 초기화
-        }
-    };
-    reader.readAsArrayBuffer(file);
-};
-
-/**
- * 그리드 데이터 매칭 및 업데이트
- */
-function updateGridWithExcelData(excelRows) {
-    const gridApi = window.finishedGridApi; // 유저님의 그리드 API 변수명 확인 필요
-    if (!gridApi) {
-        alert("그리드 API를 찾을 수 없습니다.");
-        return;
-    }
-
-    let updateCount = 0;
-    const itemsToUpdate = [];
-
-    gridApi.forEachNode((node) => {
-        // 엑셀의 헤더명이 'QT번호', '적용금액'이라고 가정
-        // 유저님의 그리드 데이터 키값이 'QT번호'라고 가정
-        const gridQtNo = String(node.data['QT번호'] || '').trim();
-        
-        const matchedRow = excelRows.find(exRow => 
-            String(exRow['QT번호'] || '').trim() === gridQtNo
-        );
-
-        if (matchedRow) {
-            // '적용금액' 컬럼의 값을 '공급가액' 필드에 반영
-            node.setDataValue('인센티브', matchedRow['인센티브'] || 0);
-            updateCount++;
-        }
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
     });
 
-    if (updateCount > 0) {
-        alert(`총 ${updateCount}건의 인센티브가 그리드에 반영되었습니다.`);
-        // 통계 수치 재계산 함수가 있다면 여기서 호출 (예: calculateStats())
-    } else {
-        alert("매칭되는 QT번호를 찾지 못했습니다. 엑셀의 'QT번호' 컬럼을 확인해주세요.");
-    }
-}
-
-// -------------------여기서부터 db연결후 인센넣기 코드 시작입니다.-------------------
-
-/**
- * DB에서 데이터를 가져와 그리드에 반영 (마감하기 버튼 클릭 시)
- */
-async function onSaveToDB() {
-    const gridApi = window.finishedGridApi; 
-    if (!gridApi) {
-        alert("그리드 API를 찾을 수 없습니다.");
-        return;
-    }
-
-    try {
-        // 1. 서버 DB로부터 데이터 조회 (API 호출)
-        // 실제 운영하시는 서버 환경의 URL로 변경하세요.
-        const response = await fetch("{% url 'get_qt_incentives' %}"); 
-        if (!response.ok) throw new Error("DB 데이터를 불러오는 데 실패했습니다.");
-        
-        const dbData = await response.json(); // [{ "QT번호": "...", "금액": 1000 }, ...] 형식 예상
-
-        let updateCount = 0;
-
-        // 2. 그리드 전체 노드를 순회하며 매칭
-        gridApi.forEachNode((node) => {
-            const gridQtNo = String(node.data['QT번호'] || '').trim();
-            
-            // DB 데이터에서 해당 QT번호 찾기
-            const matchedRow = dbData.find(dbRow => 
-                String(dbRow['QT번호'] || '').trim() === gridQtNo
-            );
-
-            if (matchedRow) {
-                // '금액' 컬럼의 값을 '인센티브' 필드에 반영
-                node.setDataValue('인센티브', matchedRow['금액'] || 0);
-                updateCount++;
-            }
+    // 3. 데이터 추가 (객체 매핑 방식)
+    let currentRow = 2;
+    rowData.forEach(data => {
+        const row = worksheet.addRow({
+            "담당자": data.담당자,
+            "미인정": data.미인정,
+            "의뢰번호": data.의뢰번호,
+            "영업담당": data.영업담당,
+            "QT번호": data.QT번호,
+            "실접수일": data.실접수일 ? data.실접수일.split('T')[0] : "",
+            "의뢰기관명": data.의뢰기관명,
+            "사업명": data.사업명,
+            "봉인명": data.봉인명,
+            "시료량": data.시료량,
+            "공급가액": Number(data.공급가액 || 0),
+            "부가세": Number(data.부가세 || 0),
+            "합계": 0, // 수식
+            "출장비구분": data.출장비구분 == '1' ? "본원" : "지원",
+            "출장비": Number(data.출장비 || 0),
+            "기본료": Number(data.기본료 || 0),
+            "정보처리비": Number(data.정보처리비 || 0),
+            "시편제작비": Number(data.시편제작비 || 0),
+            "지게차운임": Number(data.지게차운임 || 0),
+            "시료수거비": Number(data.시료수거비 || 0),
+            "청구위탁시험비": Number(data.청구위탁시험비 || 0),
+            "적용금액": 0, // 수식
+            "요율(지원)": Number(data.요율지원 || 0),
+            "인센(예상)": 0, // 수식
+            "인센티브": Number(data.인센티브 || 0),
+            "요율(본원)": Number(data['요율(본원)'] || 0),
+            "본원분": 0, // 수식
+            "입금일": data.입금일,
+            "입금액": Number(data.입금액 || 0),
+            "시료채취자": data.시료채취자,
+            "현장담당": data.현장담당,
+            "시료명": data.시료명,
+            "공수": data.공수,
+            "지급액합계": Number(data.지급액합계 || 0),
+            "팀별성과금": 0 // 수식
         });
 
-        if (updateCount > 0) {
-            alert(`DB 조회를 통해 총 ${updateCount}건의 인센티브가 반영되었습니다.`);
-            // 필요 시 통계 재계산 함수 호출
-            // if (typeof calculateStats === 'function') calculateStats();
-        } else {
-            alert("그리드의 QT번호와 일치하는 DB 데이터를 찾지 못했습니다.");
-        }
+        // 4. 수식 적용
+        const D = `D${currentRow}`; const K = `K${currentRow}`; const L = `L${currentRow}`;
+        const O = `O${currentRow}`; const P = `P${currentRow}`; const Q = `Q${currentRow}`;
+        const R = `R${currentRow}`; const S = `S${currentRow}`; const T = `T${currentRow}`;
+        const U = `U${currentRow}`; const V = `V${currentRow}`; const W = `W${currentRow}`;
+        const X = `X${currentRow}`; const Z = `Z${currentRow}`; const AA = `AA${currentRow}`;
+        const AF = `AF${currentRow}`; const AH = `AH${currentRow}`;
 
-    } catch (err) {
-        console.error("DB Update Error:", err);
-        alert("오류가 발생했습니다: " + err.message);
+        row.getCell('M').value = { formula: `${K}+${L}` }; // 합계
+        row.getCell('V').value = { formula: `${K}-(${O}+${P}+${Q}+${R}+${S}+${T}+${U})` }; // 적용금액
+        row.getCell('X').value = { formula: `IF(OR(${D}="이동규",${D}="김태식"),(${V}*${W})+${O}+${T},${V}*${W})` }; // 인센예상
+        row.getCell('AA').value = { formula: `${K}*${Z}` }; // 본원분
+        row.getCell('AI').value = { formula: `${K}-(${X}+${AA}+IF(ISNUMBER(SEARCH("시료수거",${AF})),0,${AH}))` }; // 성과금
+
+        // 스타일 및 포맷
+        moneyCols.forEach(col => {
+            const cell = row.getCell(col);
+            cell.numFmt = '#,##0';
+            cell.alignment = { horizontal: 'right', vertical: 'middle' };
+        });
+        row.getCell('V').font = { color: { argb: 'FFFF0000' } };
+        row.getCell('AI').font = { bold: true, color: { argb: 'FF0000FF' } };
+
+        currentRow++;
+    });
+
+    // 5. 다운로드
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `실적정산_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+}
+
+// --------------------------여기서부터 챠트-----------STR
+
+function onYearFilterChange() {
+    const selectedYear = document.getElementById('yearFilter').value;
+    let filteredData = originSearchedData;
+
+    if (selectedYear !== 'all') {
+        filteredData = originSearchedData.filter(item => {
+            const dateStr = item.실접수일 || item.입금일;
+            if (!dateStr) return false;
+            return new Date(dateStr).getFullYear().toString() === selectedYear;
+        });
+    }
+
+    // 통계 그래프 및 표를 필터링된 데이터로 다시 그립니다.
+    updateStatistics(filteredData);
+}
+
+// function updateChartData() {
+//     const selectedYear = document.getElementById('yearSelect').value;
+    
+//     // 1. 현재 그리드 화면에 있는 최신 데이터를 다시 긁어옵니다 (성과금 포함)
+//     const currentGridRows = [];
+//     if (gridApi) {
+//         gridApi.forEachNode(node => {
+//             const row = { ...node.data };
+//             // 실적확인 버튼을 통해 계산된 최신 팀별성과금을 반영
+//             // 화면의 '팀별성과금' 컬럼에서 값을 가져옵니다.
+//             row["팀별성과금_최종"] = gridApi.getValue("팀별성과금", node) || 0;
+//             currentGridRows.push(row);
+//         });
+//     }
+
+//     // 만약 그리드에 데이터가 없다면 이전에 조회했던 원본 데이터라도 사용합니다.
+//     const sourceData = currentGridRows.length > 0 ? currentGridRows : originSearchedData;
+
+//     let filteredData = [];
+
+//     // 2. 선택된 연도에 따라 필터링 수행
+//     if (selectedYear === 'all') {
+//         filteredData = sourceData;
+//     } else {
+//         filteredData = sourceData.filter(item => {
+//             const dateStr = item.실접수일 || item.입금일;
+//             if (!dateStr) return false;
+            
+//             // 데이터의 연도와 선택한 연도 비교
+//             const dataYear = new Date(dateStr).getFullYear().toString();
+//             return dataYear === selectedYear;
+//         });
+//     }
+
+//     // 3. 필터링된 데이터로 상단 요약 문구 업데이트 (선택 사항)
+//     const totalPerformance = filteredData.reduce((sum, r) => sum + Number(r["팀별성과금_최종"] || 0), 0);
+//     const detailContent = document.getElementById('detail-content');
+//     if (detailContent && selectedYear !== 'all') {
+//         // 기존 안내 문구가 있다면 연도와 금액만 살짝 갱신해줍니다.
+//         const alertBox = detailContent.querySelector('.alert');
+//         if (alertBox) {
+//             alertBox.innerHTML = `
+//                 <h6 class="fw-bold"><i class="bi bi-check2-square"></i> ${selectedYear}년 실적 데이터 확인</h6>
+//                 <hr>
+//                 <div class="row">
+//                     <div class="col-md-12 text-primary">
+//                         <b>선택 연도 팀별성과금 합계: ${totalPerformance.toLocaleString()} 원</b>
+//                     </div>
+//                 </div>
+//             `;
+//         }
+//     }
+
+//     // 4. 최종적으로 통계 함수 호출하여 그래프와 표 갱신
+//     updateStatistics(filteredData);
+// }
+
+function updateChartData() {
+    const currentGridRows = [];
+    if (gridApi) {
+        gridApi.forEachNode(node => {
+            const row = { ...node.data };
+            // 화면상에 계산된 최종 '팀별성과금'을 강제로 가져와 저장
+            row["팀별성과금_최종"] = gridApi.getValue("팀별성과금", node) || 0;
+            currentGridRows.push(row);
+        });
+    }
+
+    // 그리드 데이터가 있으면 그리드 데이터를, 없으면 검색 원본 데이터를 사용
+    const sourceData = currentGridRows.length > 0 ? currentGridRows : originSearchedData;
+
+    // [핵심] 여기서 연도 필터를 거르지 않고 '전체'를 보냅니다.
+    // 그래야 2025년 접수건에 붙은 2026년 입금액이 통계 함수에 도달합니다.
+    if (sourceData && sourceData.length > 0) {
+        updateStatistics(sourceData);
     }
 }
 
-// -------------------여기까지 db연결후 인센넣기 코드 끝입니다.-------------------
+// 그리드의 valueGetter 수식을 그대로 복제한 마스터 계산기
+function masterPerformanceCalculator(d) {
+    const supply = Number(String(d.공급가액 || 0).replace(/,/g, ''));
+    const name = (d.영업담당 || "").trim();
+    const rate = Number(d.요율지원 || 0);
+    const bonRate = Number(d['요율(본원)'] || 0);
+    
+    const expenses = Number(d.출장비 || 0) + Number(d.기본료 || 0) + Number(d.정보처리비 || 0) + 
+                    Number(d.시편제작비 || 0) + Number(d.지게차운임 || 0) + 
+                    Number(d.시료수거비 || 0) + Number(d.청구위탁시험비 || 0);
+    
+    const appliedAmount = supply - expenses;
+    let incentiveExpected = (name === "이동규" || name === "김태식") 
+        ? (appliedAmount * rate) + Number(d.출장비 || 0) + Number(d.시료수거비 || 0)
+        : appliedAmount * rate;
 
+    const specimenName = d.시료명 || "";
+    const finalPayment = specimenName.includes("시료수거") ? 0 : Number(d.지급액합계 || 0);
 
+    return Math.floor(supply - (incentiveExpected + (supply * bonRate) + finalPayment));
+}
+
+// function updateStatistics(data) {
+//     const container = document.getElementById('statistics-container');
+//     if (container) container.style.display = 'block';
+
+//     const teams = ["1팀", "2팀", "3팀", "4팀", "5팀", "6팀", "미지정"];
+//     const months = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
+
+//     const stats = {};
+//     teams.forEach(team => {
+//         stats[team] = months.map(() => ({
+//             count: 0,
+//             supply: 0,
+//             deposit: 0,
+//             incentive: 0 
+//         }));
+//     });
+
+//     data.forEach(item => {
+//         let teamName = (item.담당자 && item.담당자 !== "-") ? item.담당자 : "미지정";
+//         let matchedTeam = teams.find(t => teamName.includes(t)) || "미지정";
+
+//         const rawDate = item.실접수일 || item.입금일;
+//         if (rawDate) {
+//             const dateObj = new Date(rawDate);
+//             const monthIdx = dateObj.getMonth();
+            
+//             if (monthIdx >= 0 && monthIdx <= 11) {
+//                 stats[matchedTeam][monthIdx].count += 1;
+//                 // 공급가액/입금액도 콤마 제거 후 합산
+//                 stats[matchedTeam][monthIdx].supply += Number(String(item.공급가액 || 0).replace(/[^0-9.-]+/g, ""));
+//                 stats[matchedTeam][monthIdx].deposit += Number(String(item.입금액 || 0).replace(/[^0-9.-]+/g, ""));
+                
+//                 // [확인] 우리가 강제로 만든 필드를 읽습니다.
+//                 const incentiveValue = Number(item["팀별성과금_최종"] || 0);
+//                 stats[matchedTeam][monthIdx].incentive += incentiveValue;
+//             }
+//         }
+//     });
+
+//     renderPerformanceChart(months, teams, stats);
+//     renderStatTable(teams, months, stats);
+// }
+
+function updateStatistics(data) {
+    const container = document.getElementById('statistics-container');
+    if (container) container.style.display = 'block';
+    
+    const detailContent = document.getElementById('detail-content');
+    if (detailContent) detailContent.style.display = 'none';
+
+    const teams = ["1팀", "2팀", "3팀", "4팀", "5팀", "6팀", "미지정"];
+    const months = Array.from({ length: 12 }, (_, i) => `${i + 1}월`);
+
+    const stats = {};
+    teams.forEach(team => {
+        stats[team] = months.map(() => ({ count: 0, supply: 0, deposit: 0, incentive: 0 }));
+    });
+
+    const selectedYear = document.getElementById('yearSelect').value;
+
+    const parseDateSafe = (val) => {
+        if (!val || val === "-" || val === 0) return null;
+        const s = String(val).replace(/[^0-9]/g, "").trim();
+        if (s.length >= 6) {
+            return { 
+                year: s.substring(0, 4), 
+                monthIdx: parseInt(s.substring(4, 6), 10) - 1 
+            };
+        }
+        return null;
+    };
+    data.forEach(item => {
+        let teamName = (item.담당자 && item.담당자 !== "-") ? String(item.담당자).trim() : "미지정";
+        let matchedTeam = teams.find(t => teamName.includes(t)) || "미지정";
+
+        // [A] 실접수일 기준: 공급가액, 건수, 성과금
+        const rInfo = parseDateSafe(item.실접수일);
+        if (rInfo && (selectedYear === 'all' || rInfo.year === selectedYear)) {
+            if (rInfo.monthIdx >= 0 && rInfo.monthIdx <= 11) {
+                stats[matchedTeam][rInfo.monthIdx].count += 1;
+                stats[matchedTeam][rInfo.monthIdx].supply += Number(String(item.공급가액 || 0).replace(/[^0-9.-]+/g, ""));
+                stats[matchedTeam][rInfo.monthIdx].incentive += Number(item["팀별성과금_최종"] || 0);
+            }
+        }
+
+        // [B] 입금일 기준: 입금액 (실접수일과 완전히 독립적으로 계산)
+        const dInfo = parseDateSafe(item.입금일);
+        if (dInfo && (selectedYear === 'all' || dInfo.year === selectedYear)) {
+            if (dInfo.monthIdx >= 0 && dInfo.monthIdx <= 11) {
+                const depositAmt = Number(String(item.입금액 || 0).replace(/[^0-9.-]+/g, ""));
+                // 조회된 2026년 2월 입금 데이터가 모두 일로 들어옵니다.
+                stats[matchedTeam][dInfo.monthIdx].deposit += depositAmt;
+            }
+        }
+    });
+
+    // 최종 결과물 출력
+    renderPerformanceChart(months, teams, stats);
+    renderStatTable(teams, months, stats);
+}
+
+function renderPerformanceChart(months, teams, stats) {
+    const ctx = document.getElementById('performanceChart');
+    if (!ctx) return;
+
+    if (myChart) myChart.destroy();
+
+    // 메인 페이지와 동일한 컬러셋
+    const teamColors = ['#FFD700', '#FF8C00', '#87CEEB', '#2E8B57', '#808080', '#DAA520', '#C9CBCF'];
+
+    const newDatasets = [];
+    const teamNames = teams; // ["1팀", "2팀", ...]
+
+    // 1. 팀별 막대 데이터셋 구성 (메인 페이지 스타일)
+    teamNames.forEach((team, i) => {
+        newDatasets.push({
+            type: 'bar',
+            label: team,
+            data: months.map((_, mIdx) => stats[team][mIdx].count),
+            backgroundColor: teamColors[i],
+            yAxisID: 'y',
+            barPercentage: 0.8,      // 막대 자체의 넓이 (메인 페이지 기준)
+            categoryPercentage: 0.9, // 월별 그룹의 넓이 (메인 페이지 기준)
+            order: 10
+        });
+    });
+
+    // 2. [핵심] 지그재그 경로 계산 (메인 페이지의 xPos 로직 적용)
+    let pathIncentive = []; // 파란선 (성과금)
+    let pathDepositCount = []; // 녹색선 (매칭 발급)
+
+    for (let m = 0; m < months.length; m++) {
+        teamNames.forEach((team, tIdx) => {
+            // 메인 페이지의 핵심 계산식: 각 막대의 중앙 x좌표를 산출
+            const barOffset = (tIdx - (teamNames.length - 1) / 2) * (0.8 / teamNames.length);
+            const xPos = m + barOffset;
+            
+            const tData = stats[team][m];
+            
+            // 파란선용 데이터 (성과금 - 우측 축 y_amount)
+            pathIncentive.push({ x: xPos, y: Number(tData.incentive || 0) });
+            // 녹색선용 데이터 (입금건수 - 좌측 축 y)
+            pathDepositCount.push({ x: xPos, y: Number(tData.deposit > 0 ? tData.count : 0) });
+        });
+    }
+
+    // 3. 선 데이터셋 추가 (parsing: false 필수)
+    newDatasets.push({
+        type: 'line',
+        label: '팀별성과금(파랑)',
+        data: pathIncentive,
+        borderColor: '#4169E1',
+        borderWidth: 2,
+        fill: false,
+        yAxisID: 'y_amount', // 우측 금액축
+        parsing: false,      // 직접 계산한 xPos를 사용하기 위해 끔
+        order: 1
+    });
+
+    newDatasets.push({
+        type: 'line',
+        label: '매칭 발급(녹색)',
+        data: pathDepositCount,
+        borderColor: '#28a745',
+        borderWidth: 2,
+        fill: false,
+        yAxisID: 'y',        // 좌측 건수축
+        parsing: false,      // 직접 계산한 xPos를 사용하기 위해 끔
+        order: 2
+    });
+
+    // 4. 차트 반영
+    myChart = new Chart(ctx.getContext('2d'), {
+        data: {
+            labels: months,
+            datasets: newDatasets
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: { 
+                    grid: { display: false },
+                    // 메인 페이지처럼 각 팀별로 세분화된 축이 아닌 월별 카테고리 유지
+                },
+                y: {
+                    beginAtZero: true,
+                    position: 'left',
+                    title: { display: true, text: '건수 (EA)' }
+                },
+                y_amount: {
+                    beginAtZero: true,
+                    position: 'right',
+                    title: { display: true, text: '성과금 (원)' },
+                    grid: { drawOnChartArea: false },
+                    ticks: {
+                        callback: (val) => (val / 10000).toLocaleString() + '만'
+                    }
+                }
+            },
+            plugins: {
+                legend: { position: 'top', align: 'end' },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false
+                }
+            }
+        }
+    });
+}
+
+function renderStatTable(teams, months, stats) {
+    const thead = document.querySelector('#statTable thead');
+    const tbody = document.getElementById('statTableBody');
+    if (!thead || !tbody) return;
+
+    // 1. 헤더 생성 (기존 로직 100% 유지)
+    let headHtml = `<tr class="table-dark"><th rowspan="2" class="align-middle text-center">담당자(팀)</th>`;
+    months.forEach(m => headHtml += `<th colspan="4" class="text-center border-start">${m}</th>`);
+    headHtml += `</tr><tr class="table-light">`;
+    months.forEach(() => {
+        headHtml += `<th class="text-center border-start">건수</th><th>공급가</th><th>입금액</th><th class="table-info">성과금</th>`;
+    });
+    headHtml += `</tr>`;
+    thead.innerHTML = headHtml;
+
+    // 세로 합계를 저장할 배열 (12개월 * 4개 항목)
+    const colTotals = months.map(() => ({ count: 0, supply: 0, deposit: 0, incentive: 0 }));
+
+    // 2. 바디 생성 (기본 팀별 데이터)
+    let bodyHtml = '';
+    teams.forEach(team => {
+        bodyHtml += `<tr><td class="fw-bold bg-light text-center">${team}</td>`;
+        stats[team].forEach((mStat, idx) => {
+            const incentiveClass = mStat.incentive > 0 ? "table-warning fw-bold" : "";
+            
+            bodyHtml += `
+                <td class="text-end border-start">${mStat.count.toLocaleString()}</td>
+                <td class="text-end">${mStat.supply.toLocaleString()}</td>
+                <td class="text-end">${mStat.deposit.toLocaleString()}</td>
+                <td class="text-end ${incentiveClass}">${mStat.incentive.toLocaleString()}</td>
+            `;
+
+            // 세로 합계 누적
+            colTotals[idx].count += (mStat.count || 0);
+            colTotals[idx].supply += (mStat.supply || 0);
+            colTotals[idx].deposit += (mStat.deposit || 0);
+            colTotals[idx].incentive += (mStat.incentive || 0);
+        });
+        bodyHtml += `</tr>`;
+    });
+
+    // 3. [추가] 마지막 줄 합계 행 생성 (기존 4열 포맷 유지)
+    let footerHtml = `<tr class="table-secondary fw-bold"><td class="text-center">합계</td>`;
+    colTotals.forEach(t => {
+        footerHtml += `
+            <td class="text-end border-start">${t.count.toLocaleString()}</td>
+            <td class="text-end">${t.supply.toLocaleString()}</td>
+            <td class="text-end">${t.deposit.toLocaleString()}</td>
+            <td class="text-end text-danger">${t.incentive.toLocaleString()}</td>
+        `;
+    });
+    footerHtml += `</tr>`;
+
+    // 팀별 데이터와 합계 행을 합쳐서 출력
+    tbody.innerHTML = bodyHtml + footerHtml;
+}
+// ------------------여기서부터 챠트------------------------end
 </script>
-</html>
+
 {% endblock %}

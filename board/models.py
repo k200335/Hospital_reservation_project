@@ -139,3 +139,13 @@ class TransactionCategory(models.Model):  # <-- 이 이름이 views.py의 이름
 
     def __str__(self):
         return self.name
+    
+class ProjectManagerMap(models.Model):
+    project_name = models.CharField(max_length=255, primary_key=True)
+    manager_name = models.CharField(max_length=50)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # [핵심] 이미지에 있는 실제 MySQL 테이블 이름과 똑같이 적어줍니다.
+        db_table = 'project_manager_map'

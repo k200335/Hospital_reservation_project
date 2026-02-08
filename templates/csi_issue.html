@@ -12,25 +12,26 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <style>
-    /* 4등분 고정 레이아웃 */
     .split-wrapper {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: 1fr 1fr;
-        height: calc(100vh - 70px);
-        width: 100%;
-        gap: 0;
-    }
+    display: grid;
+    grid-template-columns: 1fr 1fr; /* 가로 2열 고정 */
+    
+    /* repeat(4, ...)를 통해 4행을 만듭니다. */
+    /* auto-rows를 사용하면 패널이 추가될 때마다 높이를 자동으로 잡아줍니다. */
+    grid-auto-rows: calc((100vh - 70px) / 2); 
+    
+    width: 100%;
+    height: auto; /* 컨테이너 자체는 높이가 늘어나야 스크롤이 생깁니다. */
+    gap: 0;
+}
 
-    .panel { 
-        overflow: auto; 
-        padding: 15px; 
-        background: white; 
-        border: 1px solid #dee2e6; 
-    }
-    .panel-bg { background-color: #f8f9fa; }
-    .table-custom { font-size: 0.82rem; width: 100%; }
-    .sticky-top { position: sticky; top: 0; background: white; z-index: 10; }
+.panel { 
+    overflow: auto; 
+    padding: 15px; 
+    background: white; 
+    border: 1px solid #dee2e6;
+    height: 100%; /* 그리드 셀 높이를 꽉 채움 */
+}
 </style>
 
 <div class="split-wrapper">
@@ -145,6 +146,58 @@
                     <tr><td colspan="4" class="text-muted">데이터를 불러와 주세요.</td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+        <div class="panel" id="panel-5">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="fw-bold text-danger mb-0">5. 의뢰번호 및 QT번호 매칭</h5>
+                
+                <div class="d-flex gap-2 align-items-center">
+                    <div class="me-2 fw-bold">총 <span id="total-count-5" class="text-primary">0</span>건</div>
+                    
+                    <select id="search_type_5" class="form-select form-select-sm" style="width:130px;">
+                        <option value="all">전체</option>
+                        <option value="request_code">의뢰번호</option>
+                        <option value="qt_no">QT번호</option>
+                        <option value="project">사업명</option>
+                        <option value="agency">의뢰기관명</option>
+                    </select>
+                    
+                    <input type="text" id="search_text_5" class="form-control form-control-sm" style="width:150px;" placeholder="검색어 입력">
+                    
+                    <button id="btn-fetch-5" class="btn btn-sm btn-dark" onclick="fetchPanel5Data()">조회</button>
+                    <button id="btn-save-5" class="btn btn-sm btn-primary" onclick="savePanel5Data()">DB 저장</button>
+                </div>
+            </div>
+            
+            <div class="table-responsive" style="height: calc(100% - 45px); border: 1px solid #dee2e6;">
+                <table class="table table-sm table-bordered table-hover text-center mb-0 table-custom">
+                    <thead class="table-light sticky-top">
+                        <tr>
+                            <th style="width: 40px;"><input type="checkbox" id="check-all-5"></th>
+                            <th style="width: 150px;">의뢰번호</th>
+                            <th style="width: 150px;">QT번호</th>
+                            <th>사업명</th>
+                            <th>의뢰기관명</th>
+                        </tr>
+                    </thead>
+                    <tbody id="panel-5-body">
+                        <tr><td colspan="5" class="text-center text-muted">데이터를 조회해 주세요.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="panel" id="panel-6">
+            <h5 class="fw-bold text-secondary mb-2">6. 추가 패널 제목 2</h5>
+        </div>
+
+        <div class="panel" id="panel-7">
+            <h5 class="fw-bold text-dark mb-2">7. 추가 패널 제목 3</h5>
+        </div>
+
+        <div class="panel" id="panel-8">
+            <h5 class="fw-bold text-muted mb-2">8. 추가 패널 제목 4</h5>
         </div>
     </div>
 </div>
@@ -806,6 +859,177 @@ async function savePanel4Data() {
         alert("오류 발생: " + e.message); 
     } finally {
         // 🌟 2. 로딩 표시 종료 (성공하든 에러가 나든 원래대로 복구)
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerText = "DB 저장";
+        }
+        document.body.style.cursor = 'default';
+    }
+}
+// -----------------------------의뢰번호매칭하기------------STR
+async function fetchPanel5Data() {
+    const type = document.getElementById('search_type_5').value;
+    const text = document.getElementById('search_text_5').value;
+    const tbody = document.getElementById('panel-5-body');
+    const totalCount = document.getElementById('total-count-5');
+    const btn = document.getElementById('btn-fetch-5');
+
+    // 로딩 상태 표시
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center"><span class="spinner-border spinner-border-sm"></span> 매칭 데이터 조회 중...</td></tr>`;
+    btn.disabled = true;
+
+    try {
+        // 위에서 만든 파이썬 함수 경로로 호출 (urls.py에 등록 필요)
+        const response = await fetch(`/fetch_panel5_data/?type=${type}&text=${encodeURIComponent(text)}`);
+        const result = await response.json();
+
+        if (result.success) {
+            tbody.innerHTML = '';
+            totalCount.innerText = result.data.length;
+
+            if (result.data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">매칭할 데이터가 없습니다.</td></tr>`;
+            } else {
+                result.data.forEach((item) => {
+                    // QT번호가 '-'인 경우 붉은색 표시 (매칭 실패 알림용)
+                    const qtClass = item.qt_no === '-' ? 'text-danger fw-bold' : 'text-info fw-bold';
+                    
+                    tbody.insertAdjacentHTML('beforeend', `
+                        <tr>
+                            <td><input type="checkbox" class="row-checkbox-5"></td>
+                            <td class="fw-bold">${item.request_code}</td>
+                            <td class="${qtClass}">${item.qt_no}</td>
+                            <td class="text-start">${item.project_name || ''}</td>
+                            <td class="text-start">${item.agency_name || ''}</td>
+                        </tr>
+                    `);
+                });
+            }
+        } else {
+            alert("조회 실패: " + result.message);
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">서버 통칭 오류가 발생했습니다.</td></tr>`;
+    } finally {
+        btn.disabled = false;
+    }
+}
+// -----------------------------의뢰번호매칭하기------------END
+/* 5번 영역 전용 조회 함수 */
+async function fetchPanel5Data() {
+    const type = document.getElementById('search_type_5').value;
+    const text = document.getElementById('search_text_5').value;
+    const tbody = document.getElementById('panel-5-body');
+    const totalCount = document.getElementById('total-count-5');
+    const btn = document.getElementById('btn-fetch-5');
+
+    // 1. 로딩 표시 및 버튼 비활성화
+    tbody.innerHTML = `<tr><td colspan="5" class="text-center"><span class="spinner-border spinner-border-sm"></span> 매칭 데이터 검색 중...</td></tr>`;
+    if(btn) btn.disabled = true;
+
+    try {
+        // 2. 서버 API 호출 (아까 만든 URL)
+        const response = await fetch(`/fetch_panel5_data/?type=${type}&text=${encodeURIComponent(text)}`);
+        const result = await response.json();
+
+        if (result.success) {
+            tbody.innerHTML = '';
+            totalCount.innerText = result.data.length;
+
+            if (result.data.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="5" class="text-center text-muted">매칭할 데이터가 없습니다.</td></tr>`;
+            } else {
+                // 3. 데이터 테이블에 뿌리기
+                result.data.forEach((item) => {
+                    // QT번호가 '-'인 경우 강조 (매칭 안된 건)
+                    const qtClass = item.qt_no === '-' ? 'text-danger fw-bold' : 'text-info fw-bold';
+                    
+                    tbody.insertAdjacentHTML('beforeend', `
+                        <tr>
+                            <td><input type="checkbox" class="row-checkbox-5"></td>
+                            <td class="fw-bold">${item.request_code}</td>
+                            <td class="${qtClass}">${item.qt_no}</td>
+                            <td class="text-start">${item.project_name || ''}</td>
+                            <td class="text-start">${item.agency_name || ''}</td>
+                        </tr>
+                    `);
+                });
+            }
+        } else {
+            alert("조회 실패: " + result.message);
+            tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">조회 실패</td></tr>`;
+        }
+    } catch (e) {
+        console.error(e);
+        tbody.innerHTML = `<tr><td colspan="5" class="text-center text-danger">서버 통신 오류</td></tr>`;
+    } finally {
+        if(btn) btn.disabled = false;
+    }
+}
+
+/* 5번 영역 체크박스 전체 선택 로직 (이것도 같이 넣어주세요) */
+document.addEventListener('change', function(e) {
+    if (e.target.id === 'check-all-5') {
+        document.querySelectorAll('#panel-5-body .row-checkbox-5').forEach(cb => {
+            cb.checked = e.target.checked;
+        });
+    }
+});
+
+async function savePanel5Data() {
+    const saveBtn = document.getElementById('btn-save-5');
+    const selectedRows = document.querySelectorAll('.row-checkbox-5:checked');
+    
+    if (selectedRows.length === 0) {
+        return alert("DB에 저장할 항목을 선택해주세요.");
+    }
+
+    // 추출 및 필터링: '-'인 데이터는 절대 포함시키지 않음
+    const itemsToSave = Array.from(selectedRows).map(checkbox => {
+        const row = checkbox.closest('tr');
+        return {
+            request_code: row.cells[1].innerText.trim(),
+            qt_no: row.cells[2].innerText.trim()
+        };
+    }).filter(item => {
+        // '-' 뿐만 아니라 공백이나 'None' 문자열도 필터링
+        const val = item.qt_no;
+        return val !== '-' && val !== '' && val !== 'None' && val !== 'NULL';
+    });
+
+    if (itemsToSave.length === 0) {
+        return alert("저장 가능한 유효한 QT번호가 없습니다.\n('-' 표시 항목은 제외되었습니다.)");
+    }
+
+    if (!confirm(`유효한 데이터 ${itemsToSave.length}건을 저장하시겠습니까?`)) return;
+
+    try {
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> 저장 중...`;
+        }
+        document.body.style.cursor = 'wait';
+
+        const response = await fetch('/save_panel5_data/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': '{{ csrf_token }}'
+            },
+            body: JSON.stringify({ items: itemsToSave })
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            alert(result.message);
+            fetchPanel5Data(); // 재조회하여 목록 갱신
+        } else {
+            alert("저장 실패: " + result.message);
+        }
+    } catch (e) {
+        alert("통신 오류 발생");
+    } finally {
         if (saveBtn) {
             saveBtn.disabled = false;
             saveBtn.innerText = "DB 저장";

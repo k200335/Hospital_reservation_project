@@ -54,6 +54,7 @@
     }
 
     .fw-bold-small { font-weight: bold; font-size: 0.85rem; }
+    
 </style>
 
 <div id="main-layout">
@@ -193,7 +194,7 @@
         { headerName: "시료수거비", field: "시료수거비", width: 110 },
         { headerName: "청구위탁시험비", field: "청구위탁시험비", width: 130, valueFormatter: p => (p.value || 0).toLocaleString() },
         { headerName: "적용금액", field: "적용금액", width: 120 },
-        { headerName: "인센티브", field: "인센티브", valueFormatter: p => Math.round(p.value || 0).toLocaleString() },
+        { headerName: "인센티브", field: "인센티브", valueFormatter: p => Math.round(p.value || 0).toLocaleString() },        
         { headerName: "입금일", field: "입금일", width: 120 },
         { headerName: "입금액", field: "입금액", width: 120, cellStyle: {'background-color': '#e6fffa'}, valueFormatter: p => (p.value || 0).toLocaleString() },
         { headerName: "계산서발행회사명", field: "계산서발행회사명", width: 180 },
