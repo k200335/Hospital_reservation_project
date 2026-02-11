@@ -645,7 +645,7 @@ function downloadExcel() {
                 "날짜": node.data.date || "",     // 백엔드 키: date
                 "범주": node.data.category || "", // 백엔드 키: category
                 "제목": node.data.title || "",   // 백엔드 키: title
-                "no": row["번호"] || ""
+                "번호": node.data.no || node.data["번호"] || ""
             });
         }
     });
