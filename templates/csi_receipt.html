@@ -336,71 +336,156 @@ window.handleExcelImport = function(event) {
     fileInput.click();
 };
 
-    // 2. CSI 불러오기 (처리자 인덱스 수정 완료)
-    window.fetchCsiData = function(event) {
-        const selected = document.querySelectorAll('.row-checkbox:checked');
-        if (selected.length === 0) return alert("대상을 선택해주세요.");
+    // // 2. CSI 불러오기 (처리자 인덱스 수정 완료)
+    // window.fetchCsiData = function(event) {
+    //     const selected = document.querySelectorAll('.row-checkbox:checked');
+    //     if (selected.length === 0) return alert("대상을 선택해주세요.");
 
-        const rqNumbers = [];
-        const targetRows = [];
+    //     const rqNumbers = [];
+    //     const targetRows = [];
         
-        selected.forEach(cb => {
-            const row = cb.closest('tr');
-            const rq = row.querySelectorAll('.edit-input')[1].value; 
-            if (rq) { 
-                rqNumbers.push(rq); 
-                targetRows.push(row); 
-            }
-        });
+    //     selected.forEach(cb => {
+    //         const row = cb.closest('tr');
+    //         const rq = row.querySelectorAll('.edit-input')[1].value; 
+    //         if (rq) { 
+    //             rqNumbers.push(rq); 
+    //             targetRows.push(row); 
+    //         }
+    //     });
 
-        overlay.style.display = 'flex';
-        loadingText.innerText = "CSI 데이터를 가져오는 중입니다...\n(서버 상태에 따라 1분 이상 소요될 수 있습니다.)";
-        progressBar.style.width = '20%';
+    //     overlay.style.display = 'flex';
+    //     loadingText.innerText = "CSI 데이터를 가져오는 중입니다...\n(서버 상태에 따라 1분 이상 소요될 수 있습니다.)";
+    //     progressBar.style.width = '20%';
 
-        fetch("{% url 'fetch_csi_data' %}", { 
-            method: 'POST',
-            headers: { 
-                'Content-Type': 'application/json', 
-                'X-CSRFToken': '{{ csrf_token }}' 
-            },
-            body: JSON.stringify({ rq_numbers: rqNumbers })
-        })
-        .then(res => {
-            if (!res.ok) throw new Error('서버 응답 오류 (URL 설정 또는 서버 상태 확인)');
-            return res.json();
-        })
-        .then(data => {
-            if (data.status === 'success') {
-                data.results.forEach((resData, idx) => {
-                    const inputs = targetRows[idx].querySelectorAll('.edit-input');
+    //     fetch("{% url 'fetch_csi_data' %}", { 
+    //         method: 'POST',
+    //         headers: { 
+    //             'Content-Type': 'application/json', 
+    //             'X-CSRFToken': '{{ csrf_token }}' 
+    //         },
+    //         body: JSON.stringify({ rq_numbers: rqNumbers })
+    //     })
+    //     .then(res => {
+    //         if (!res.ok) throw new Error('서버 응답 오류 (URL 설정 또는 서버 상태 확인)');
+    //         return res.json();
+    //     })
+    //     .then(data => {
+    //         if (data.status === 'success') {
+    //             data.results.forEach((resData, idx) => {
+    //                 const inputs = targetRows[idx].querySelectorAll('.edit-input');
                     
-                    // 백엔드 데이터(resData) 순서: [접수번호, 접수일시, 상태, 사업명, 의뢰기관, 채취자, 봉인명, 특정처리자]
-                    // 표의 입력칸(inputs) 인덱스 매핑:
-                    // inputs[3]: 접수번호, inputs[4]: 접수일시, inputs[5]: 진행상태, inputs[6]: 사업명,
-                    // inputs[7]: 의뢰기관명, inputs[8]: 채취자, inputs[9]: 봉인명, inputs[10]: 처리자
+    //                 // 백엔드 데이터(resData) 순서: [접수번호, 접수일시, 상태, 사업명, 의뢰기관, 채취자, 봉인명, 특정처리자]
+    //                 // 표의 입력칸(inputs) 인덱스 매핑:
+    //                 // inputs[3]: 접수번호, inputs[4]: 접수일시, inputs[5]: 진행상태, inputs[6]: 사업명,
+    //                 // inputs[7]: 의뢰기관명, inputs[8]: 채취자, inputs[9]: 봉인명, inputs[10]: 처리자
                     
-                    for(let i=0; i < resData.length; i++) {
-                        if(resData[i] !== undefined && inputs[i+2]) {
-                            inputs[i+2].value = resData[i];
-                        }
+    //                 for(let i=0; i < resData.length; i++) {
+    //                     if(resData[i] !== undefined && inputs[i+2]) {
+    //                         inputs[i+2].value = resData[i];
+    //                     }
+    //                 }
+    //             });
+                
+    //             progressBar.style.width = '100%';
+    //             setTimeout(() => { 
+    //                 overlay.style.display = 'none'; 
+    //                 alert(data.message || "성공적으로 불러왔습니다."); 
+    //             }, 300);
+    //         } else {
+    //             throw new Error(data.message);
+    //         }
+    //     })
+    //     .catch(err => {
+    //         overlay.style.display = 'none';
+    //         alert("실패 사유: " + err.message);
+    //     });
+    // };
+
+// 2. CSI 불러오기 (데이터 매핑 정확도 개선 버전)
+window.fetchCsiData = function(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+
+    const selected = document.querySelectorAll('.row-checkbox:checked');
+    if (selected.length === 0) return alert("대상을 선택해주세요.");
+
+    const rqNumbers = [];
+    const targetRows = [];
+    
+    selected.forEach(cb => {
+        const row = cb.closest('tr');
+        // data-name="u_id"인 요소를 찾아 의뢰번호 추출
+        const rqInput = row.querySelector('[data-name="u_id"]');
+        const rq = rqInput ? rqInput.value.trim() : "";
+        
+        if (rq) { 
+            rqNumbers.push(rq); 
+            targetRows.push(row); 
+        }
+    });
+
+    if (rqNumbers.length === 0) return alert("선택된 행에 의뢰번호가 없습니다.");
+
+    overlay.style.display = 'flex';
+    loadingText.innerText = "CSI 데이터를 가져오는 중입니다...\n(서버 상태에 따라 1분 이상 소요될 수 있습니다.)";
+    progressBar.style.width = '20%';
+
+    fetch("{% url 'fetch_csi_data' %}", { 
+        method: 'POST',
+        headers: { 
+            'Content-Type': 'application/json', 
+            'X-CSRFToken': '{{ csrf_token }}' 
+        },
+        body: JSON.stringify({ rq_numbers: rqNumbers })
+    })
+    .then(res => {
+        if (!res.ok) throw new Error('서버 응답 오류 (URL 설정 또는 서버 상태 확인)');
+        return res.json();
+    })
+    .then(data => {
+        if (data.status === 'success') {
+            data.results.forEach((resData, idx) => {
+                const row = targetRows[idx];
+                
+                // data-name 속성을 기반으로 정확한 위치에 값 입력
+                // 백엔드 순서: [0:접수번호, 1:접수일시, 2:상태, 3:사업명, 4:의뢰기관, 5:채취자, 6:봉인명, 7:처리자]
+                const mapping = [
+                    { name: 'receipt_id',   value: resData[0] },
+                    { name: 'receipt_date', value: resData[1] },
+                    { name: 'status',       value: resData[2] },
+                    { name: 'project',      value: resData[3] },
+                    { name: 'client',       value: resData[4] },
+                    { name: 'sampler',      value: resData[5] },
+                    { name: 'seal',         value: resData[6] },
+                    { name: 'processor',    value: resData[7] }
+                ];
+
+                mapping.forEach(item => {
+                    const targetInput = row.querySelector(`[data-name="${item.name}"]`);
+                    if (targetInput) {
+                        targetInput.value = item.value || "";
+                        // 값이 변경되었음을 알리기 위해 노란색으로 잠시 강조 (선택 사항)
+                        targetInput.style.backgroundColor = "#fff3cd";
                     }
                 });
-                
-                progressBar.style.width = '100%';
-                setTimeout(() => { 
-                    overlay.style.display = 'none'; 
-                    alert(data.message || "성공적으로 불러왔습니다."); 
-                }, 300);
-            } else {
-                throw new Error(data.message);
-            }
-        })
-        .catch(err => {
-            overlay.style.display = 'none';
-            alert("실패 사유: " + err.message);
-        });
-    };
-
+            });
+            
+            progressBar.style.width = '100%';
+            setTimeout(() => { 
+                overlay.style.display = 'none'; 
+                alert(data.message || "성공적으로 불러왔습니다."); 
+            }, 300);
+        } else {
+            throw new Error(data.message);
+        }
+    })
+    .catch(err => {
+        overlay.style.display = 'none';
+        alert("실패 사유: " + err.message);
+    });
+};
 
 
 
