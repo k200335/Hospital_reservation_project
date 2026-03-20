@@ -598,7 +598,7 @@ def fetch_csi_wait_data(request):
 
                     # 상세페이지 진입하여 의뢰/접수번호 수집
                     driver.execute_script("arguments[0].click();", target_link)
-                    expand_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질시험 의뢰서 내역')]")))
+                    expand_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질검사 의뢰서 내역')]")))
                     driver.execute_script("arguments[0].click();", expand_btn)
                     time.sleep(1.2)
                     
