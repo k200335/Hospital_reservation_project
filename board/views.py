@@ -3232,11 +3232,11 @@ def csi_evaluation_view(request):
 def get_table_data_with_retry(driver, retries=3):
     for i in range(retries):
         try:
-            # 아코디언이 이미 열려 있다고 가정하고 데이터 탐색
+            # 요소가 나타날 때까지 기다리는 시간을 줍니다.
             script = """
             var parent = document.querySelector("div[id^='collapse_3_']");
             var parent_ajax = document.querySelector("#rqstViewAjax");
-            if (!parent) return ["추출 실패"] * 5; // 영역이 없으면 실패 반환
+            if (!parent || parent.querySelector("table") === null) return null; // 아예 요소가 없으면 null 반환
 
             var leader = parent.querySelector("div.table-scrollable table > tbody > tr:nth-child(1) > td:nth-child(4)");
             var tester = parent.querySelector("div.table-scrollable table > tbody > tr:nth-child(1) > td:nth-child(5)");
@@ -3253,12 +3253,16 @@ def get_table_data_with_retry(driver, retries=3):
             ];
             """
             results = driver.execute_script(script)
-            # 결과가 모두 "추출 실패"라면 다시 시도
-            if all(r == "추출 실패" for r in results): raise Exception("데이터 없음")
-            return results
-        except:
+            
+            # 결과가 있고, "추출 실패"가 하나도 없는 경우에만 통과
+            if results and all(r != "추출 실패" for r in results):
+                return results
+            
+            raise Exception("데이터가 아직 덜 로딩됨")
+            
+        except Exception as e:
             if i == retries - 1: return ["추출 실패"] * 5
-            time.sleep(2) # 재시도 시 대기 시간 증가
+            time.sleep(3) # 실패 시 대기 시간 3초로 상향
 
 
 @csrf_exempt
@@ -3563,4 +3567,38 @@ def save_all_to_mysql(request):
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
 
+
+# --------발급대장 MYSQL에서 불러오기-------------------------
+@csrf_exempt
+def search_issued_ledger(request):
+    """
+    접수대장 내역을 MySQL에서 조회하는 API
+    """
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            start_date = data.get('start_date')
+            end_date = data.get('end_date')
+
+            with connection.cursor() as cursor:
+                # 주의: 접수대장 전용 테이블 이름으로 수정하세요!
+                sql = """
+                    SELECT * FROM csi_receipts_new 
+                    WHERE receive_date BETWEEN %s AND %s
+                    ORDER BY receive_date DESC
+                """
+                cursor.execute(sql, [start_date, end_date])
+                
+                columns = [col[0] for col in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+            return JsonResponse({'status': 'success', 'results': results})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
         # ----------------------여기까지 적정성 평가------------end
+        
+@csrf_exempt
+def search_receipt_ledger(request):
+    # 여기에 접수대장 조회 로직을 작성하세요
+    # 예시:
+    return JsonResponse({'status': 'success', 'results': []})

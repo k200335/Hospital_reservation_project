@@ -284,15 +284,84 @@
     // 불러오기 등 버턴제어
 
     // 1. 내부 MySQL에 이미 저장된 과거 대장 데이터 불러오기 및 검색용
-function searchData() {
+async function searchData() {
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
-    if(!startDate || !endDate) {
+    const titleEl = document.getElementById('page-title');
+    const currentTitle = titleEl ? titleEl.innerText.trim() : "";
+
+    // 공통 유효성 검사
+    if (!startDate || !endDate) {
         alert("조회할 날짜 범위를 먼저 지정해주세요.");
         return;
     }
-    console.log("MySQL에서 데이터를 조회합니다...", startDate, "~", endDate);
-    // TODO: Django views로 날짜 조건 던져서 rowData 갱신 로직 작성
+
+    // 그리드 로딩 표시
+    if (evaluationGrid) evaluationGrid.showLoadingOverlay();
+
+    try {
+        let apiUrl = "";
+        const searchParams = { start_date: startDate, end_date: endDate };
+
+        // 각 대장별 조건 분기
+        switch (currentTitle) {
+            case "발급대장 내역":
+                apiUrl = "{% url 'search_issued_ledger' %}";
+                // 특정 컬럼만 보이도록 헤더(ColumnDefs) 동적 재설정
+                const limitedIssuedCols = [
+                    { field: "receipt_no", headerName: "접수번호", width: 130 },
+                    { field: "cert_no", headerName: "발급번호", width: 130 },
+                    { field: "issue_date", headerName: "발급일자", width: 120 },
+                    { field: "seal_name", headerName: "봉인명", width: 150 },
+                    { field: "agency", headerName: "의뢰기관명", width: 180 },
+                    { field: "project_name", headerName: "공사명", width: 220 },
+                    { field: "tester", headerName: "시험검사자", width: 110 },
+                    { field: "technical_leader", headerName: "책임기술인", width: 110 },
+                    { field: "remark_management_no", headerName: "비고(관리번호)", width: 150 }
+                ];
+                evaluationGrid.setGridOption('columnDefs', limitedIssuedCols);
+                break;
+            case "접수대장 내역":
+                apiUrl = "{% url 'search_receipt_ledger' %}";
+                break;
+            case "시료관리대장 내역":
+                
+                break;
+            case "시험검사실적표 내역":
+                
+                // 예: 시험검사실적표는 추가 조건이 필요할 경우 여기서 searchParams에 추가
+                break;
+            default:
+                alert("현재 화면에서는 검색 기능을 지원하지 않습니다.");
+                if (evaluationGrid) evaluationGrid.hideOverlay();
+                return;
+        }
+
+        // 서버 데이터 요청
+        // 2. 서버 요청 (MySQL 저장된 데이터 조회)
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify(searchParams)
+        });
+
+        const data = await response.json();
+
+        if (data.status === 'success') {
+            if (evaluationGrid) {
+                evaluationGrid.setGridOption('rowData', data.results);
+                evaluationGrid.hideOverlay();
+                if (data.results.length === 0) evaluationGrid.showNoRowsOverlay();
+            }
+        } else {
+            alert("조회 실패: " + data.message);
+            if (evaluationGrid) evaluationGrid.hideOverlay();
+        }
+
+    } catch (e) {
+        alert("서버와 통신 중 에러가 발생했습니다.");
+        if (evaluationGrid) evaluationGrid.hideOverlay();
+    }
 }
 
 // 2. 외부 CSI 사이트 원격 데이터 크롤링/가져오기 요청
@@ -300,10 +369,23 @@ function searchData() {
 async function fetchCsiData() {
     const startDate = document.getElementById('start-date').value;
     const endDate = document.getElementById('end-date').value;
-    
-    if(!startDate || !endDate) {
+    const titleEl = document.getElementById('page-title');
+
+    // [조건 1] 현재 페이지가 발급대장 또는 접수대장인지 확인
+    const allowedTitles = ["발급대장 내역", "접수대장 내역"];
+    if (!titleEl || !allowedTitles.includes(titleEl.innerText.trim())) {
+        alert("CSI 조회는 '발급대장' 또는 '접수대장' 화면에서만 가능합니다.");
+        return;
+    }
+
+    if (!startDate || !endDate) {
         alert("조회할 날짜 범위를 먼저 지정해 주세요.");
         return;
+    }
+
+    // [조건 2] 접속 여부 최종 확인
+    if (!confirm(`${titleEl.innerText}에 대한 CSI 원격 조회를 시작하시겠습니까?\n(데이터 수집에는 시간이 다소 소요될 수 있습니다.)`)) {
+        return; // 취소 시 함수 종료
     }
 
     if (evaluationGrid) { evaluationGrid.showLoadingOverlay(); }
@@ -325,7 +407,7 @@ async function fetchCsiData() {
             }
             alert(`${data.results.length}건의 CSI 데이터를 성공적으로 파싱했습니다.`);
             if (evaluationGrid) {
-                evaluationGrid.setGridOption('rowData', data.results); // 표에 밀어넣기
+                evaluationGrid.setGridOption('rowData', data.results);
             }
         } else {
             alert("조회 실패 원인: " + data.message);
@@ -405,10 +487,6 @@ function getCookie(name) {
 
 // 4. 가공 완료된 최종 데이터를 본 서비스용 MySQL DB에 영구 저장
 function saveToMysql() {
-    if (!confirm("그리드의 모든 데이터를 MySQL 데이터베이스에 최종 저장(갱신)하시겠습니까?")) {
-        return;
-    }
-
     // 1. 그리드 전체 데이터 수집
     const rowData = [];
     evaluationGrid.forEachNode(node => {
@@ -418,6 +496,21 @@ function saveToMysql() {
     if (rowData.length === 0) {
         alert("저장할 데이터가 없습니다.");
         return;
+    }
+
+    // [조건 1] 관리번호(remark_management_no)가 비어있는 행이 있는지 확인
+    const hasEmptyManagementNo = rowData.some(row => 
+        !row.remark_management_no || row.remark_management_no.trim() === ""
+    );
+
+    if (hasEmptyManagementNo) {
+        alert("SQL DB 매칭을 완료한 후 진행해 주세요. (관리번호가 누락된 항목이 있습니다.)");
+        return; // 확인 누르면 저장 로직 중단 (이전 상태 유지)
+    }
+
+    // [조건 2] 위 조건을 만족하면 최종 저장 확인
+    if (!confirm("그리드의 모든 데이터를 MySQL 데이터베이스에 최종 저장(갱신)하시겠습니까?")) {
+        return; // '아니오' 선택 시 중단
     }
 
     // 2. 서버 전송

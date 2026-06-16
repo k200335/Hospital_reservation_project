@@ -167,6 +167,10 @@ urlpatterns = [
 
     # 2. 그리드의 전체 데이터를 MySQL에 저장/갱신하는 API
     path('api/save-all-to-mysql/', views.save_all_to_mysql, name='save_all_to_mysql'),
+    
+    # 1. 화면 검색 (대장별 조회 API_발급대장)
+    path('api/search-issued-ledger/', views.search_issued_ledger, name='search_issued_ledger'),
+    path('api/search-receipt-ledger/', views.search_receipt_ledger, name='search_receipt_ledger'),
 
 ]
 # 아래 내용을 반드시 추가
