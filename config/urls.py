@@ -156,6 +156,18 @@ urlpatterns = [
     # 만약 저장 로직도 구현하신다면 미리 추가해두세요 (선택사항)
     path('save_panel5_data/', views.save_panel5_data, name='save_panel5_data'),
 
+# 적정성평가 URL
+    path('csi_evaluation/', views.csi_evaluation_view, name='csi_evaluation'),
+
+    # 🚀 CSI 조회 기능을 호출할 비동기 처리 URL 주소 추가!
+    path('api/fetch-csi-released-ledger/', views.fetch_csi_released_ledger_data, name='fetch_csi_released_ledger_data'),
+
+# 🚀 QT번호 매칭 추가!
+    path('api/match-management-no/', views.match_management_no, name='match_management_no'),
+
+    # 2. 그리드의 전체 데이터를 MySQL에 저장/갱신하는 API
+    path('api/save-all-to-mysql/', views.save_all_to_mysql, name='save_all_to_mysql'),
+
 ]
 # 아래 내용을 반드시 추가
 if settings.DEBUG:

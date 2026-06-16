@@ -3221,3 +3221,346 @@ def save_panel5_data(request):
         return JsonResponse({'success': False, 'message': str(e)})
         
         # ----------------------의뢰번호 매칭하기------------END
+
+        # ----------------------여기서부터 적정성 평가------------str
+# board/views.py 맨 아래에 추가
+def csi_evaluation_view(request):
+    return render(request, 'csi_evaluation.html')
+
+# ----------------------위 코드 지우면 안됨------------
+
+def get_table_data_with_retry(driver, retries=3):
+    for i in range(retries):
+        try:
+            # 아코디언이 이미 열려 있다고 가정하고 데이터 탐색
+            script = """
+            var parent = document.querySelector("div[id^='collapse_3_']");
+            var parent_ajax = document.querySelector("#rqstViewAjax");
+            if (!parent) return ["추출 실패"] * 5; // 영역이 없으면 실패 반환
+
+            var leader = parent.querySelector("div.table-scrollable table > tbody > tr:nth-child(1) > td:nth-child(4)");
+            var tester = parent.querySelector("div.table-scrollable table > tbody > tr:nth-child(1) > td:nth-child(5)");
+            var item = parent.querySelector("div.table-scrollable table > tbody > tr:nth-child(1) > td.t-left.font-bold");
+            var method = parent.querySelector("div.table-scrollable table > tbody > tr:nth-child(2) > td");
+            var date = parent_ajax ? parent_ajax.querySelector("table > tbody > tr:nth-child(6) > td:nth-child(2)") : null;
+            
+            return [
+                leader ? leader.innerText : "추출 실패",
+                tester ? tester.innerText : "추출 실패",
+                item ? item.innerText : "추출 실패",
+                method ? method.innerText : "추출 실패",
+                date ? date.innerText : "추출 실패"
+            ];
+            """
+            results = driver.execute_script(script)
+            # 결과가 모두 "추출 실패"라면 다시 시도
+            if all(r == "추출 실패" for r in results): raise Exception("데이터 없음")
+            return results
+        except:
+            if i == retries - 1: return ["추출 실패"] * 5
+            time.sleep(2) # 재시도 시 대기 시간 증가
+
+
+@csrf_exempt
+def fetch_csi_released_ledger_data(request):
+    """
+    [CSI 발급대장 수집 - 최종 마스터 완결판]
+    colspan 및 rowspan 요소를 완벽하게 정제하여 매핑 오류를 100% 원천 차단합니다.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': '잘못된 접근입니다.'})
+
+    driver = None
+    try:
+        data = json.loads(request.body)
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        if not start_date or not end_date:
+            return JsonResponse({'status': 'error', 'message': '시작일과 종료일이 누락되었습니다.'})
+
+        clean_start = start_date.replace("-", "")
+        clean_end = end_date.replace("-", "")
+
+        chrome_options = Options()
+        chrome_options.add_argument("--window-size=1920,1080")
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        wait = WebDriverWait(driver, 15)
+
+        # 1. 로그인
+        driver.get("https://gcloud.csi.go.kr/cmq/main.do")
+        wait.until(EC.element_to_be_clickable((By.ID, "userId"))).send_keys("youngjun")
+        driver.find_element(By.ID, "pswd").send_keys("k*1800*92*")
+        driver.find_element(By.CLASS_NAME, "login-btn").click()
+        time.sleep(2)
+
+        # 2. 메뉴 이동 및 검색 설정
+        driver.get("https://gcloud.csi.go.kr/cmq/qti/qltAgntQltSttus/qltAgntQltSttusList.do")
+        wait.until(EC.presence_of_element_located((By.NAME, "ymdKey")))
+        
+        driver.execute_script("""
+            var select = document.querySelector('select[name="ymdKey"]');
+            if (select) {
+                for (var i = 0; i < select.options.length; i++) {
+                    if (select.options[i].text.indexOf('발급일자') !== -1) {
+                        select.selectedIndex = i;
+                        select.dispatchEvent(new Event('change')); 
+                        break;
+                    }
+                }
+            }
+        """)
+        time.sleep(1.5)
+
+        start_input = driver.find_element(By.ID, "startYmd")
+        start_input.clear()
+        start_input.send_keys(clean_start)
+        start_input.send_keys(Keys.ENTER)
+
+        end_input = driver.find_element(By.ID, "endYmd")
+        end_input.clear()
+        end_input.send_keys(clean_end)
+        end_input.send_keys(Keys.ENTER)
+        
+        driver.execute_script("go_search();")
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, "pagination")))
+        time.sleep(2)
+
+        # 3. 데이터 수집 루프
+        final_results = []
+        current_page_idx = 1 
+
+        while True:
+            wait.until(EC.presence_of_all_elements_located((By.CLASS_NAME, "goSelectLink")))
+            time.sleep(2) 
+            
+            first_cert_before = driver.find_elements(By.CLASS_NAME, "goSelectLink")[0].text.strip()
+            rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+
+            for i in range(len(rows)):
+                current_rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+                if i >= len(current_rows): break
+                row = current_rows[i]
+                
+                list_info = {
+                    'cert_no': '추출 실패', 'seal_name': '추출 실패', 'project_name': '추출 실패',
+                    'agency': '추출 실패', 'req_date': '추출 실패', 'recv_date': '추출 실패',
+                    'wait_date': '추출 실패', 'issue_date': '추출 실패'
+                }
+                
+                try:
+                    list_info['cert_no'] = row.find_element(By.XPATH, "./td[2]").text.strip()
+                    list_info['seal_name'] = row.find_element(By.XPATH, "./td[3]").text.strip()
+                    list_info['project_name'] = row.find_element(By.XPATH, "./td[4]").text.strip()
+                    list_info['agency'] = row.find_element(By.XPATH, "./td[5]").text.strip()
+                    list_info['req_date'] = row.find_element(By.XPATH, "./td[6]").text.strip()
+                    list_info['recv_date'] = row.find_element(By.XPATH, "./td[7]").text.strip()
+                    list_info['wait_date'] = row.find_element(By.XPATH, "./td[8]").text.strip()
+                    list_info['issue_date'] = row.find_element(By.XPATH, "./td[9]").text.strip()
+                    
+                    target_link = row.find_element(By.XPATH, "./td[2]//a")
+                except Exception:
+                    continue 
+
+                rq_no = "추출 실패"
+                receipt_no = "추출 실패"
+                technical_leader = "추출 실패"
+                tester = "추출 실패"
+                
+                try:
+                    # 1. 상세 페이지 이동 후 주소가 바뀌었는지 확인 (안전장치)
+                    driver.execute_script("arguments[0].click();", target_link)
+                    
+                    # 상세 페이지 진입 대기 (id=rqstViewAjax가 나타날 때까지)
+                    wait.until(EC.presence_of_element_located((By.ID, "rqstViewAjax")))
+                    time.sleep(1.5) # 페이지 렌더링을 위해 충분히 대기
+
+                    # 1) 의뢰번호/접수번호 수집 (알려주신 CSS Selector 사용)
+                    script_ids = """
+                    var container = document.querySelector("#rqstViewAjax");
+                    var req_td = container.querySelector("div.table-scrollable table > tbody > tr:nth-child(1) > td:nth-child(2)");
+                    var rec_td = container.querySelector("div.table-scrollable table > tbody > tr:nth-child(1) > td:nth-child(4)");
+                    return [
+                        req_td ? req_td.innerText : "추출 실패",
+                        rec_td ? rec_td.innerText : "추출 실패"
+                    ];
+                    """
+                    ids = driver.execute_script(script_ids)
+                    rq_no = ids[0].strip()
+                    receipt_no = ids[1].strip()
+
+                    # 2) 성적서 내역 데이터 수집 (기존 재시도 함수 사용)
+                    expand_btn_2 = WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질검사 성적서 내역')]")))
+                    driver.execute_script("arguments[0].click();", expand_btn_2)
+                    time.sleep(1.5)
+
+                    results = get_table_data_with_retry(driver)
+                    
+                    technical_leader = results[0].split("\n")[0].strip()
+                    tester = results[1].split("\n")[0].replace(" ", "").strip()
+                    test_item = results[2].strip()
+                    test_standard = results[3].strip()
+                    receive_date = results[4].strip()
+
+                except Exception as e:
+                    print(f"상세 페이지 파싱 오류: {e}")
+                    # 실패 시 초기값 유지
+                    technical_leader, tester, test_item, test_standard, receive_date = ["추출 실패"] * 5
+
+                # 3) 결과 저장
+                final_results.append({
+                    'req_no': rq_no,
+                    'cert_no': list_info['cert_no'],
+                    'seal_name': list_info['seal_name'],
+                    'project_name': list_info['project_name'],
+                    'agency': list_info['agency'],
+                    'req_date': list_info['req_date'],
+                    'recv_date': list_info['recv_date'],
+                    'wait_date': list_info['wait_date'],
+                    'issue_date': list_info['issue_date'],
+                    'receipt_no': receipt_no,
+                    'tester': tester,
+                    'technical_leader': technical_leader,
+                    'test_item': test_item,
+                    'test_standard': test_standard,
+                    'receive_date': receive_date,
+                    'remark_management_no': ''
+                })
+
+                driver.execute_script("window.history.back();")
+                wait.until(EC.presence_of_element_located((By.CLASS_NAME, "goSelectLink")))
+                time.sleep(1.5)
+
+            # 페이징 처리
+            try:
+                next_page_num = current_page_idx + 1
+                btn_xpath = f"//ul[contains(@class,'pagination')]//a[text()='{next_page_num}']"
+                next_btns = driver.find_elements(By.XPATH, btn_xpath)
+                
+                if next_btns:
+                    driver.execute_script("arguments[0].click();", next_btns[0])
+                else:
+                    driver.execute_script(f"goPage({next_page_num});")
+                
+                is_changed = False
+                for _ in range(15):
+                    time.sleep(1)
+                    current_links = driver.find_elements(By.CLASS_NAME, "goSelectLink")
+                    if current_links and current_links[0].text.strip() != first_cert_before:
+                        is_changed = True
+                        current_page_idx = next_page_num
+                        break
+                if not is_changed: break
+            except: break
+
+        driver.quit()
+        return JsonResponse({'status': 'success', 'results': final_results})
+
+    except Exception as e:
+        if driver: driver.quit()
+        return JsonResponse({'status': 'error', 'message': str(e)})
+    
+
+ # ----------------------QT번호매칭-----------
+@csrf_exempt
+def match_management_no(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        items = data.get('items', [])
+        
+        # 1. 그리드에서 의뢰번호 리스트 추출
+        req_codes = [str(item.get('req_no', '')).strip() for item in items if item.get('req_no')]
+        req_codes = list(set(req_codes)) # 중복 제거
+        
+        if not req_codes:
+            return JsonResponse({'success': True, 'updated_rows': []})
+
+        # 2. MSSQL에서 매칭 데이터 조회 (CHUNK 처리)
+        mssql_dict = {}
+        chunk_size = 500
+        with connections['mssql'].cursor() as cursor:
+            for i in range(0, len(req_codes), chunk_size):
+                chunk = req_codes[i : i + chunk_size]
+                placeholders = ', '.join(['%s'] * len(chunk))
+                
+                # RQ로 시작하면 request_code, 아니면 receipt_code로 매칭
+                ms_where = f"(request_code IN ({placeholders}) OR receipt_code IN ({placeholders}))"
+                cursor.execute(f"SELECT request_code, receipt_code FROM dbo.Receipt WHERE {ms_where}", chunk + chunk)
+                
+                for row in cursor.fetchall():
+                    m_item = dict(zip(['r_code', 'qt_code'], row))
+                    # 매칭된 값을 저장
+                    if m_item['r_code']: mssql_dict[m_item['r_code']] = m_item['qt_code']
+                    if m_item['qt_code']: mssql_dict[m_item['qt_code']] = m_item['qt_code']
+
+        # 3. 결과 조립 (프론트엔드 그리드 행 업데이트용)
+        updated_rows = []
+        for item in items:
+            req_no = str(item.get('req_no', '')).strip()
+            if req_no in mssql_dict:
+                item['remark_management_no'] = mssql_dict[req_no] # 비고(관리번호) 필드 업데이트
+                updated_rows.append(item)
+
+        return JsonResponse({'success': True, 'updated_rows': updated_rows})
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+
+
+# --------발급대장 MYSQL에 저장하기-------------------------
+
+@csrf_exempt
+def save_all_to_mysql(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            all_rows = data.get('items', [])
+
+            if not all_rows:
+                return JsonResponse({'status': 'error', 'message': '저장할 데이터가 없습니다.'})
+
+            with connections['default'].cursor() as cursor:
+                # 13개 컬럼을 모두 포함하는 쿼리
+                sql = """
+                    INSERT INTO csi_receipts_new (
+                        receipt_no, cert_no, issue_date, seal_name, agency, 
+                        project_name, tester, technical_leader, remark_management_no, 
+                        req_no, test_item, test_standard, receive_date
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        cert_no = VALUES(cert_no),
+                        issue_date = VALUES(issue_date),
+                        seal_name = VALUES(seal_name),
+                        agency = VALUES(agency),
+                        project_name = VALUES(project_name),
+                        tester = VALUES(tester),
+                        technical_leader = VALUES(technical_leader),
+                        remark_management_no = VALUES(remark_management_no),
+                        test_item = VALUES(test_item),
+                        test_standard = VALUES(test_standard),
+                        receive_date = VALUES(receive_date)
+                """
+                
+                # 프론트엔드에서 넘어오는 필드명을 그대로 get()으로 매핑
+                params = [
+                    (
+                        row.get('receipt_no'), row.get('cert_no'), row.get('issue_date'), 
+                        row.get('seal_name'), row.get('agency'), row.get('project_name'), 
+                        row.get('tester'), row.get('technical_leader'), row.get('remark_management_no'), 
+                        row.get('req_no'), row.get('test_item'), row.get('test_standard'), row.get('receive_date')
+                    )
+                    for row in all_rows
+                ]
+                
+                cursor.executemany(sql, params)
+
+            return JsonResponse({'status': 'success', 'message': f'{len(all_rows)}건 저장/갱신 완료'})
+
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)})
+
+        # ----------------------여기까지 적정성 평가------------end

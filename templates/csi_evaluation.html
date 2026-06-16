@@ -1,0 +1,455 @@
+{% extends "base.html" %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<script src="https://cdn.jsdelivr.net/npm/ag-grid-community/dist/ag-grid-community.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-grid.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community/styles/ag-theme-alpine.css">
+
+</head>
+<style>
+    /* 좌측 사이드바 스타일 커스텀 */
+    .sidebar-menu {
+        min-height: calc(100vh - 120px); /* 상단바 제외한 높이 전체 사용 */
+        background-color: #f8f9fa;
+        border-right: 1px solid #dee2e6;
+    }
+    .sidebar-menu .nav-link {
+        color: #333;
+        padding: 12px 20px;
+        border-bottom: 1px solid #e9ecef;
+        font-weight: 500;
+    }
+    .sidebar-menu .nav-link:hover {
+        background-color: #e9ecef;
+        color: #007bff;
+    }
+    .sidebar-menu .nav-link.active {
+        background-color: #007bff;
+        color: #fff;
+    }
+    /* 우측 콘텐츠 영역 */
+    .content-area {
+        padding: 30px;
+    }
+</style>
+
+<div class="container-fluid">
+    <div class="row">
+        <nav class="col-md-3 col-lg-2 d-md-block sidebar-menu p-0">
+            <div class="position-sticky pt-3">
+                <ul class="nav flex-column">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#" onclick="switchMenu('issued')">발급대장</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="switchMenu('receipt')">접수대장</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="switchMenu('sample')">시료관리대장</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" onclick="switchMenu('report')">시험검사실적표</a>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 content-area">
+    
+    <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+        <h1 class="h2 mb-0 flex-shrink-0" id="page-title">발급대장 내역</h1>
+        
+        <div class="d-flex align-items-center flex-wrap gap-2 ms-auto">
+            
+            <div class="d-flex align-items-center gap-1">
+                <span id="date-label" class="text-secondary font-weight-bold" style="font-size: 14px; min-width: 50px; text-align: right;">발급일:</span>
+                <input type="date" class="form-control form-control-sm" id="start-date" style="width: 140px;">
+                <span class="text-secondary">~</span>
+                <input type="date" class="form-control form-control-sm" id="end-date" style="width: 140px;">
+            </div>
+
+            <div class="d-flex align-items-center gap-1 ms-2">
+                <select class="form-select form-select-sm" id="search-type" style="width: 120px;">
+                    <option value="client_name">의뢰기관명</option>
+                    <option value="project_name">공사명</option>
+                    <option value="remark_management_no">관리번호</option>
+                </select>
+                <input type="text" class="form-control form-control-sm" id="search-keyword" placeholder="검색어 입력..." style="width: 150px;">
+            </div>
+
+            <div class="d-flex align-items-center gap-1 ms-3">
+                <button class="btn btn-primary btn-sm px-2" onclick="searchData()">
+                    🔍 검색
+                </button>
+                
+                <div class="vr mx-1" style="height: 20px;"></div> <button class="btn btn-info btn-sm text-white px-2" onclick="fetchCsiData()">
+                    🌐 CSI 조회
+                </button>
+                <button class="btn btn-warning btn-sm text-white px-2" onclick="matchSqlManagementNo()">
+                    🔗 SQL DB 매칭
+                </button>
+                <button class="btn btn-secondary btn-sm px-2" onclick="saveToMysql()">
+                    💾 MySQL DB 저장
+                </button>
+
+                <div class="vr mx-1" style="height: 20px;"></div> <button class="btn btn-success btn-sm px-2" onclick="exportToExcel()">
+                    📄 엑셀 다운로드
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <div id="myGrid" class="ag-theme-alpine" style="height: 600px; width: 100%;"></div>
+</main>
+    </div>
+</div>
+
+<script>
+    // 전역 변수로 grid 객체 선언
+    let evaluationGrid;
+    // ==========================================
+    // 1. 각 대장별 컬럼 정의 (Column Definitions)
+    // ==========================================
+
+    // [1] 발급대장 컬럼
+    const issuedColumnDefs = [
+    { field: "receipt_no",         headerName: "접수번호",    width: 130, filter: 'agTextColumnFilter', sortable: true },
+    { field: "cert_no",            headerName: "발급번호",    width: 130, filter: 'agTextColumnFilter', sortable: true },
+    { field: "issue_date",         headerName: "발급일자",    width: 120, filter: 'agDateColumnFilter', sortable: true },
+    { field: "seal_name",          headerName: "봉인명",      width: 150, filter: 'agTextColumnFilter' },
+    { field: "agency",             headerName: "의뢰기관명",  width: 180, filter: 'agTextColumnFilter' },
+    { field: "project_name",       headerName: "공사명",      width: 220, filter: 'agTextColumnFilter' },
+    { field: "tester",             headerName: "시험검사자",  width: 110, filter: 'agTextColumnFilter' },
+    { field: "technical_leader",   headerName: "책임기술인",  width: 110, filter: 'agTextColumnFilter' },
+    { field: "remark_management_no", headerName: "비고(관리번호)", width: 150, filter: 'agTextColumnFilter' },
+    { field: "req_no",             headerName: "의뢰번호",    width: 140, filter: 'agTextColumnFilter', sortable: true },
+    { field: "test_item",          headerName: "시험검사종목", width: 150, filter: 'agTextColumnFilter' },
+    { field: "test_standard",      headerName: "시험검사기준", width: 150, filter: 'agTextColumnFilter' },
+    { field: "receive_date",       headerName: "접수일시",    width: 150, filter: 'agTextColumnFilter' }
+];
+
+    const receiptColumnDefs = [
+        { field: "receipt_no",         headerName: "접수번호",     width: 140, filter: 'agTextColumnFilter', sortable: true },
+        { field: "receipt_date",       headerName: "접수일시",       width: 130, filter: 'agDateColumnFilter', sortable: true },
+        { field: "agency",             headerName: "의뢰기관명",   width: 180, filter: 'agTextColumnFilter' },
+        { field: "project_name",       headerName: "공사명",       width: 240, filter: 'agTextColumnFilter' },
+        { field: "seal_name",          headerName: "봉인명",       width: 160, filter: 'agTextColumnFilter' },
+        { field: "sample_quantity",    headerName: "시료량",       width: 110, filter: 'agTextColumnFilter' },
+        { field: "remark_management_no", headerName: "비고(관리번호)", width: 150, filter: 'agTextColumnFilter' },
+        { field: "req_no",             headerName: "의뢰번호",     width: 140, filter: 'agTextColumnFilter', sortable: true } // 🔥 추가
+    ];
+
+    const sampleColumnDefs = [
+        { field: "receipt_no",         headerName: "접수번호",     width: 130, filter: 'agTextColumnFilter', sortable: true },
+        { field: "receipt_date",       headerName: "접수일시",       width: 120, filter: 'agDateColumnFilter', sortable: true },
+        { field: "issue_date",         headerName: "발급일자",     width: 120, filter: 'agDateColumnFilter', sortable: true },
+        { field: "agency",             headerName: "의뢰기관명",   width: 160, filter: 'agTextColumnFilter' },
+        { field: "project_name",       headerName: "공사명",       width: 200, filter: 'agTextColumnFilter' },
+        { field: "seal_name",          headerName: "봉인명",       width: 140, filter: 'agTextColumnFilter' },
+        { field: "sample_quantity",    headerName: "시료량",       width: 100, filter: 'agTextColumnFilter' },
+        { field: "used_quantity",      headerName: "사용량",       width: 100, filter: 'agTextColumnFilter' },
+        { field: "remaining_quantity", headerName: "남은량",       width: 100, filter: 'agTextColumnFilter' },
+        { field: "disposal_date",      headerName: "폐기일",       width: 120, filter: 'agDateColumnFilter', sortable: true },
+        { field: "remark_management_no", headerName: "비고(관리번호)", width: 150, filter: 'agTextColumnFilter' },
+        { field: "req_no",             headerName: "의뢰번호",     width: 140, filter: 'agTextColumnFilter', sortable: true } // 🔥 추가
+    ];
+
+    const reportColumnDefs = [
+        { field: "seq_no",             headerName: "연번",         width: 80,  filter: 'agNumberColumnFilter', sortable: true },
+        { field: "request_date",       headerName: "의뢰연월일",   width: 120, filter: 'agDateColumnFilter', sortable: true },
+        { field: "agency",             headerName: "의뢰기관명",   width: 160, filter: 'agTextColumnFilter' },
+        { field: "project_name",       headerName: "공사명",       width: 200, filter: 'agTextColumnFilter' },
+        { field: "seal_name",          headerName: "봉인명",       width: 130, filter: 'agTextColumnFilter' },
+        { field: "test_item",          headerName: "시험검사종목", width: 150, filter: 'agTextColumnFilter' },
+        { field: "test_standard",      headerName: "시험검사기준", width: 150, filter: 'agTextColumnFilter' },
+        { field: "test_result",        headerName: "시험결과",     width: 110, filter: 'agTextColumnFilter' },
+        { field: "fee",                headerName: "수수료",       width: 110, filter: 'agNumberColumnFilter', sortable: true, valueFormatter: params => params.value ? params.value.toLocaleString() + '원' : '0원' },
+        { field: "tester",             headerName: "시험검사자",   width: 110, filter: 'agTextColumnFilter' },
+        { field: "technical_leader",   headerName: "책임기술인",   width: 110, filter: 'agTextColumnFilter' },
+        { field: "issue_date",         headerName: "발급일자",     width: 120, filter: 'agDateColumnFilter', sortable: true },
+        { field: "remark_management_no", headerName: "비고(관리번호)", width: 150, filter: 'agTextColumnFilter' },
+        { field: "req_no",             headerName: "의뢰번호",     width: 140, filter: 'agTextColumnFilter', sortable: true } // 🔥 추가
+    ];
+
+    
+
+
+    // ==========================================
+    // 2. 각 대장별 UI 확인용 가상 데이터 (Row Data)
+    // ==========================================
+
+    // 초기 가상 테스트 데이터 구조 싱크업
+    const dummyIssuedData = [
+        { "receipt_no": "REC-2026-0001", "cert_no": "ISS-2026-0001", "issue_date": "2026-06-16", "seal_name": "품질시험인감 A", "agency": "(주)대한건설", "project_name": "고양시 도로 개설 공사", "tester": "홍길동", "technical_leader": "김철수", "remark_management_no": "", "req_no": "REQ-2026-9999" }
+    ];
+
+    const dummyReceiptData = [
+        { "receipt_no": "REC-2026-0001", "receipt_date": "2026-06-10", "client_name": "(주)대한건설", "project_name": "고양시 도로 개설 공사", "seal_name": "품질시험인감 A", "sample_quantity": "50 kg", "remark_management_no": "MGMT-9942" }
+    ];
+
+    const dummySampleData = [
+        { "receipt_no": "REC-2026-0001", "receipt_date": "2026-06-10", "issue_date": "2026-06-16", "client_name": "(주)대한건설", "project_name": "고양시 도로 개설 공사", "seal_name": "품질시험인감 A", "sample_quantity": "50 kg", "used_quantity": "40 kg", "remaining_quantity": "10 kg", "disposal_date": "2026-06-20", "remark_management_no": "MGMT-9942" }
+    ];
+
+    // [추가됨] 시험검사실적표 가상 데이터
+    const dummyReportData = [
+        {
+            "seq_no": 1,
+            "request_date": "2026-06-10",
+            "client_name": "(주)대한건설",
+            "project_name": "고양시 도로 개설 공사",
+            "seal_name": "품질시험인감 A",
+            "test_item": "흙 점성도 시험",
+            "test_standard": "KS F 2303",
+            "test_result": "적합",
+            "fee": 150000,
+            "tester": "홍길동",
+            "technical_leader": "김철수",
+            "issue_date": "2026-06-16",
+            "remark_management_no": "MGMT-9942"
+        }
+    ];
+
+
+    // ==========================================
+    // 3. 페이지 초기 로드 및 그리드 생성
+    // ==========================================
+    document.addEventListener('DOMContentLoaded', function () {
+        const gridOptions = {
+            columnDefs: issuedColumnDefs, // 첫 화면 기본값: 발급대장
+            rowData: dummyIssuedData,
+            pagination: true,
+            getRowId: (params) => {
+            // 접수번호가 있다면 접수번호를, 없다면 의뢰번호를 ID로 사용
+            return params.data.receipt_no || params.data.req_no;
+        },
+            paginationPageSize: 20,
+            paginationPageSizeSelector: [10, 20, 50, 100],
+            defaultColDef: {
+                resizable: true,
+                flex: 1,
+                minWidth: 90
+            }
+        };
+
+        const gridDiv = document.querySelector('#myGrid');
+        evaluationGrid = agGrid.createGrid(gridDiv, gridOptions);
+        window.myGridApi = evaluationGrid;
+    });
+
+
+    // ==========================================
+    // 4. 좌측 사이드 메뉴 전환 함수
+    // ==========================================
+    function switchMenu(menuType) {
+        // 사이드바 active 스타일 제어
+        const links = document.querySelectorAll('.sidebar-menu .nav-link');
+        links.forEach(link => link.classList.remove('active'));
+        event.currentTarget.classList.add('active');
+
+        const titleEl = document.getElementById('page-title');
+        
+        if (!evaluationGrid) return;
+
+        // 메뉴 선택에 따른 그리드 스위칭
+        if(menuType === 'issued') {
+            titleEl.innerText = "발급대장 내역";
+            evaluationGrid.setGridOption('columnDefs', issuedColumnDefs);
+            evaluationGrid.setGridOption('rowData', dummyIssuedData);
+            
+        } else if(menuType === 'receipt') {
+            titleEl.innerText = "접수대장 내역";
+            evaluationGrid.setGridOption('columnDefs', receiptColumnDefs);
+            evaluationGrid.setGridOption('rowData', dummyReceiptData);
+            
+        } else if(menuType === 'sample') {
+            titleEl.innerText = "시료관리대장 내역";
+            evaluationGrid.setGridOption('columnDefs', sampleColumnDefs);
+            evaluationGrid.setGridOption('rowData', dummySampleData);
+            
+        } else if(menuType === 'report') {
+            // 💡 [수정됨] 시험검사실적표 클릭 시 변환 로직 연결
+            titleEl.innerText = "시험검사실적표 내역";
+            evaluationGrid.setGridOption('columnDefs', reportColumnDefs);
+            evaluationGrid.setGridOption('rowData', dummyReportData);
+        }
+    }
+
+    // 불러오기 등 버턴제어
+
+    // 1. 내부 MySQL에 이미 저장된 과거 대장 데이터 불러오기 및 검색용
+function searchData() {
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    if(!startDate || !endDate) {
+        alert("조회할 날짜 범위를 먼저 지정해주세요.");
+        return;
+    }
+    console.log("MySQL에서 데이터를 조회합니다...", startDate, "~", endDate);
+    // TODO: Django views로 날짜 조건 던져서 rowData 갱신 로직 작성
+}
+
+// 2. 외부 CSI 사이트 원격 데이터 크롤링/가져오기 요청
+// 🌐 [1단계] CSI 대장 조회 비동기 함수 구현
+async function fetchCsiData() {
+    const startDate = document.getElementById('start-date').value;
+    const endDate = document.getElementById('end-date').value;
+    
+    if(!startDate || !endDate) {
+        alert("조회할 날짜 범위를 먼저 지정해 주세요.");
+        return;
+    }
+
+    if (evaluationGrid) { evaluationGrid.showLoadingOverlay(); }
+
+    try {
+        const response = await fetch("{% url 'fetch_csi_released_ledger_data' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+            body: JSON.stringify({ start_date: startDate, end_date: endDate })
+        });
+        
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            if (data.results.length === 0) {
+                alert("조회 기간 내 수집된 데이터가 없습니다.");
+                if (evaluationGrid) { evaluationGrid.showNoRowsOverlay(); }
+                return;
+            }
+            alert(`${data.results.length}건의 CSI 데이터를 성공적으로 파싱했습니다.`);
+            if (evaluationGrid) {
+                evaluationGrid.setGridOption('rowData', data.results); // 표에 밀어넣기
+            }
+        } else {
+            alert("조회 실패 원인: " + data.message);
+            if (evaluationGrid) { evaluationGrid.hideOverlay(); }
+        }
+    } catch (e) {
+        alert("원격 연동 에러가 발생했습니다.");
+        if (evaluationGrid) { evaluationGrid.hideOverlay(); }
+    }
+}
+
+// 3. 화면에 로드된 데이터의 접수번호를 기반으로 레거시 SQL DB에서 관리번호 찾아와 매핑
+function matchSqlManagementNo() {
+    // 1. 그리드 확인 (가장 안전한 방법)
+    if (!evaluationGrid) {
+        alert("그리드 객체를 찾을 수 없습니다.");
+        return;
+    }
+
+    const rowData = [];
+    // 2. 최신 API 방식에 맞춰 수정 (evaluationGrid 자체가 api를 포함하거나 gridOptions에 연결됨)
+    evaluationGrid.forEachNode(node => {
+        rowData.push(node.data);
+    });
+
+    if (rowData.length === 0) {
+        alert("그리드에 데이터가 없습니다.");
+        return;
+    }
+
+    fetch('/api/match-management-no/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ items: rowData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // 💡 핵심 수정: .api를 제거하고 evaluationGrid에 직접 applyTransaction 호출
+            // 만약 여기서도 에러가 나면 evaluationGrid.api.applyTransaction 대신 
+            // evaluationGrid.applyTransaction으로 호출하세요.
+            if (evaluationGrid.applyTransaction) {
+                evaluationGrid.applyTransaction({ update: data.updated_rows });
+            } else if (evaluationGrid.api && evaluationGrid.api.applyTransaction) {
+                evaluationGrid.api.applyTransaction({ update: data.updated_rows });
+            }
+            alert("매칭 완료!");
+        } else {
+            alert("매칭 실패: " + data.message);
+        }
+    })
+    .catch(error => {
+        console.error("통신 에러:", error);
+        alert("통신 중 에러 발생 (콘솔 확인)");
+    });
+}
+
+// CSRF 토큰을 가져오는 함수 (이게 없어서 fetch가 멈춘 것입니다)
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+
+// 4. 가공 완료된 최종 데이터를 본 서비스용 MySQL DB에 영구 저장
+function saveToMysql() {
+    if (!confirm("그리드의 모든 데이터를 MySQL 데이터베이스에 최종 저장(갱신)하시겠습니까?")) {
+        return;
+    }
+
+    // 1. 그리드 전체 데이터 수집
+    const rowData = [];
+    evaluationGrid.forEachNode(node => {
+        rowData.push(node.data);
+    });
+
+    if (rowData.length === 0) {
+        alert("저장할 데이터가 없습니다.");
+        return;
+    }
+
+    // 2. 서버 전송
+    fetch('/api/save-all-to-mysql/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+        },
+        body: JSON.stringify({ items: rowData })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert(data.message);
+        } else {
+            alert("저장 실패: " + data.message);
+        }
+    })
+    .catch(error => {
+        console.error("통신 에러:", error);
+        alert("서버와 통신 중 에러가 발생했습니다.");
+    });
+}
+
+// 5. 정제 완료된 데이터 엑셀 추출
+function exportToExcel() {
+    if (evaluationGrid) {
+        alert("현재 그리드 화면에 표시된 내역을 엑셀로 추출합니다.");
+        // evaluationGrid.api.exportDataAsCsv(); 또는 exceljs 객체 활용 로직
+    }
+}
+
+</script>
+{% endblock %}
