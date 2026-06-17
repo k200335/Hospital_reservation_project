@@ -172,6 +172,25 @@ urlpatterns = [
     path('api/search-issued-ledger/', views.search_issued_ledger, name='search_issued_ledger'),
     path('api/search-receipt-ledger/', views.search_receipt_ledger, name='search_receipt_ledger'),
 
+# 1. 접수대장 매칭하기
+    path('api/match-management-no/receipt/', views.match_receipt_management_no, name='match_receipt_no'),
+
+# 1. 접수대장 저장하기
+    path('api/save-receipt-to-mysql/', views.save_receipt_to_mysql, name='save_receipt'),
+# 1. 접수대장 MYSQL에서 불러오기
+    path('api/get-receipt-data/', views.get_receipt_data, name='get_receipt_data'),
+
+    # 3. 시료관리대장 MYSQL에서 불러오기 API
+    path('api/search-sample-ledger/', views.search_sample_ledger, name='search_sample_ledger'),
+
+    # 💡 시료관리대장 매칭용 API 추가
+    path('api/match-management-no/sample/', views.match_management_no_sample, name='match_management_no_sample'),
+
+
+    path('api/match-management-no/performance/', views.match_management_no_performance, name='match_performance'),
+
+    path('api/get-performance-data/', views.get_performance_data, name='get_performance_data'),
+
 ]
 # 아래 내용을 반드시 추가
 if settings.DEBUG:

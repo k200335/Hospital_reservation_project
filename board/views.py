@@ -3465,7 +3465,7 @@ def fetch_csi_released_ledger_data(request):
         return JsonResponse({'status': 'error', 'message': str(e)})
     
 
- # ----------------------QT번호매칭-----------
+# ----------------------QT번호매칭-----------
 @csrf_exempt
 def match_management_no(request):
     if request.method != 'POST':
@@ -3506,6 +3506,234 @@ def match_management_no(request):
             req_no = str(item.get('req_no', '')).strip()
             if req_no in mssql_dict:
                 item['remark_management_no'] = mssql_dict[req_no] # 비고(관리번호) 필드 업데이트
+                updated_rows.append(item)
+
+        return JsonResponse({'success': True, 'updated_rows': updated_rows})
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+    
+# --------접수대장 매칭하기------------------------
+
+@csrf_exempt
+def match_receipt_management_no(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        items = data.get('items', [])
+        req_codes = [str(item.get('req_no', '')).strip() for item in items if item.get('req_no')]
+        req_codes = list(set(req_codes))
+        
+        if not req_codes:
+            return JsonResponse({'success': True, 'updated_rows': []})
+
+        # 매칭 데이터를 담을 딕셔너리
+        mssql_data = {}
+        chunk_size = 500
+        
+        with connections['mssql'].cursor() as cursor:
+            for i in range(0, len(req_codes), chunk_size):
+                chunk = req_codes[i : i + chunk_size]
+                placeholders = ', '.join(['%s'] * len(chunk))
+                
+                # Receipt(r)와 Send_Report(s)를 receipt_code로 JOIN하여 한 번에 조회
+                query = f"""
+                    SELECT r.request_code, r.receipt_code, s.in_specimen 
+                    FROM dbo.Receipt r
+                    LEFT JOIN dbo.Send_Report s ON r.receipt_code = s.receipt_code
+                    WHERE r.request_code IN ({placeholders})
+                """
+                cursor.execute(query, chunk)
+                
+                for row in cursor.fetchall():
+                    req_code, rec_code, in_specimen = row
+                    mssql_data[req_code] = {
+                        'receipt_code': rec_code,
+                        'in_specimen': in_specimen
+                    }
+
+        updated_rows = []
+        for item in items:
+            req_no = str(item.get('req_no', '')).strip()
+            if req_no in mssql_data:
+                # 비고(관리번호)와 시료량 모두 업데이트
+                item['remark_management_no'] = mssql_data[req_no]['receipt_code']
+                item['sample_quantity'] = mssql_data[req_no]['in_specimen']
+                updated_rows.append(item)
+
+        return JsonResponse({'success': True, 'updated_rows': updated_rows})
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+    
+
+# --------시료관리대장 SQL에TJ 매칭하기-------------------------
+
+@csrf_exempt
+def match_management_no_sample(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        items = data.get('items', [])
+        
+        # 1. 관리번호(remark_management_no) 리스트 추출 및 중복 제거
+        mng_nos = [str(item.get('remark_management_no', '')).strip() for item in items if item.get('remark_management_no')]
+        mng_nos = list(set(mng_nos))
+        
+        if not mng_nos:
+            return JsonResponse({'success': True, 'updated_rows': []})
+
+        mssql_data = {}
+        chunk_size = 500
+        
+        # 2. MSSQL 연결 및 벌크 조회 (정확한 필드명 적용)
+        with connections['mssql'].cursor() as cursor:
+            for i in range(0, len(mng_nos), chunk_size):
+                chunk = mng_nos[i : i + chunk_size]
+                placeholders = ', '.join(['%s'] * len(chunk))
+                
+                # 스크린샷에 나온 정확한 필드명 사용
+                query = f"""
+                    SELECT receipt_code, in_specimen, use_specimen, remain_specimen, disuse_specimen
+                    FROM dbo.Send_Report
+                    WHERE receipt_code IN ({placeholders})
+                """
+                cursor.execute(query, chunk)
+                
+                for row in cursor.fetchall():
+                    rec_code, in_spec, use_spec, rem_spec, dis_date = row
+                    mssql_data[str(rec_code).strip()] = {
+                        'sample_quantity': in_spec,
+                        'used_quantity': use_spec,
+                        'remaining_quantity': rem_spec,
+                        'disposal_date': dis_date
+                    }
+
+        # 3. 데이터 매칭 및 업데이트
+        updated_rows = []
+        for item in items:
+            mng_no = str(item.get('remark_management_no', '')).strip()
+            if mng_no in mssql_data:
+                # 그리드 필드명에 맞춰 업데이트
+                item.update(mssql_data[mng_no])
+                updated_rows.append(item)
+
+        return JsonResponse({'success': True, 'updated_rows': updated_rows})
+
+    except Exception as e:
+        return JsonResponse({'success': False, 'message': str(e)})
+
+
+# --------시료검사실적표 MYSQL에서 불러오기-------------------------
+@csrf_exempt
+def get_performance_data(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        with connections['default'].cursor() as cursor:
+            # 1. MySQL에서 데이터 조회
+            sql = """
+                SELECT 
+                    receive_date, agency, project_name, seal_name, 
+                    test_item, test_standard, tester, technical_leader, 
+                    issue_date, remark_management_no, req_no
+                FROM csi_receipts_new
+                WHERE issue_date BETWEEN %s AND %s
+                ORDER BY issue_date DESC
+            """
+            cursor.execute(sql, [start_date, end_date])
+            
+            columns = [col[0] for col in cursor.description]
+            rows = cursor.fetchall()
+
+            # 2. 데이터 가공 (연번 및 시험결과 추가)
+            result_list = []
+            for index, row in enumerate(rows, start=1):
+                item = dict(zip(columns, row))
+                
+                # 1) 연번 및 시험결과 고정값
+                item['seq_no'] = index
+                item['test_result'] = "적합"
+                
+                # 2) 날짜 포맷 변환 (2025-02-14 09:39:52 -> 2025-02-14)
+                if item.get('receive_date'):
+                    # 문자열로 변환 후 앞 10자리만 자르기
+                    item['receive_date'] = str(item['receive_date'])[:10]
+                
+                # 3) test_item 및 test_standard 뒤에 " 외" 추가
+                if item.get('test_item'):
+                    item['test_item'] = f"{item['test_item']} 외"
+                
+                if item.get('test_standard'):
+                    item['test_standard'] = f"{item['test_standard']} 외"
+                
+                result_list.append(item)
+
+        return JsonResponse({'status': 'success', 'results': result_list}, safe=False)
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+
+# --------시료검사실적표 MSSQL에서 매칭하기-------------------------
+
+@csrf_exempt
+def match_management_no_performance(request):
+    if request.method != 'POST':
+        return JsonResponse({'success': False, 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        items = data.get('items', [])
+        
+        # 1. 관리번호(remark_management_no) 리스트 추출 및 중복 제거
+        # 그리드에서는 remark_management_no로 들어오고, DB의 receipt_code와 매칭됨
+        mng_nos = [str(item.get('remark_management_no', '')).strip() for item in items if item.get('remark_management_no')]
+        mng_nos = list(set(mng_nos))
+        
+        if not mng_nos:
+            return JsonResponse({'success': True, 'updated_rows': []})
+
+        mssql_data = {}
+        chunk_size = 500
+        
+        # 2. MSSQL에서 Estimate 테이블 조회
+        with connections['mssql'].cursor() as cursor:
+            for i in range(0, len(mng_nos), chunk_size):
+                chunk = mng_nos[i : i + chunk_size]
+                placeholders = ', '.join(['%s'] * len(chunk))
+                
+                # supply_value와 vat을 가져와 합산
+                query = f"""
+                    SELECT receipt_code, supply_value, vat
+                    FROM dbo.Estimate
+                    WHERE receipt_code IN ({placeholders})
+                """
+                cursor.execute(query, chunk)
+                
+                for row in cursor.fetchall():
+                    rec_code, supply, vat = row
+                    # 수수료(fee) = 공급가액 + 부가세
+                    total_fee = (supply or 0) + (vat or 0)
+                    mssql_data[str(rec_code).strip()] = {
+                        'fee': total_fee
+                    }
+
+        # 3. 데이터 매칭
+        updated_rows = []
+        for item in items:
+            mng_no = str(item.get('remark_management_no', '')).strip()
+            if mng_no in mssql_data:
+                # 그리드의 fee 필드 업데이트
+                item['fee'] = mssql_data[mng_no]['fee']
                 updated_rows.append(item)
 
         return JsonResponse({'success': True, 'updated_rows': updated_rows})
@@ -3566,39 +3794,255 @@ def save_all_to_mysql(request):
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
+        
+# --------접수대장 MYSQL에 저장하기-------------------------
+@csrf_exempt
+def save_receipt_to_mysql(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        items = data.get('items', [])
+
+        if not items:
+            return JsonResponse({'status': 'error', 'message': '저장할 데이터가 없습니다.'})
+
+        with connections['default'].cursor() as cursor:
+            # 💡 req_no를 기준으로 INSERT 또는 UPDATE 실행
+            sql = """
+                INSERT INTO csi_receipt_ledger (
+                    receipt_no, receipt_date, agency, project_name, 
+                    seal_name, sample_quantity, remark_management_no, req_no
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    receipt_no = VALUES(receipt_no),
+                    receipt_date = VALUES(receipt_date),
+                    agency = VALUES(agency),
+                    project_name = VALUES(project_name),
+                    seal_name = VALUES(seal_name),
+                    sample_quantity = VALUES(sample_quantity),
+                    remark_management_no = VALUES(remark_management_no)
+            """
+            
+            params = [
+                (
+                    row.get('receipt_no'), row.get('receipt_date'), row.get('agency'), 
+                    row.get('project_name'), row.get('seal_name'), row.get('sample_quantity'), 
+                    row.get('remark_management_no'), row.get('req_no')
+                )
+                for row in items
+            ]
+            
+            cursor.executemany(sql, params)
+
+        return JsonResponse({'status': 'success', 'message': f'{len(items)}건 저장/갱신 완료'})
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
 
 
 # --------발급대장 MYSQL에서 불러오기-------------------------
 @csrf_exempt
 def search_issued_ledger(request):
-    """
-    접수대장 내역을 MySQL에서 조회하는 API
-    """
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            start_date = data.get('start_date')
-            end_date = data.get('end_date')
+            start_date, end_date = data.get('start_date'), data.get('end_date')
 
             with connection.cursor() as cursor:
-                # 주의: 접수대장 전용 테이블 이름으로 수정하세요!
+                # [중요] 프론트엔드 field와 일치하도록 별칭(AS) 지정
                 sql = """
-                    SELECT * FROM csi_receipts_new 
-                    WHERE receive_date BETWEEN %s AND %s
-                    ORDER BY receive_date DESC
+                    SELECT 
+                        receipt_no AS receipt_no, 
+                        cert_no AS cert_no, 
+                        issue_date AS issue_date, 
+                        seal_name AS seal_name, 
+                        agency AS agency, 
+                        project_name AS project_name, 
+                        tester AS tester, 
+                        technical_leader AS technical_leader, 
+                        remark_management_no AS remark_management_no
+                    FROM csi_receipts_new 
+                    WHERE issue_date BETWEEN %s AND %s 
+                    ORDER BY issue_date DESC
                 """
                 cursor.execute(sql, [start_date, end_date])
                 
                 columns = [col[0] for col in cursor.description]
                 results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-
+                
+                # 체크박스 데이터 추가
+                for row in results:
+                    row['checkbox'] = "" 
+            
             return JsonResponse({'status': 'success', 'results': results})
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
-        # ----------------------여기까지 적정성 평가------------end
         
+
+# --------접수대장 MYSQL에서 불러오기-------------------------
+def get_receipt_data(request):
+    try:
+        # 데이터베이스 커넥션 사용
+        with connections['default'].cursor() as cursor:
+            # 💡 접수대장 테이블 전체 조회
+            cursor.execute("""
+                SELECT 
+                    receipt_no, receipt_date, agency, project_name, 
+                    seal_name, sample_quantity, remark_management_no, req_no
+                FROM csi_receipt_ledger
+                ORDER BY receipt_date DESC
+            """)
+            
+            # 컬럼명 리스트
+            columns = [col[0] for col in cursor.description]
+            
+            # 딕셔너리 형태로 데이터 변환
+            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        return JsonResponse({'status': 'success', 'results': rows}, safe=False)
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+    
+# --------시료관리대장 MYSQL에서 불러오기-------------------------
+@csrf_exempt
+def search_sample_ledger(request):
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+
+        with connections['default'].cursor() as cursor:
+            # 시료관리대장용 필드만 선택하여 조회
+            sql = """
+                SELECT 
+                    receipt_no, receive_date, issue_date, agency, project_name, 
+                    seal_name, remark_management_no, req_no
+                FROM csi_receipts_new
+                WHERE issue_date BETWEEN %s AND %s
+                ORDER BY issue_date DESC
+            """
+            cursor.execute(sql, [start_date, end_date])
+            
+            columns = [col[0] for col in cursor.description]
+            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+
+        return JsonResponse({'status': 'success', 'results': rows}, safe=False)
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+
+# --------접수대장 CSI 크롤링-------------------------
 @csrf_exempt
 def search_receipt_ledger(request):
-    # 여기에 접수대장 조회 로직을 작성하세요
-    # 예시:
-    return JsonResponse({'status': 'success', 'results': []})
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': '잘못된 접근입니다.'})
+
+    driver = None
+    try:
+        data = json.loads(request.body)
+        start_date, end_date = data.get('start_date'), data.get('end_date')
+        clean_start, clean_end = start_date.replace("-", ""), end_date.replace("-", "")
+
+        # 1. 드라이버 설정
+        chrome_options = Options()
+        chrome_options.add_argument("--window-size=1920,1080")
+        # headless 모드 사용 시 아래 주석 해제 (서버 환경일 경우)
+        # chrome_options.add_argument("--headless") 
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+        wait = WebDriverWait(driver, 15)
+
+        # 2. 로그인 (기존 로직 유지)
+        driver.get("https://gcloud.csi.go.kr/cmq/main.do")
+        wait.until(EC.element_to_be_clickable((By.ID, "userId"))).send_keys("youngjun")
+        driver.find_element(By.ID, "pswd").send_keys("k*1800*92*")
+        driver.find_element(By.CLASS_NAME, "login-btn").click()
+        time.sleep(2)
+
+        # 3. 접수대장 페이지 이동 및 검색
+        driver.get("https://gcloud.csi.go.kr/cmq/qtc/qltRptRegstr/qltRptRegstrList.do")
+        
+        start_input = wait.until(EC.presence_of_element_located((By.ID, "startYmd")))
+        start_input.clear()
+        start_input.send_keys(clean_start)
+        
+        end_input = driver.find_element(By.ID, "endYmd")
+        end_input.clear()
+        end_input.send_keys(clean_end)
+        
+        search_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#formList > table > tbody > tr:nth-child(1) > td.padL10 > button")))
+        driver.execute_script("arguments[0].click();", search_btn)
+        time.sleep(2)
+
+        # 4. 데이터 수집 루프
+        final_results = []
+        rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+        
+        for i in range(len(rows)):
+            # 새로 페이지가 로딩될 때마다 다시 요소를 찾아야 함 (stale element 방지)
+            current_rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+            row = current_rows[i]
+            
+            receipt_no = row.find_element(By.XPATH, "./td[2]").text.strip()
+            seal_name = row.find_element(By.XPATH, "./td[5]").text.strip()
+            project_name = row.find_element(By.XPATH, "./td[7]").text.strip()
+            recv_date = row.find_element(By.CSS_SELECTOR, "td:nth-child(8)").get_attribute("textContent").strip()
+
+            # 상세 페이지 이동
+            target_link = row.find_element(By.XPATH, "./td[2]/a")
+            driver.execute_script("arguments[0].click();", target_link)
+            wait.until(EC.presence_of_element_located((By.ID, "rqstViewAjax")))
+            
+            # 아코디언 펼치기
+            expand_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질검사 의뢰서 내역')]")))
+            driver.execute_script("arguments[0].click();", expand_btn)
+            time.sleep(1)
+
+            # 상세 정보 추출 (제공해주신 CSS Selector 적용)
+            script_details = """
+                var container = document.querySelector("#rqstViewAjax");
+                
+                // 테이블 내의 모든 tr을 가져와서 안전하게 접근
+                var rows = container.querySelectorAll("table > tbody > tr");
+                
+                // 1번째 행(index 0)의 2번째 td -> 의뢰번호
+                var req_no = rows[0].querySelector("td:nth-child(2)").textContent.trim();
+                
+                // 4번째 행(index 3)의 2번째 td -> 의뢰기관명
+                var agency = rows[3].querySelector("td:nth-child(2)").textContent.trim();
+                
+                return [req_no, agency];
+            """
+            details = driver.execute_script(script_details)
+            
+            final_results.append({
+                'receipt_no': receipt_no,
+                'seal_name': seal_name,
+                'project_name': project_name,
+                'receipt_date': recv_date,
+                'req_no': details[0],
+                'agency': details[1]
+            })
+
+            driver.execute_script("window.history.back();")
+            wait.until(EC.presence_of_element_located((By.ID, "endYmd"))) # 목록 복귀 대기
+            time.sleep(1)
+
+        driver.quit()
+        return JsonResponse({'status': 'success', 'results': final_results})
+
+    except Exception as e:
+        if driver: driver.quit()
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+
+        
+        # ----------------------여기까지 적정성 평가------------end
+        
+
