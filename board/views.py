@@ -43,6 +43,7 @@ from django.db.models import Sum
 from .models import transactions
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import TransactionCategory
+from selenium.common.exceptions import NoSuchElementException, TimeoutException
 
 
 
@@ -3953,12 +3954,11 @@ def search_receipt_ledger(request):
         # 1. 드라이버 설정
         chrome_options = Options()
         chrome_options.add_argument("--window-size=1920,1080")
-        # headless 모드 사용 시 아래 주석 해제 (서버 환경일 경우)
-        # chrome_options.add_argument("--headless") 
+        # chrome_options.add_argument("--headless")
         driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
         wait = WebDriverWait(driver, 15)
 
-        # 2. 로그인 (기존 로직 유지)
+        # 2. 로그인
         driver.get("https://gcloud.csi.go.kr/cmq/main.do")
         wait.until(EC.element_to_be_clickable((By.ID, "userId"))).send_keys("youngjun")
         driver.find_element(By.ID, "pswd").send_keys("k*1800*92*")
@@ -3980,62 +3980,99 @@ def search_receipt_ledger(request):
         driver.execute_script("arguments[0].click();", search_btn)
         time.sleep(2)
 
-        # 4. 데이터 수집 루프
+        # 4. 데이터 수집 루프 (페이지네이션 포함)
         final_results = []
-        rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+        current_page = 1
         
-        for i in range(len(rows)):
-            # 새로 페이지가 로딩될 때마다 다시 요소를 찾아야 함 (stale element 방지)
-            current_rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
-            row = current_rows[i]
+        while True:
+            print(f"--- {current_page} 페이지 수집 시작 ---")
             
-            receipt_no = row.find_element(By.XPATH, "./td[2]").text.strip()
-            seal_name = row.find_element(By.XPATH, "./td[5]").text.strip()
-            project_name = row.find_element(By.XPATH, "./td[7]").text.strip()
-            recv_date = row.find_element(By.CSS_SELECTOR, "td:nth-child(8)").get_attribute("textContent").strip()
-
-            # 상세 페이지 이동
-            target_link = row.find_element(By.XPATH, "./td[2]/a")
-            driver.execute_script("arguments[0].click();", target_link)
-            wait.until(EC.presence_of_element_located((By.ID, "rqstViewAjax")))
+            # 현재 페이지의 총 행(row) 수 파악
+            wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, "table.table-striped tbody tr")))
+            rows_count = len(driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr"))
             
-            # 아코디언 펼치기
-            expand_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질검사 의뢰서 내역')]")))
-            driver.execute_script("arguments[0].click();", expand_btn)
-            time.sleep(1)
+            for i in range(rows_count):
+                # DOM이 갱신될 수 있으므로 매번 요소를 새로 찾음
+                current_rows = driver.find_elements(By.CSS_SELECTOR, "table.table-striped tbody tr")
+                row = current_rows[i]
+                
+                receipt_no = row.find_element(By.XPATH, "./td[2]").text.strip()
+                seal_name = row.find_element(By.XPATH, "./td[5]").text.strip()
+                project_name = row.find_element(By.XPATH, "./td[7]").text.strip()
+                recv_date = row.find_element(By.CSS_SELECTOR, "td:nth-child(8)").get_attribute("textContent").strip()
 
-            # 상세 정보 추출 (제공해주신 CSS Selector 적용)
-            script_details = """
-                var container = document.querySelector("#rqstViewAjax");
+                # 상세 페이지 이동
+                target_link = row.find_element(By.XPATH, "./td[2]/a")
+                driver.execute_script("arguments[0].click();", target_link)
+                wait.until(EC.presence_of_element_located((By.ID, "rqstViewAjax")))
                 
-                // 테이블 내의 모든 tr을 가져와서 안전하게 접근
-                var rows = container.querySelectorAll("table > tbody > tr");
+                # 아코디언 펼치기
+                try:
+                    expand_btn = wait.until(EC.element_to_be_clickable((By.XPATH, "//a[contains(text(), '품질검사 의뢰서 내역')]")))
+                    driver.execute_script("arguments[0].click();", expand_btn)
+                    time.sleep(0.5)
+                except TimeoutException:
+                    pass # 아코디언이 없거나 이미 열려있을 경우 패스
+
+                # 상세 정보 추출 (JS 실행)
+                script_details = """
+                    var container = document.querySelector("#rqstViewAjax");
+                    var rows = container.querySelectorAll("table > tbody > tr");
+                    var req_no = rows[0] ? rows[0].querySelector("td:nth-child(2)").textContent.trim() : "";
+                    var agency = rows[3] ? rows[3].querySelector("td:nth-child(2)").textContent.trim() : "";
+                    return [req_no, agency];
+                """
+                details = driver.execute_script(script_details)
                 
-                // 1번째 행(index 0)의 2번째 td -> 의뢰번호
-                var req_no = rows[0].querySelector("td:nth-child(2)").textContent.trim();
-                
-                // 4번째 행(index 3)의 2번째 td -> 의뢰기관명
-                var agency = rows[3].querySelector("td:nth-child(2)").textContent.trim();
-                
-                return [req_no, agency];
-            """
-            details = driver.execute_script(script_details)
+                final_results.append({
+                    'receipt_no': receipt_no,
+                    'seal_name': seal_name,
+                    'project_name': project_name,
+                    'receipt_date': recv_date,
+                    'req_no': details[0],
+                    'agency': details[1]
+                })
+
+                # [중요] 뒤로 가기 대신, 알려주신 '목록' 버튼을 클릭하여 페이지 상태 유지
+                list_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#content > div.table-bottom-control > div > div > button:nth-child(3)")))
+                driver.execute_script("arguments[0].click();", list_btn)
+                wait.until(EC.presence_of_element_located((By.ID, "endYmd"))) # 목록 화면 렌더링 대기
+                time.sleep(1)
+
+            # 5. 다음 페이지로 이동 로직
+            current_page += 1
+            print(f"--- {current_page} 페이지로 이동 시도 중 ---")
             
-            final_results.append({
-                'receipt_no': receipt_no,
-                'seal_name': seal_name,
-                'project_name': project_name,
-                'receipt_date': recv_date,
-                'req_no': details[0],
-                'agency': details[1]
-            })
-
-            driver.execute_script("window.history.back();")
-            wait.until(EC.presence_of_element_located((By.ID, "endYmd"))) # 목록 복귀 대기
-            time.sleep(1)
+            try:
+                # 수정 1: normalize-space()를 써서 숫자 양옆 공백 무시
+                # 수정 2: wait.until을 사용해 요소가 화면에 나타날 때까지 넉넉히 대기
+                next_page_xpath = f"//div[contains(@class, 'paging-area')]//a[normalize-space(text())='{current_page}']"
+                next_page_btn = wait.until(EC.presence_of_element_located((By.XPATH, next_page_xpath)))
+                
+                driver.execute_script("arguments[0].click();", next_page_btn)
+                time.sleep(2) # 테이블 갱신 대기
+                
+            except TimeoutException: 
+                # NoSuchElementException 대신 TimeoutException으로 처리
+                print(f"{current_page} 페이지 번호가 안 보입니다. 다음 구간[>] 버튼을 클릭합니다.")
+                try:
+                    # 수정 3: [>] 버튼과 [>>] 버튼 중 첫 번째인 [>] 버튼을 명확히 짚어줌
+                    next_block_xpath = "(//li[contains(@class, 'next')]/a)[1]"
+                    next_block_btn = wait.until(EC.presence_of_element_located((By.XPATH, next_block_xpath)))
+                    driver.execute_script("arguments[0].click();", next_block_btn)
+                    time.sleep(2)
+                    
+                    # [>] 버튼 누른 후 화면이 바뀌었으니 다시 다음 페이지 번호 찾아서 클릭
+                    next_page_btn = wait.until(EC.presence_of_element_located((By.XPATH, next_page_xpath)))
+                    driver.execute_script("arguments[0].click();", next_page_btn)
+                    time.sleep(2)
+                    
+                except TimeoutException:
+                    print("크롤링 완료 (더 이상 페이지가 없습니다.)")
+                    break
 
         driver.quit()
-        return JsonResponse({'status': 'success', 'results': final_results})
+        return JsonResponse({'status': 'success', 'results': final_results, 'total_crawled': len(final_results)})
 
     except Exception as e:
         if driver: driver.quit()
