@@ -163,7 +163,7 @@ urlpatterns = [
     path('api/fetch-csi-released-ledger/', views.fetch_csi_released_ledger_data, name='fetch_csi_released_ledger_data'),
 
 # 🚀 QT번호 매칭 추가!
-    path('api/match-management-no/', views.match_management_no, name='match_management_no'),
+    path('api/match-management-no/issued/', views.match_management_no, name='match_management_no'),
 
     # 2. 그리드의 전체 데이터를 MySQL에 저장/갱신하는 API
     path('api/save-all-to-mysql/', views.save_all_to_mysql, name='save_all_to_mysql'),
@@ -190,6 +190,9 @@ urlpatterns = [
     path('api/match-management-no/performance/', views.match_management_no_performance, name='match_performance'),
 
     path('api/get-performance-data/', views.get_performance_data, name='get_performance_data'),
+
+# 엑셀 다운로드
+    path('api/export-excel/<str:ledger_type>/', views.export_excel_view, name='export_excel'),
 
 ]
 # 아래 내용을 반드시 추가

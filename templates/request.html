@@ -197,6 +197,8 @@
 
 
 <script>
+// 그리드 API를 담을 변수
+let gridApi;    
 /**
  * ★ 18개 헤더 순서 고정 및 '담당자~의뢰번호' 틀고정 ★
  */
@@ -225,16 +227,15 @@ const columnDefs = [
     { field: "미인정", width: 80 }
 ];
 
-// 그리드 API를 담을 변수
-let gridApi;
+
 
 const gridOptions = {
     columnDefs: columnDefs,
     defaultColDef: { 
-        sortable: true, 
-        filter: true, 
-        resizable: true,
-        headerClass: 'text-center'
+    sortable: true, 
+    filter: true,    
+    resizable: true,
+    headerClass: 'text-center'
     },
     rowData: [],
     // 이 줄이 핵심입니다. 데이터 높이에 맞춰 그리드 크기가 변합니다.
@@ -306,8 +307,7 @@ function onSearch() {
             } else {
                 gridApi.setRowData(res.data);
             }
-            console.log("그리드 로드 완료:", res.data.length, "건");
-             
+            console.log("그리드 로드 완료:", res.data.length, "건");             
             // 4. [중요] 상단 빨간 테두리 합계 업데이트 호출
             updateTopSummary(res.data);
             // --- [추가된 부분] 빨간 테두리 요약 정보 업데이트 ---

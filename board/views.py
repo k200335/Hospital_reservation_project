@@ -10,6 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db import transaction  # 이 줄이 반드시 있어야 합니다!
 from selenium.webdriver.common.action_chains import ActionChains
 from django.views.decorators.csrf import csrf_exempt
+import re
 
 # 셀레늄 및 크롤링 관련
 from selenium import webdriver
@@ -44,6 +45,7 @@ from .models import transactions
 from django.shortcuts import render, get_object_or_404, redirect
 from .models import TransactionCategory
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
+import openpyxl
 
 
 
@@ -3666,15 +3668,18 @@ def get_performance_data(request):
                 
                 # 2) 날짜 포맷 변환 (2025-02-14 09:39:52 -> 2025-02-14)
                 if item.get('receive_date'):
-                    # 문자열로 변환 후 앞 10자리만 자르기
                     item['receive_date'] = str(item['receive_date'])[:10]
                 
-                # 3) test_item 및 test_standard 뒤에 " 외" 추가
+                # 3) 💡 핵심 수정: test_item 공백 축소 및 " 외" 추가
                 if item.get('test_item'):
-                    item['test_item'] = f"{item['test_item']} 외"
+                    # re.sub(r'\s+', ' ', ...) -> 모든 연속된 공백(2칸 이상 포함)을 1칸으로 변경
+                    cleaned_item = re.sub(r'\s+', ' ', str(item['test_item'])).strip()
+                    item['test_item'] = f"{cleaned_item} 외"
                 
+                # 4) 💡 test_standard도 동일하게 다중 공백을 1칸으로 변경
                 if item.get('test_standard'):
-                    item['test_standard'] = f"{item['test_standard']} 외"
+                    cleaned_standard = re.sub(r'\s+', ' ', str(item['test_standard'])).strip()
+                    item['test_standard'] = f"{cleaned_standard} 외"
                 
                 result_list.append(item)
 
@@ -3885,17 +3890,33 @@ def search_issued_ledger(request):
 
 # --------접수대장 MYSQL에서 불러오기-------------------------
 def get_receipt_data(request):
+    # 안전성을 위해 POST 요청만 허용하도록 체크
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'POST 요청만 허용됩니다.'}, status=405)
+
     try:
+        # 1. 프론트엔드에서 보낸 날짜 데이터(JSON) 파싱
+        body_data = json.loads(request.body)
+        start_date = body_data.get('start_date')
+        end_date = body_data.get('end_date')
+
+        # 날짜 데이터가 넘어오지 않았을 경우 예외 처리
+        if not start_date or not end_date:
+            return JsonResponse({'status': 'error', 'message': '조회 시작일과 종료일이 누락되었습니다.'}, status=400)
+
         # 데이터베이스 커넥션 사용
         with connections['default'].cursor() as cursor:
-            # 💡 접수대장 테이블 전체 조회
-            cursor.execute("""
+            # 💡 핵심 수정: WHERE 절을 추가하여 receipt_date 범위를 필터링합니다.
+            # SQL 인젝션 방지를 위해 %s 자리에 직접 변수를 넣지 않고, execute 메서드의 두 번째 인자로 넘깁니다.
+            query = """
                 SELECT 
                     receipt_no, receipt_date, agency, project_name, 
                     seal_name, sample_quantity, remark_management_no, req_no
                 FROM csi_receipt_ledger
+                WHERE receipt_date BETWEEN %s AND %s
                 ORDER BY receipt_date DESC
-            """)
+            """
+            cursor.execute(query, [start_date, end_date])
             
             # 컬럼명 리스트
             columns = [col[0] for col in cursor.description]
@@ -3904,8 +3925,9 @@ def get_receipt_data(request):
             rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
 
         return JsonResponse({'status': 'success', 'results': rows}, safe=False)
+        
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)})
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
     
 # --------시료관리대장 MYSQL에서 불러오기-------------------------
 @csrf_exempt
@@ -3931,9 +3953,24 @@ def search_sample_ledger(request):
             cursor.execute(sql, [start_date, end_date])
             
             columns = [col[0] for col in cursor.description]
-            rows = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            rows = cursor.fetchall()
 
-        return JsonResponse({'status': 'success', 'results': rows}, safe=False)
+            # 💡 데이터 가공 (날짜 포맷 변환)
+            result_list = []
+            for row in rows:
+                item = dict(zip(columns, row))
+                
+                # 1) 접수일 날짜 포맷 변환 (2026-06-18 11:26:17 -> 2026-06-18)
+                if item.get('receive_date'):
+                    item['receive_date'] = str(item['receive_date'])[:10]
+                
+                # 2) 발급일 날짜 포맷 변환 (혹시 모르니 발급일도 같이 처리합니다)
+                if item.get('issue_date'):
+                    item['issue_date'] = str(item['issue_date'])[:10]
+                
+                result_list.append(item)
+
+        return JsonResponse({'status': 'success', 'results': result_list}, safe=False)
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
@@ -4077,6 +4114,90 @@ def search_receipt_ledger(request):
     except Exception as e:
         if driver: driver.quit()
         return JsonResponse({'status': 'error', 'message': str(e)})
+    
+
+
+# 여기서부터 엑셀 다운로드 처리-------------------------------------------
+
+def export_excel_view(request, ledger_type):
+    """
+    각 대장별 엑셀 원본 템플릿에 프론트엔드 그리드 데이터를 매핑하여 다운로드하는 뷰
+    """
+    if request.method != 'POST':
+        return HttpResponse("Method Not Allowed", status=405)
+        
+    try:
+        # 1. 프론트엔드가 보낸 JSON 데이터 추출
+        data = json.loads(request.body)
+        items = data.get('items', [])
+        
+        # 2. 대장 타입(ledger_type)별 매핑 구성 정보 정의
+        template_config = {
+            'issued': {
+                'file': 'issued_template.xlsx',
+                'fields': ['receipt_no', 'cert_no', 'issue_date', 'seal_name', 'agency', 'project_name', 'tester', 'technical_leader', 'remark_management_no'],
+                'start_row': 2  # 💡 발급대장은 2행부터 입력
+            },
+            'receipt': {
+                'file': 'receipt_template.xlsx',
+                'fields': ['receipt_no', 'receipt_date', 'agency', 'project_name', 'seal_name', 'sample_quantity', 'remark_management_no', 'req_no'],
+                'start_row': 2  # 💡 접수대장은 2행부터 입력
+            },
+            'sample': {
+                'file': 'sample_template.xlsx',
+                'fields': ['receipt_no', 'receive_date', 'issue_date','agency','project_name','seal_name','sample_quantity','used_quantity','remaining_quantity','disposal_date','remark_management_no','req_no'],
+                'start_row': 3  # 💡 시료관리대장은 3행부터 입력
+            },
+            'performance': {
+                'file': 'performance_template.xlsx',
+                'fields': ['seq_no','receive_date','agency','project_name','seal_name','test_item','test_standard','test_result','fee','tester','technical_leader','issue_date','','remark_management_no','req_no'],
+                'start_row': 2  # 💡 시험검사실적표는 2행부터 입력
+            }
+        }
+        
+        # 입력된 타입 검증
+        config = template_config.get(ledger_type)
+        if not config:
+            return HttpResponse("유효하지 않은 대장 요청 타입입니다.", status=400)
+            
+        # 3. static/excel_templates/ 폴더 내 파일 절대 경로 생성
+        template_path = os.path.join(settings.BASE_DIR, 'static', 'excel_templates', config['file'])
+        
+        # 원본 파일 존재 여부 체크
+        if not os.path.exists(template_path):
+            return HttpResponse(f"서버에 엑셀 양식 파일이 존재하지 않습니다: {config['file']}", status=500)
+            
+        # 4. openpyxl로 원본 템플릿 엑셀 파일 로드
+        wb = openpyxl.load_workbook(template_path)
+        ws = wb.active # 첫 번째 활성화된 시트 선택
+        
+        # 💡 [핵심 수정] 하드코딩된 4 대신, 위 config에서 설정한 대장별 start_row를 동적으로 가져옵니다.
+        start_row = config.get('start_row', 4)
+        
+        # 5. 데이터 주입 로직 시행
+        for row_idx, item in enumerate(items):
+            current_row = start_row + row_idx
+            
+            # config['fields']에 나열된 순서대로 Column 1(A), Column 2(B)... 에 차례대로 삽입
+            for col_idx, field_name in enumerate(config['fields'], start=1):
+                value = item.get(field_name, '')
+                
+                # 값이 None 일 경우 빈 문자열 처리
+                if value is None:
+                    value = ''
+                    
+                ws.cell(row=current_row, column=col_idx, value=value)
+                
+        # 6. HttpResponse 오브젝트에 엑셀 파일 스트림 탑재하여 리턴
+        response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        response['Content-Disposition'] = f'attachment; filename="{ledger_type}_export.xlsx"'
+        
+        # 변경된 엑셀 데이터를 바로 다운로드 스트림에 바인딩
+        wb.save(response)
+        return response
+        
+    except Exception as e:
+        return HttpResponse(f"서버 엑셀 생성 중 에러 발생: {str(e)}", status=500)
 
 
         
