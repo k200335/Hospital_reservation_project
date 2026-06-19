@@ -3761,8 +3761,10 @@ def save_all_to_mysql(request):
                 return JsonResponse({'status': 'error', 'message': '저장할 데이터가 없습니다.'})
 
             with connections['default'].cursor() as cursor:
-                # 13개 컬럼을 모두 포함하는 쿼리
-                sql = """
+                # ----------------------------------------------------
+                # 1. 기존 csi_receipts_new 테이블 쿼리 및 파라미터
+                # ----------------------------------------------------
+                sql_receipts = """
                     INSERT INTO csi_receipts_new (
                         receipt_no, cert_no, issue_date, seal_name, agency, 
                         project_name, tester, technical_leader, remark_management_no, 
@@ -3783,8 +3785,7 @@ def save_all_to_mysql(request):
                         receive_date = VALUES(receive_date)
                 """
                 
-                # 프론트엔드에서 넘어오는 필드명을 그대로 get()으로 매핑
-                params = [
+                params_receipts = [
                     (
                         row.get('receipt_no'), row.get('cert_no'), row.get('issue_date'), 
                         row.get('seal_name'), row.get('agency'), row.get('project_name'), 
@@ -3794,9 +3795,35 @@ def save_all_to_mysql(request):
                     for row in all_rows
                 ]
                 
-                cursor.executemany(sql, params)
+                # 첫 번째 테이블 대량 저장 실행
+                cursor.executemany(sql_receipts, params_receipts)
 
-            return JsonResponse({'status': 'success', 'message': f'{len(all_rows)}건 저장/갱신 완료'})
+
+                # ----------------------------------------------------
+                # 2. 추가된 csi_issue_results 테이블 쿼리 및 파라미터
+                # ----------------------------------------------------
+                sql_results = """
+                    INSERT INTO csi_issue_results (의뢰번호, 성적서번호, 발급일자)
+                    VALUES (%s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        성적서번호 = VALUES(성적서번호),
+                        발급일자 = VALUES(발급일자)
+                """
+                
+                # 두 번째 테이블용 파라미터 맵핑 (req_no -> 의뢰번호, cert_no -> 성적서번호, issue_date -> 발급일자)
+                params_results = [
+                    (
+                        row.get('req_no'), 
+                        row.get('cert_no'), 
+                        row.get('issue_date')
+                    )
+                    for row in all_rows
+                ]
+                
+                # 두 번째 테이블 대량 저장 실행
+                cursor.executemany(sql_results, params_results)
+
+            return JsonResponse({'status': 'success', 'message': f'{len(all_rows)}건 두 테이블에 모두 저장/갱신 완료'})
 
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)})
@@ -3815,13 +3842,13 @@ def save_receipt_to_mysql(request):
             return JsonResponse({'status': 'error', 'message': '저장할 데이터가 없습니다.'})
 
         with connections['default'].cursor() as cursor:
-            # 💡 req_no를 기준으로 INSERT 또는 UPDATE 실행
+            # 💡 status 컬럼 추가 및 ON DUPLICATE KEY UPDATE 구문 확장
             sql = """
                 INSERT INTO csi_receipt_ledger (
                     receipt_no, receipt_date, agency, project_name, 
-                    seal_name, sample_quantity, remark_management_no, req_no
+                    seal_name, sample_quantity, remark_management_no, req_no, status
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON DUPLICATE KEY UPDATE
                     receipt_no = VALUES(receipt_no),
                     receipt_date = VALUES(receipt_date),
@@ -3829,14 +3856,16 @@ def save_receipt_to_mysql(request):
                     project_name = VALUES(project_name),
                     seal_name = VALUES(seal_name),
                     sample_quantity = VALUES(sample_quantity),
-                    remark_management_no = VALUES(remark_management_no)
+                    remark_management_no = VALUES(remark_management_no),
+                    status = VALUES(status)
             """
             
+            # 파라미터 리스트 맨 뒤에 row.get('status') 추가
             params = [
                 (
                     row.get('receipt_no'), row.get('receipt_date'), row.get('agency'), 
                     row.get('project_name'), row.get('seal_name'), row.get('sample_quantity'), 
-                    row.get('remark_management_no'), row.get('req_no')
+                    row.get('remark_management_no'), row.get('req_no'), row.get('status')
                 )
                 for row in items
             ]
@@ -3889,6 +3918,8 @@ def search_issued_ledger(request):
         
 
 # --------접수대장 MYSQL에서 불러오기-------------------------
+
+@csrf_exempt
 def get_receipt_data(request):
     # 안전성을 위해 POST 요청만 허용하도록 체크
     if request.method != 'POST':
@@ -3906,19 +3937,18 @@ def get_receipt_data(request):
 
         # 데이터베이스 커넥션 사용
         with connections['default'].cursor() as cursor:
-            # 💡 핵심 수정: WHERE 절을 추가하여 receipt_date 범위를 필터링합니다.
-            # SQL 인젝션 방지를 위해 %s 자리에 직접 변수를 넣지 않고, execute 메서드의 두 번째 인자로 넘깁니다.
+            # 💡 SELECT 절의 req_no 다음에 status 컬럼을 추가했습니다.
             query = """
                 SELECT 
                     receipt_no, receipt_date, agency, project_name, 
-                    seal_name, sample_quantity, remark_management_no, req_no
+                    seal_name, sample_quantity, remark_management_no, req_no, status
                 FROM csi_receipt_ledger
                 WHERE receipt_date BETWEEN %s AND %s
                 ORDER BY receipt_date DESC
             """
             cursor.execute(query, [start_date, end_date])
             
-            # 컬럼명 리스트
+            # 컬럼명 리스트 (여기서 자동으로 'status' 컬럼명도 포함됩니다.)
             columns = [col[0] for col in cursor.description]
             
             # 딕셔너리 형태로 데이터 변환
@@ -4051,13 +4081,18 @@ def search_receipt_ledger(request):
                 except TimeoutException:
                     pass # 아코디언이 없거나 이미 열려있을 경우 패스
 
-                # 상세 정보 추출 (JS 실행)
+                # 상세 정보 추출 (진행상태 스크립트 추가 🛠️)
                 script_details = """
                     var container = document.querySelector("#rqstViewAjax");
                     var rows = container.querySelectorAll("table > tbody > tr");
                     var req_no = rows[0] ? rows[0].querySelector("td:nth-child(2)").textContent.trim() : "";
                     var agency = rows[3] ? rows[3].querySelector("td:nth-child(2)").textContent.trim() : "";
-                    return [req_no, agency];
+                    
+                    // 요청하신 진행상태 CSS 선택자 적용
+                    var status_el = container.querySelector("div.table-scrollable.scrollOptionXnone > table > tbody > tr:nth-child(1) > td:nth-child(6)");
+                    var status = status_el ? status_el.textContent.trim() : "";
+                    
+                    return [req_no, agency, status];
                 """
                 details = driver.execute_script(script_details)
                 
@@ -4067,10 +4102,11 @@ def search_receipt_ledger(request):
                     'project_name': project_name,
                     'receipt_date': recv_date,
                     'req_no': details[0],
-                    'agency': details[1]
+                    'agency': details[1],
+                    'status': details[2]  # 🔥 진행상태 결과 딕셔너리에 추가
                 })
 
-                # [중요] 뒤로 가기 대신, 알려주신 '목록' 버튼을 클릭하여 페이지 상태 유지
+                # [중요] '목록' 버튼을 클릭하여 페이지 상태 유지
                 list_btn = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, "#content > div.table-bottom-control > div > div > button:nth-child(3)")))
                 driver.execute_script("arguments[0].click();", list_btn)
                 wait.until(EC.presence_of_element_located((By.ID, "endYmd"))) # 목록 화면 렌더링 대기
@@ -4081,8 +4117,6 @@ def search_receipt_ledger(request):
             print(f"--- {current_page} 페이지로 이동 시도 중 ---")
             
             try:
-                # 수정 1: normalize-space()를 써서 숫자 양옆 공백 무시
-                # 수정 2: wait.until을 사용해 요소가 화면에 나타날 때까지 넉넉히 대기
                 next_page_xpath = f"//div[contains(@class, 'paging-area')]//a[normalize-space(text())='{current_page}']"
                 next_page_btn = wait.until(EC.presence_of_element_located((By.XPATH, next_page_xpath)))
                 
@@ -4090,16 +4124,13 @@ def search_receipt_ledger(request):
                 time.sleep(2) # 테이블 갱신 대기
                 
             except TimeoutException: 
-                # NoSuchElementException 대신 TimeoutException으로 처리
                 print(f"{current_page} 페이지 번호가 안 보입니다. 다음 구간[>] 버튼을 클릭합니다.")
                 try:
-                    # 수정 3: [>] 버튼과 [>>] 버튼 중 첫 번째인 [>] 버튼을 명확히 짚어줌
                     next_block_xpath = "(//li[contains(@class, 'next')]/a)[1]"
                     next_block_btn = wait.until(EC.presence_of_element_located((By.XPATH, next_block_xpath)))
                     driver.execute_script("arguments[0].click();", next_block_btn)
                     time.sleep(2)
                     
-                    # [>] 버튼 누른 후 화면이 바뀌었으니 다시 다음 페이지 번호 찾아서 클릭
                     next_page_btn = wait.until(EC.presence_of_element_located((By.XPATH, next_page_xpath)))
                     driver.execute_script("arguments[0].click();", next_page_btn)
                     time.sleep(2)
@@ -4140,7 +4171,7 @@ def export_excel_view(request, ledger_type):
             },
             'receipt': {
                 'file': 'receipt_template.xlsx',
-                'fields': ['receipt_no', 'receipt_date', 'agency', 'project_name', 'seal_name', 'sample_quantity', 'remark_management_no', 'req_no'],
+                'fields': ['receipt_no', 'receipt_date', 'agency', 'project_name', 'seal_name', 'sample_quantity', 'remark_management_no', 'req_no', 'status'],
                 'start_row': 2  # 💡 접수대장은 2행부터 입력
             },
             'sample': {

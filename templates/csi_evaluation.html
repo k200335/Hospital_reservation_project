@@ -150,7 +150,7 @@
 ];
 
     const receiptColumnDefs = [ 
-        checkboxColumn, // 🔥 추가      
+        checkboxColumn,      
         { field: "receipt_no",         headerName: "접수번호",     width: 140, filter: 'agTextColumnFilter', sortable: true },
         { field: "receipt_date",       headerName: "접수일",       width: 130, filter: 'agDateColumnFilter', sortable: true },
         { field: "agency",             headerName: "의뢰업체명",   width: 180, filter: 'agTextColumnFilter' },
@@ -158,8 +158,12 @@
         { field: "seal_name",          headerName: "재료명",       width: 160, filter: 'agTextColumnFilter' },
         { field: "sample_quantity",    headerName: "시료량",       width: 110, filter: 'agTextColumnFilter' },
         { field: "remark_management_no", headerName: "비고(관리번호)", width: 150, filter: 'agTextColumnFilter' },
-        { field: "req_no",             headerName: "의뢰번호",     width: 140, filter: 'agTextColumnFilter', sortable: true } // 🔥 추가
-    ];
+        { field: "req_no",             headerName: "의뢰번호",     width: 140, filter: 'agTextColumnFilter', sortable: true },
+        { 
+            field: "status",           headerName: "진행상태",     width: 120, filter: 'agTextColumnFilter', 
+            cellStyle: { textAlign: 'center' }, sortable: true 
+        } // 🔥 의뢰번호 다음, 맨 마지막 열로 이동!
+];
 
     const sampleColumnDefs = [ 
         checkboxColumn, // 🔥 추가       
@@ -209,14 +213,15 @@
 
     const dummyReceiptData = [
         {   "checkbox": "", 
-            "receipt_no": "AC-2026-090078", 
-            "receipt_date": "2026-06-01", 
-            "agency": "(주)씨앤비", 
-            "project_name": "평촌처리분구 우오수 분류식화사업(호계1동)", 
-            "seal_name": "되메우기용 흙(현장밀도)", 
+            "receipt_no": "", 
+            "receipt_date": "", 
+            "agency": "", 
+            "project_name": "", 
+            "seal_name": "", 
             "sample_quantity": "", 
             "remark_management_no": "",
-            "req_no": "RQ-2026-095399" 
+            "req_no": "",
+            "status": "" 
         }
     ];
 
