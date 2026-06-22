@@ -3641,8 +3641,12 @@ def get_performance_data(request):
         start_date = data.get('start_date')
         end_date = data.get('end_date')
 
+        # 💡 1. 프론트엔드에서 보낸 검색 조건 및 검색어 추출
+        search_type = data.get('search_type')
+        search_keyword = data.get('search_keyword', '').strip()
+
         with connections['default'].cursor() as cursor:
-            # 1. MySQL에서 데이터 조회
+            # 기본 SQL 쿼리 작성 (ORDER BY 분리)
             sql = """
                 SELECT 
                     receive_date, agency, project_name, seal_name, 
@@ -3650,14 +3654,32 @@ def get_performance_data(request):
                     issue_date, remark_management_no, req_no
                 FROM csi_receipts_new
                 WHERE issue_date BETWEEN %s AND %s
-                ORDER BY issue_date DESC
             """
-            cursor.execute(sql, [start_date, end_date])
+            params = [start_date, end_date]
+
+            # 💡 2. 검색어가 입력되었을 때만 SQL 조건 동적 추가 (화이트리스트 매핑)
+            if search_keyword:
+                type_mapping = {
+                    'client_name': 'agency',                 # 의뢰기관명 -> agency 컬럼
+                    'project_name': 'project_name',           # 공사명 -> project_name 컬럼
+                    'remark_management_no': 'remark_management_no' # 관리번호 -> remark_management_no 컬럼
+                }
+                
+                db_column = type_mapping.get(search_type)
+                
+                if db_column:
+                    sql += f" AND {db_column} LIKE %s"
+                    params.append(f"%{search_keyword}%")  # 포함 검색(Like) 처리를 위해 % 추가
+
+            # 💡 3. 정렬 조건 최종 병합
+            sql += " ORDER BY issue_date DESC"
+            
+            cursor.execute(sql, params)
             
             columns = [col[0] for col in cursor.description]
             rows = cursor.fetchall()
 
-            # 2. 데이터 가공 (연번 및 시험결과 추가)
+            # 💡 4. 데이터 가공 (기존의 연번, 결과, 정규식 로직 철저히 유지)
             result_list = []
             for index, row in enumerate(rows, start=1):
                 item = dict(zip(columns, row))
@@ -3670,13 +3692,12 @@ def get_performance_data(request):
                 if item.get('receive_date'):
                     item['receive_date'] = str(item['receive_date'])[:10]
                 
-                # 3) 💡 핵심 수정: test_item 공백 축소 및 " 외" 추가
+                # 3) test_item 공백 축소 및 " 외" 추가
                 if item.get('test_item'):
-                    # re.sub(r'\s+', ' ', ...) -> 모든 연속된 공백(2칸 이상 포함)을 1칸으로 변경
                     cleaned_item = re.sub(r'\s+', ' ', str(item['test_item'])).strip()
                     item['test_item'] = f"{cleaned_item} 외"
                 
-                # 4) 💡 test_standard도 동일하게 다중 공백을 1칸으로 변경
+                # 4) test_standard도 동일하게 다중 공백을 1칸으로 변경
                 if item.get('test_standard'):
                     cleaned_standard = re.sub(r'\s+', ' ', str(item['test_standard'])).strip()
                     item['test_standard'] = f"{cleaned_standard} 외"
@@ -3884,26 +3905,51 @@ def search_issued_ledger(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
-            start_date, end_date = data.get('start_date'), data.get('end_date')
+            start_date = data.get('start_date')
+            end_date = data.get('end_date')
+            
+            # 💡 1. 프론트엔드에서 보낸 검색 조건 및 검색어 추출
+            search_type = data.get('search_type')
+            search_keyword = data.get('search_keyword', '').strip()
+
+            # 기본 SQL 쿼리 작성 (ORDER BY 분리)
+            sql = """
+                SELECT 
+                    receipt_no AS receipt_no, 
+                    cert_no AS cert_no, 
+                    issue_date AS issue_date, 
+                    seal_name AS seal_name, 
+                    agency AS agency, 
+                    project_name AS project_name, 
+                    tester AS tester, 
+                    technical_leader AS technical_leader, 
+                    remark_management_no AS remark_management_no
+                FROM csi_receipts_new 
+                WHERE issue_date BETWEEN %s AND %s
+            """
+            params = [start_date, end_date]
+
+            # 💡 2. 검색어가 입력되었을 때만 SQL 조건 동적 추가
+            if search_keyword:
+                # 프론트엔드 select value 값과 실제 DB 컬럼명 매핑 (보안을 위한 화이트리스트)
+                type_mapping = {
+                    'client_name': 'agency',                 # 의뢰기관명 -> agency 컬럼
+                    'project_name': 'project_name',           # 공사명 -> project_name 컬럼
+                    'remark_management_no': 'remark_management_no' # 관리번호 -> remark_management_no 컬럼
+                }
+                
+                db_column = type_mapping.get(search_type)
+                
+                # 매핑된 안전한 컬럼명이 존재할 때만 쿼리에 포함
+                if db_column:
+                    sql += f" AND {db_column} LIKE %s"
+                    params.append(f"%{search_keyword}%")  # 포함 검색(Like) 처리를 위해 % 추가
+
+            # 💡 3. 정렬 조건 최종 병합
+            sql += " ORDER BY issue_date DESC"
 
             with connection.cursor() as cursor:
-                # [중요] 프론트엔드 field와 일치하도록 별칭(AS) 지정
-                sql = """
-                    SELECT 
-                        receipt_no AS receipt_no, 
-                        cert_no AS cert_no, 
-                        issue_date AS issue_date, 
-                        seal_name AS seal_name, 
-                        agency AS agency, 
-                        project_name AS project_name, 
-                        tester AS tester, 
-                        technical_leader AS technical_leader, 
-                        remark_management_no AS remark_management_no
-                    FROM csi_receipts_new 
-                    WHERE issue_date BETWEEN %s AND %s 
-                    ORDER BY issue_date DESC
-                """
-                cursor.execute(sql, [start_date, end_date])
+                cursor.execute(sql, params)
                 
                 columns = [col[0] for col in cursor.description]
                 results = [dict(zip(columns, row)) for row in cursor.fetchall()]
@@ -3926,29 +3972,51 @@ def get_receipt_data(request):
         return JsonResponse({'status': 'error', 'message': 'POST 요청만 허용됩니다.'}, status=405)
 
     try:
-        # 1. 프론트엔드에서 보낸 날짜 데이터(JSON) 파싱
+        # 1. 프론트엔드에서 보낸 날짜 및 검색 데이터(JSON) 파싱
         body_data = json.loads(request.body)
         start_date = body_data.get('start_date')
         end_date = body_data.get('end_date')
+        
+        # 💡 추가: 검색 조건 및 검색어 추출
+        search_type = body_data.get('search_type')
+        search_keyword = body_data.get('search_keyword', '').strip()
 
         # 날짜 데이터가 넘어오지 않았을 경우 예외 처리
         if not start_date or not end_date:
             return JsonResponse({'status': 'error', 'message': '조회 시작일과 종료일이 누락되었습니다.'}, status=400)
 
+        # 2. 기본 SQL 쿼리 작성 (ORDER BY 분리)
+        query = """
+            SELECT 
+                receipt_no, receipt_date, agency, project_name, 
+                seal_name, sample_quantity, remark_management_no, req_no, status
+            FROM csi_receipt_ledger
+            WHERE receipt_date BETWEEN %s AND %s
+        """
+        params = [start_date, end_date]
+
+        # 💡 3. 검색어가 입력되었을 때만 SQL 조건 동적 추가 (화이트리스트 매핑)
+        if search_keyword:
+            type_mapping = {
+                'client_name': 'agency',                 # 의뢰기관명 -> agency
+                'project_name': 'project_name',           # 공사명 -> project_name
+                'remark_management_no': 'remark_management_no' # 관리번호 -> remark_management_no
+            }
+            
+            db_column = type_mapping.get(search_type)
+            
+            if db_column:
+                query += f" AND {db_column} LIKE %s"
+                params.append(f"%{search_keyword}%")  # 포함(Like) 검색을 위해 % 추가
+
+        # 💡 4. 정렬 조건 최종 병합
+        query += " ORDER BY receipt_date DESC"
+
         # 데이터베이스 커넥션 사용
         with connections['default'].cursor() as cursor:
-            # 💡 SELECT 절의 req_no 다음에 status 컬럼을 추가했습니다.
-            query = """
-                SELECT 
-                    receipt_no, receipt_date, agency, project_name, 
-                    seal_name, sample_quantity, remark_management_no, req_no, status
-                FROM csi_receipt_ledger
-                WHERE receipt_date BETWEEN %s AND %s
-                ORDER BY receipt_date DESC
-            """
-            cursor.execute(query, [start_date, end_date])
+            cursor.execute(query, params)
             
-            # 컬럼명 리스트 (여기서 자동으로 'status' 컬럼명도 포함됩니다.)
+            # 컬럼명 리스트
             columns = [col[0] for col in cursor.description]
             
             # 딕셔너리 형태로 데이터 변환
@@ -3970,22 +4038,44 @@ def search_sample_ledger(request):
         start_date = data.get('start_date')
         end_date = data.get('end_date')
 
+        # 💡 1. 프론트엔드에서 보낸 검색 조건 및 검색어 추출
+        search_type = data.get('search_type')
+        search_keyword = data.get('search_keyword', '').strip()
+
+        # 시료관리대장용 기본 SQL 작성 (ORDER BY 분리)
+        sql = """
+            SELECT 
+                receipt_no, receive_date, issue_date, agency, project_name, 
+                seal_name, remark_management_no, req_no
+            FROM csi_receipts_new
+            WHERE issue_date BETWEEN %s AND %s
+        """
+        params = [start_date, end_date]
+
+        # 💡 2. 검색어가 입력되었을 때만 SQL 조건 동적 추가 (화이트리스트 매핑)
+        if search_keyword:
+            type_mapping = {
+                'client_name': 'agency',                 # 의뢰기관명 -> agency 컬럼
+                'project_name': 'project_name',           # 공사명 -> project_name 컬럼
+                'remark_management_no': 'remark_management_no' # 관리번호 -> remark_management_no 컬럼
+            }
+            
+            db_column = type_mapping.get(search_type)
+            
+            if db_column:
+                sql += f" AND {db_column} LIKE %s"
+                params.append(f"%{search_keyword}%")  # 포함 검색(Like) 처리를 위해 % 추가
+
+        # 💡 3. 정렬 조건 최종 병합
+        sql += " ORDER BY issue_date DESC"
+
         with connections['default'].cursor() as cursor:
-            # 시료관리대장용 필드만 선택하여 조회
-            sql = """
-                SELECT 
-                    receipt_no, receive_date, issue_date, agency, project_name, 
-                    seal_name, remark_management_no, req_no
-                FROM csi_receipts_new
-                WHERE issue_date BETWEEN %s AND %s
-                ORDER BY issue_date DESC
-            """
-            cursor.execute(sql, [start_date, end_date])
+            cursor.execute(sql, params)
             
             columns = [col[0] for col in cursor.description]
             rows = cursor.fetchall()
 
-            # 💡 데이터 가공 (날짜 포맷 변환)
+            # 💡 4. 데이터 가공 (기존 날짜 포맷 변환 로직 유지)
             result_list = []
             for row in rows:
                 item = dict(zip(columns, row))
@@ -3994,7 +4084,7 @@ def search_sample_ledger(request):
                 if item.get('receive_date'):
                     item['receive_date'] = str(item['receive_date'])[:10]
                 
-                # 2) 발급일 날짜 포맷 변환 (혹시 모르니 발급일도 같이 처리합니다)
+                # 2) 발급일 날짜 포맷 변환
                 if item.get('issue_date'):
                     item['issue_date'] = str(item['issue_date'])[:10]
                 
