@@ -87,9 +87,29 @@
 
     #bizmekaGrid { width: 100%; height: 100%; }
 
-    /* AG-Grid 높이 최적화 */
-    .ag-header { min-height: 35px !important; height: 35px !important; }
-    .ag-theme-quartz { --ag-grid-size: 4px; --ag-list-item-height: 25px; } /* 행 간격 축소 */
+ /* ... 기존의 다른 스타일들 (body, main-wrapper 등)은 그대로 두고 ... */
+
+#bizmekaGrid { width: 100%; height: 100%; }
+
+/* [기존 두 줄을 지우고 아래 내용으로 완전히 교체] */
+.ag-theme-quartz { 
+    --ag-grid-size: 4px; 
+    --ag-list-item-height: 25px; 
+    --ag-header-height: 25%; /* 공식 변수로 높이 지정하여 내부 레이아웃 깨짐 방지 */
+}
+
+/* 헤더 내부 글자 세로 중앙 정렬 및 잘림 방지 */
+.ag-theme-quartz .ag-header-cell-label {
+    display: flex;
+    align-items: center;
+    line-height: 1 !important; 
+}
+
+/* 헤더 밑의 회색 선 제거 */
+.ag-theme-quartz .ag-header,
+.ag-theme-quartz .ag-header-row {
+    border-bottom: none !important;
+}
 
 
 </style>
@@ -199,7 +219,10 @@
                         <option value="위재완">위재완</option>
                         <option value="양지훈">양지훈</option>
                         <option value="권석규">권석규</option>
+                        <option value="김태환">김태환</option>
                         <option value="오범석">오범석</option>
+                        <option value="장재민">장재민</option>
+                        <option value="양호승">양호승</option>
                     </select>
 
                     <button onclick="loadFinishedData()" class="btn btn-primary btn-sm py-0 fw-bold" style="font-size: 0.75rem;">불러오기</button>
@@ -374,6 +397,9 @@
                                 <option value="양지훈">양지훈</option>
                                 <option value="권석규">권석규</option>
                                 <option value="오범석">오범석</option>
+                                <option value="김태환">김태환</option>
+                                <option value="장재민">장재민</option>
+                                <option value="양호승">양호승</option>
                             </select>
                         </div>
 
