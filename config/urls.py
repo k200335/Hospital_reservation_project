@@ -194,6 +194,11 @@ urlpatterns = [
 # 엑셀 다운로드
     path('api/export-excel/<str:ledger_type>/', views.export_excel_view, name='export_excel'),
 
+    path('calibration/', views.calibration_main, name='calibration_main'),
+
+
+
+
 ]
 # 아래 내용을 반드시 추가
 if settings.DEBUG:

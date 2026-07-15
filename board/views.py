@@ -4323,5 +4323,13 @@ def export_excel_view(request, ledger_type):
 
         
         # ----------------------여기까지 적정성 평가------------end
+
+# ----------------------여기부터 교정성적서 보정------------str
+def calibration_main(request):
+    """1. 장비교정 자동화 메인 화면을 열어주는 뷰 (임시)"""
+    from django.shortcuts import render
+    return render(request, 'calibration.html')
+
+# ----------------------여기부터 교정성적서 보정------------end
         
 

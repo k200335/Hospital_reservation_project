@@ -1,0 +1,259 @@
+{% extends "base.html" %}
+{% block content %}
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>장비교정 자동화 - 한국건설품질시험원(주)</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@31.3.0/dist/ag-grid-community.min.js"></script>    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.3.0/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@31.3.0/styles/ag-theme-alpine.css">
+
+    <style>
+        /* 좌측 사이드바 및 아이템 스타일 */
+        .sub-eq-item {
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+            padding: 3px 6px;
+            border-radius: 4px;
+        }
+        .sub-eq-item:hover {
+            background-color: #e2eafc;
+            color: #0d6efd !important;
+            font-weight: 600;
+        }
+        .sub-eq-item.active {
+            background-color: #0d6efd;
+            color: #ffffff !important;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid p-0">
+    <div class="row g-0">
+        
+        <div class="col-md-3 col-lg-3 border-end bg-light p-0" style="min-height: calc(100vh - 120px);">
+            
+            <div class="bg-primary text-white fw-bold p-3 fs-6">
+                <i class="bi bi-cpu me-1"></i> 교정성적서 보정관리
+            </div>
+
+            <div class="p-3 border-bottom bg-white">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="fw-bold small text-dark"><i class="bi bi-search me-1"></i>장비 검색</span>
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="form-check form-switch m-0" style="min-height: auto;">
+                            <input class="form-check-input" type="checkbox" id="activeOnlySwitch" checked style="cursor: pointer;">
+                            <label class="form-check-label small text-muted" for="activeOnlySwitch" style="font-size: 11px;">사용중만</label>
+                        </div>
+                        <button class="btn btn-sm btn-success py-1 px-2 d-flex align-items-center gap-1" title="신규 장비 등록">
+                            <i class="bi bi-person-plus-fill"></i>+
+                        </button>
+                    </div>
+                </div>
+                <div class="input-group input-group-sm">
+                    <input type="text" id="eqSearchInput" class="form-control border-primary" placeholder="장비명 검색">
+                    <button class="btn btn-primary px-3" type="button"><i class="bi bi-search"></i></button>
+                </div>
+            </div>
+
+            <div class="p-3" style="max-height: calc(100vh - 260px); overflow-y: auto;">
+                
+                <div class="card border-primary mb-3 shadow-sm" style="border-radius: 8px; background-color: #f4f8ff;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">[300kN_1] 300kN 만능재료시험기</h6>
+                            <span class="badge bg-primary" style="font-size: 10px;">정상</span>
+                        </div>
+                        <p class="text-muted mb-2" style="font-size: 11px;">
+                            <i class="bi bi-telephone me-1"></i>031-999-8888 | 교정일: 2026-01-15
+                        </p>
+                        
+                        <div class="border-top pt-2" style="font-size: 12px;">
+                            <div class="text-primary text-truncate sub-eq-item mb-1" 
+                                 onclick="selectSubEquipment(this, '300kN 만능재료시험기 - [100kN 로드셀]', '300kN_1', '100kN_Cell')">
+                                &nbsp;ㄴ [100kN 로드셀] 인장/압축 보정구간
+                            </div>
+                            <div class="text-primary text-truncate sub-eq-item" 
+                                 onclick="selectSubEquipment(this, '300kN 만능재료시험기 - [300kN 로드셀]', '300kN_1', '300kN_Cell')">
+                                &nbsp;ㄴ [300kN 로드셀] 고하중 보정구간
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-secondary mb-3 shadow-sm" style="border-radius: 8px; background-color: #f8f9fa;">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">[500kN_C] 콘크리트 압축시험기</h6>
+                            <span class="badge bg-secondary" style="font-size: 10px;">예비</span>
+                        </div>
+                        <p class="text-muted mb-2" style="font-size: 11px;">
+                            <i class="bi bi-gear me-1"></i>KS F 2405 | 교정일: 2025-11-20
+                        </p>
+                        <div class="border-top pt-2" style="font-size: 12px;">
+                            <div class="text-primary text-truncate sub-eq-item" 
+                                 onclick="selectSubEquipment(this, '콘크리트 압축시험기 - [메인 압축센서]', '500kN_C', 'Main_Sensor')">
+                                &nbsp;ㄴ [메인 압축센서] 단일 구간 보정
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="col-md-9 col-lg-9 p-4 bg-white" style="min-height: calc(100vh - 120px);">
+            
+            <div class="card shadow-sm border-0 mb-4" style="border: 1px solid #dee2e6 !important;">
+                <div class="card-body p-4">
+                    
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+                        <div>
+                            <span class="text-muted small fw-bold me-2" id="headerEqCode">선택된 장비 없음</span>
+                            <span class="text-muted small" id="headerEqStatus">좌측 목록에서 장비를 선택해주세요.</span>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-outline-primary px-3" onclick="alert('엑셀 성적서 업로드 기능 연동')">
+                                <i class="bi bi-file-earmark-arrow-up me-1"></i> 교정성적서 업로드
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary px-3" onclick="alert('보정값 엑셀 다운로드')">
+                                <i class="bi bi-file-earmark-excel me-1"></i> 양식 다운로드
+                            </button>
+                        </div>
+                    </div>
+
+                    <h4 class="fw-bold text-primary mb-3" id="displayEqTitle">
+                        좌측 리스트에서 장비(로드셀)를 클릭해주세요.
+                    </h4>
+
+                    <div id="equipmentDetailArea">
+                        
+                        <div id="emptySelectGuide" class="text-center py-5 bg-light border rounded">
+                            <i class="bi bi-arrow-left-circle fs-2 text-muted mb-2 d-block"></i>
+                            <p class="text-muted small mb-0">해당 장비의 보정 구간(지시하중/기준하중)을 조회하거나 수정하려면<br>좌측 파란색 장비 이름을 클릭하세요.</p>
+                        </div>
+
+                        <div id="gridContainer" style="display: none;">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="small fw-bold text-dark"><i class="bi bi-table me-1"></i>구간별 선형보간 기준점 데이터</span>
+                                <button class="btn btn-sm btn-primary py-0" onclick="saveCalibrationData()">변경사항 저장</button>
+                            </div>
+                            <div id="calibrationGrid" class="ag-theme-alpine" style="height: 380px; width: 100%;"></div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // 전역 변수: AG-Grid 인스턴스 및 현재 선택된 장비 정보
+    let gridOptions = null;
+    let currentEqCode = "";
+    let currentSubCode = "";
+
+    /**
+     * 좌측 파란색 장비 이름을 마우스로 클릭했을 때 실행되는 핵심 함수
+     */
+    function selectSubEquipment(element, titleName, eqCode, subCode) {
+        // 1. 기존에 선택된 아이템의 하이라이트(active 클래스) 제거
+        document.querySelectorAll('.sub-eq-item').forEach(el => {
+            el.classList.remove('active');
+        });
+        
+        // 2. 현재 클릭한 아이템에 하이라이트 적용 (파란색 바탕 + 흰 글씨)
+        element.classList.add('active');
+
+        // 3. 우측 상단 파란색 타이틀 글씨 및 정보 업데이트 (image_246bdc.png 스타일 반영)
+        document.getElementById('displayEqTitle').textContent = titleName;
+        document.getElementById('headerEqCode').textContent = "장비코드: [" + eqCode + "]";
+        document.getElementById('headerEqStatus').textContent = "서브센서: " + subCode;
+
+        // 4. 비어있던 안내 텍스트를 숨기고, AG-Grid 테이블 창을 표시
+        document.getElementById('emptySelectGuide').style.display = 'none';
+        document.getElementById('gridContainer').style.display = 'block';
+
+        // 5. 선택된 장비 정보를 전역 변수에 저장
+        currentEqCode = eqCode;
+        currentSubCode = subCode;
+
+        // 6. 해당 장비의 교정 데이터를 서버(또는 가상 데이터)에서 불러와 그리드에 띄움
+        loadCalibrationGridData(eqCode, subCode);
+    }
+
+    /**
+     * 선택한 장비의 보정 구간 데이터를 불러와 AG-Grid 테이블을 그리는 함수
+     */
+    function loadCalibrationGridData(eqCode, subCode) {
+        const gridDiv = document.querySelector('#calibrationGrid');
+        
+        // 이미 생성된 그리드가 있다면 데이터만 새것으로 업데이트
+        if (gridOptions && gridOptions.api) {
+            gridOptions.api.setRowData(getMockData(eqCode, subCode));
+            return;
+        }
+
+        // AG-Grid 컬럼 및 옵션 최초 설정
+        gridOptions = {
+            columnDefs: [
+                { headerName: "순번", field: "id", width: 80, textAlign: "center" },
+                { headerName: "지시하중 (X, 계측값)", field: "raw_val", editable: true, flex: 1 },
+                { headerName: "기준하중 (Y, 성적서 보정값)", field: "std_val", editable: true, flex: 1 },
+                { headerName: "보정 오차(%)", valueGetter: "((data.std_val - data.raw_val) / data.raw_val * 100).toFixed(2) + '%'", width: 150 }
+            ],
+            defaultColDef: {
+                resizable: true,
+                sortable: true
+            },
+            rowData: getMockData(eqCode, subCode)
+        };
+
+        new agGrid.Grid(gridDiv, gridOptions);
+    }
+
+    /**
+     * 테스트용 가상 보정 데이터를 반환하는 함수 (추후 Django API fetch로 교체할 부분)
+     */
+    function getMockData(eqCode, subCode) {
+        if (subCode === '100kN_Cell') {
+            return [
+                { id: 1, raw_val: 0.0, std_val: 0.0 },
+                { id: 2, raw_val: 20.0, std_val: 20.12 },
+                { id: 3, raw_val: 50.0, std_val: 50.35 },
+                { id: 4, raw_val: 100.0, std_val: 100.80 }
+            ];
+        } else if (subCode === '300kN_Cell') {
+            return [
+                { id: 1, raw_val: 0.0, std_val: 0.0 },
+                { id: 2, raw_val: 100.0, std_val: 101.50 },
+                { id: 3, raw_val: 200.0, std_val: 202.80 },
+                { id: 4, raw_val: 300.0, std_val: 304.10 }
+            ];
+        } else {
+            return [
+                { id: 1, raw_val: 10.0, std_val: 10.05 },
+                { id: 2, raw_val: 50.0, std_val: 50.15 }
+            ];
+        }
+    }
+
+    function saveCalibrationData() {
+        alert("현재 그리드의 보정 데이터가 [" + currentEqCode + "] 장비 DB로 저장됩니다.");
+    }
+</script>
+
+</body>
+</html>
+{% endblock %}
