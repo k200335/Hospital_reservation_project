@@ -11,6 +11,7 @@ from django.conf.urls.static import static
 # board 앱의 views를 정확하게 가져옵니다.
 from board import views 
 
+
 # 1. 회원가입 로직 (별도 파일로 분리하지 않았다면 여기에 유지)
 def signup(request):
     if request.method == 'POST':
@@ -196,6 +197,20 @@ urlpatterns = [
 
     path('calibration/', views.calibration_main, name='calibration_main'),
 
+    # 2. 장비 및 하위항목 API URL
+    # ==========================================
+    # ① 좌측 사이드바 장비 목록 트리 조회 API (GET)
+    # 2. 좌측 사이드바 장비 목록 트리 조회 API (GET)
+    path('api/equipment/list/', views.get_equipment_list, name='api_equipment_list'),
+
+    # 3. 신규 메인장비 및 하위장비(7번 기준하중 표 포함) 저장 API (POST)
+    path('api/equipment/save/', views.save_equipment_to_mysql, name='api_equipment_save'),
+
+    # 4. 우측 AG-Grid 테이블에서 수정한 보정 데이터 DB 저장 API (POST)
+    path('api/calibration/save/', views.save_calibration_grid_data, name='api_calibration_save'),
+    
+    # [추가] 교정성적서 상세 스펙 수정 API 경로
+    path('api/equipment/update-spec/', views.update_equipment_spec, name='update_equipment_spec'),
 
 
 

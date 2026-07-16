@@ -40,8 +40,9 @@
         
         <div class="col-md-3 col-lg-3 border-end bg-light p-0" style="min-height: calc(100vh - 120px);">
             
-            <div class="bg-primary text-white fw-bold p-3 fs-6">
-                <i class="bi bi-cpu me-1"></i> 교정성적서 보정관리
+            <div class="bg-primary text-white fw-bold p-3 fs-6 d-flex align-items-center justify-content-between">
+                <span><i class="bi bi-cpu me-1"></i> 교정성적서 보정관리</span>
+                <span class="badge bg-light text-primary" style="font-size: 11px;">v2.0</span>
             </div>
 
             <div class="p-3 border-bottom bg-white">
@@ -49,64 +50,27 @@
                     <span class="fw-bold small text-dark"><i class="bi bi-search me-1"></i>장비 검색</span>
                     <div class="d-flex align-items-center gap-2">
                         <div class="form-check form-switch m-0" style="min-height: auto;">
-                            <input class="form-check-input" type="checkbox" id="activeOnlySwitch" checked style="cursor: pointer;">
-                            <label class="form-check-label small text-muted" for="activeOnlySwitch" style="font-size: 11px;">사용중만</label>
+                            <input class="form-check-input" type="checkbox" id="subModeSwitch" style="cursor: pointer;">
+                            <label class="form-check-label fw-bold" for="subModeSwitch" style="font-size: 11px; color: #0d6efd;">하위장비 등록</label>
                         </div>
-                        <button class="btn btn-sm btn-success py-1 px-2 d-flex align-items-center gap-1" title="신규 장비 등록">
-                            <i class="bi bi-person-plus-fill"></i>+
+                        <button class="btn btn-sm btn-success py-1 px-2 d-flex align-items-center gap-1 shadow-sm" onclick="openRegistrationModal()" title="장비 등록">
+                            <i class="bi bi-plus-lg"></i>+
                         </button>
                     </div>
                 </div>
                 <div class="input-group input-group-sm">
-                    <input type="text" id="eqSearchInput" class="form-control border-primary" placeholder="장비명 검색">
-                    <button class="btn btn-primary px-3" type="button"><i class="bi bi-search"></i></button>
+                    <input type="text" id="eqSearchInput" class="form-control border-primary" 
+                        placeholder="장비명 또는 코드 검색..." 
+                        onkeyup="handleSearchKeyup(event)">
+                    
+                    <button class="btn btn-primary px-3" type="button" onclick="executeSearch()" title="검색">
+                        <i class="bi bi-search"></i>
+                    </button>
                 </div>
             </div>
 
-            <div class="p-3" style="max-height: calc(100vh - 260px); overflow-y: auto;">
-                
-                <div class="card border-primary mb-3 shadow-sm" style="border-radius: 8px; background-color: #f4f8ff;">
-                    <div class="card-body p-3">
-                        <div class="d-flex justify-content-between align-items-start mb-1">
-                            <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">[300kN_1] 300kN 만능재료시험기</h6>
-                            <span class="badge bg-primary" style="font-size: 10px;">정상</span>
-                        </div>
-                        <p class="text-muted mb-2" style="font-size: 11px;">
-                            <i class="bi bi-telephone me-1"></i>031-999-8888 | 교정일: 2026-01-15
-                        </p>
-                        
-                        <div class="border-top pt-2" style="font-size: 12px;">
-                            <div class="text-primary text-truncate sub-eq-item mb-1" 
-                                 onclick="selectSubEquipment(this, '300kN 만능재료시험기 - [100kN 로드셀]', '300kN_1', '100kN_Cell')">
-                                &nbsp;ㄴ [100kN 로드셀] 인장/압축 보정구간
-                            </div>
-                            <div class="text-primary text-truncate sub-eq-item" 
-                                 onclick="selectSubEquipment(this, '300kN 만능재료시험기 - [300kN 로드셀]', '300kN_1', '300kN_Cell')">
-                                &nbsp;ㄴ [300kN 로드셀] 고하중 보정구간
-                            </div>
-                        </div>
-                    </div>
+            <div id="sidebarEquipmentList" class="p-3" style="max-height: calc(100vh - 260px); overflow-y: auto;">
                 </div>
-
-                <div class="card border-secondary mb-3 shadow-sm" style="border-radius: 8px; background-color: #f8f9fa;">
-                    <div class="card-body p-3">
-                        <div class="d-flex justify-content-between align-items-start mb-1">
-                            <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">[500kN_C] 콘크리트 압축시험기</h6>
-                            <span class="badge bg-secondary" style="font-size: 10px;">예비</span>
-                        </div>
-                        <p class="text-muted mb-2" style="font-size: 11px;">
-                            <i class="bi bi-gear me-1"></i>KS F 2405 | 교정일: 2025-11-20
-                        </p>
-                        <div class="border-top pt-2" style="font-size: 12px;">
-                            <div class="text-primary text-truncate sub-eq-item" 
-                                 onclick="selectSubEquipment(this, '콘크리트 압축시험기 - [메인 압축센서]', '500kN_C', 'Main_Sensor')">
-                                &nbsp;ㄴ [메인 압축센서] 단일 구간 보정
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
         </div>
 
         <div class="col-md-9 col-lg-9 p-4 bg-white" style="min-height: calc(100vh - 120px);">
@@ -137,13 +101,56 @@
                         
                         <div id="emptySelectGuide" class="text-center py-5 bg-light border rounded">
                             <i class="bi bi-arrow-left-circle fs-2 text-muted mb-2 d-block"></i>
-                            <p class="text-muted small mb-0">해당 장비의 보정 구간(지시하중/기준하중)을 조회하거나 수정하려면<br>좌측 파란색 장비 이름을 클릭하세요.</p>
+                            <p class="text-muted small mb-0">해당 장비의 보정 구간(지시하중/기준하중)을 조회하거나 수정하려면<br>좌측 파란색 하위항목(ㄴ [코드] 이름)을 클릭하세요.</p>
+                        </div>
+
+                        <div id="subEqSpecBox" class="p-3 mb-4 bg-light border rounded" style="display: none; background-color: #f8fbfd !important; border-color: #cce5ff !important;">
+                            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
+                                <h6 class="fw-bold text-dark mb-0" style="font-size: 13px;">
+                                    <i class="bi bi-file-earmark-check-fill text-primary me-1"></i> 교정성적서 상세 스펙 (수정 가능)
+                                </h6>
+                                <button class="btn btn-sm btn-primary py-0 px-2" onclick="saveSpecData()" style="font-size: 11px;">
+                                    <i class="bi bi-save me-1"></i> 스펙 수정 저장
+                                </button>
+                            </div>
+                            
+                            <div class="row g-2" style="font-size: 12px;">
+                                <div class="col-md-4">
+                                    <span class="text-muted d-block mb-1">교정성적서번호:</span>
+                                    <input type="text" id="specCertNo" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-4">
+                                    <span class="text-muted d-block mb-1">발행기관:</span>
+                                    <input type="text" id="specIssuedBy" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-4">
+                                    <span class="text-muted d-block mb-1">정격용량:</span>
+                                    <input type="text" id="specCapacity" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-4">
+                                    <span class="text-muted d-block mb-1">교정일자:</span>
+                                    <input type="date" id="specDate" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-4">
+                                    <span class="text-muted d-block mb-1">교정만료일:</span>
+                                    <input type="date" id="specExpireDate" class="form-control form-control-sm">
+                                    <div id="expiryWarning" class="mt-1 fw-bold" style="font-size: 11px; display: none;"></div>
+                                </div>
+                                <div class="col-md-4">
+                                    <span class="text-muted d-block mb-1">기준하중 데이터 수:</span>
+                                    <input type="text" id="specLoadCount" class="form-control form-control-sm" readonly style="background:#eee;">
+                                </div>
+                            </div>
                         </div>
 
                         <div id="gridContainer" style="display: none;">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="small fw-bold text-dark"><i class="bi bi-table me-1"></i>구간별 선형보간 기준점 데이터</span>
-                                <button class="btn btn-sm btn-primary py-0" onclick="saveCalibrationData()">변경사항 저장</button>
+                                <div class="d-flex gap-1">
+                                <button class="btn btn-sm btn-outline-success py-0 px-2" onclick="addGridRow()"><i class="bi bi-plus"></i> 행 추가</button>
+                                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteGridRow()"><i class="bi bi-trash"></i> 행 삭제</button>
+                                <button class="btn btn-sm btn-primary py-0 px-3" onclick="saveCalibrationData()">변경사항 DB 저장</button>
+                            </div>
                             </div>
                             <div id="calibrationGrid" class="ag-theme-alpine" style="height: 380px; width: 100%;"></div>
                         </div>
@@ -158,100 +165,795 @@
     </div>
 </div>
 
+<div class="modal fade" id="regModal" tabindex="-1" aria-labelledby="regModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            
+            <div class="modal-header bg-primary text-white py-3">
+                <h5 class="modal-title fw-bold fs-6" id="regModalLabel">
+                    <i class="bi bi-plus-circle me-1"></i> 장비 및 하위항목 등록
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+
+            <div class="modal-body p-4 text-dark" style="font-size: 13px;">
+                
+                <div id="mainRegFormArea">
+                    <div class="alert alert-primary py-2 px-3 mb-3" style="font-size: 12px;">
+                        💡 <strong>메인장비</strong>는 상위 그룹 역할을 합니다. 장비명만 입력하여 간편하게 생성하세요.
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">1. 장비명 <span class="text-danger">*</span></label>
+                        <input type="text" id="mainNameInput" class="form-control form-control-sm" placeholder="예: 300kN 만능재료시험기">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">2. 상태</label>
+                        <select id="mainStatusInput" class="form-select form-select-sm">
+                            <option value="정상">정상</option>
+                            <option value="예비">예비</option>
+                            <option value="수리중">수리중</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div id="subRegFormArea" style="display: none;">
+                    
+                    <div class="bg-light p-3 rounded border mb-3">
+                        <label class="form-label fw-bold text-primary mb-1">대상 메인장비 선택 <span class="text-danger">*</span></label>
+                        <select id="subParentSelect" class="form-select form-select-sm fw-bold text-primary">
+                        </select>
+                    </div>
+
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">1. 장비코드 <span class="text-danger">*</span></label>
+                            <input type="text" id="subCodeInput" class="form-control form-control-sm" placeholder="예: LC-100kN">
+                        </div>
+                                    
+                    </div>
+
+                    <div class="row g-3 mb-2">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">2. 교정성적서번호 <span class="text-danger">*</span></label>
+                            <input type="text" id="subCertNoInput" class="form-control form-control-sm" placeholder="예: CAL-2026-0001">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">3. 발행기관 <span class="text-danger">*</span></label>
+                            <input type="text" id="subIssuedByInput" class="form-control form-control-sm" placeholder="예: 한국산업기술시험원(KTL)">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">4. 교정일 <span class="text-danger">*</span></label>
+                            <input type="date" id="subDateInput" class="form-control form-control-sm" value="2026-01-15">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">5. 교정만료일 <span class="text-danger">*</span></label>
+                            <input type="date" id="subExpireDateInput" class="form-control form-control-sm" value="2027-01-14">
+                        </div>
+                        
+                        <div id="stageWrapper">
+                            <label class="form-label fw-bold text-primary">6. 단(Stage) 및 하중 데이터 관리</label>
+                            <div id="stageContainer"></div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addStageBlock()">
+                                <i class="bi bi-plus-circle"></i> 단(Stage) 추가하기
+                            </button>
+                        </div>        
+
+                    </div>
+
+                    <div class="border-top pt-3">
+                        <div class="d-flex justify-content-between align-items-end mb-2">
+                            <label class="form-label fw-bold mb-0">7. 지시하중 / 기준하중 (kN) 테이블 <span class="text-danger">*</span></label>
+                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" onclick="addLoadRow()" style="font-size: 11px;">
+                                <i class="bi bi-plus"></i> 행 추가
+                            </button>
+                        </div>
+                        
+                        <div class="table-responsive border rounded" style="max-height: 200px; overflow-y: auto;">
+                            <table class="table table-sm table-bordered text-center mb-0" style="font-size: 12px;">
+                                <thead class="table-light sticky-top">
+                                    <tr>
+                                        <th style="width: 50px;">No.</th>
+                                        <th>지시하중 (kN)</th>
+                                        <th>기준하중 (kN)</th>
+                                        <th style="width: 50px;">삭제</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="loadTableBody">
+                                    </tbody>
+                            </table>
+                        </div>
+                        <small class="text-muted" style="font-size: 11px;">* 성적서의 지시하중(X)과 기준하중(Y)을 쌍으로 입력해주세요.</small>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="modal-footer bg-light py-2">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-sm btn-primary px-4 fw-bold" onclick="saveRegistrationData()">저장하기</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-    // 전역 변수: AG-Grid 인스턴스 및 현재 선택된 장비 정보
+    // ==========================================
+    // 1. 전역 변수 설정
+    // ==========================================
     let gridOptions = null;
     let currentEqCode = "";
     let currentSubCode = "";
+    let regModalInstance = null;
+    let dbEquipmentList = []; // MySQL DB에서 로드한 데이터를 보관하는 배열
 
-    /**
-     * 좌측 파란색 장비 이름을 마우스로 클릭했을 때 실행되는 핵심 함수
-     */
-    function selectSubEquipment(element, titleName, eqCode, subCode) {
-        // 1. 기존에 선택된 아이템의 하이라이트(active 클래스) 제거
-        document.querySelectorAll('.sub-eq-item').forEach(el => {
-            el.classList.remove('active');
-        });
+    // 페이지 로드 시 실행
+    document.addEventListener("DOMContentLoaded", function() {
+        const modalEl = document.getElementById('regModal');
+        if (modalEl) regModalInstance = new bootstrap.Modal(modalEl);
         
-        // 2. 현재 클릭한 아이템에 하이라이트 적용 (파란색 바탕 + 흰 글씨)
-        element.classList.add('active');
+        fetchEquipmentListFromDB(); // 1. 로딩 즉시 MySQL DB에서 장비목록 호출
+        initLoadTable(); // 모달 내 7번 지시/기준하중 기본 6개 구간 세팅
+    });
 
-        // 3. 우측 상단 파란색 타이틀 글씨 및 정보 업데이트 (image_246bdc.png 스타일 반영)
-        document.getElementById('displayEqTitle').textContent = titleName;
-        document.getElementById('headerEqCode').textContent = "장비코드: [" + eqCode + "]";
-        document.getElementById('headerEqStatus').textContent = "서브센서: " + subCode;
-
-        // 4. 비어있던 안내 텍스트를 숨기고, AG-Grid 테이블 창을 표시
-        document.getElementById('emptySelectGuide').style.display = 'none';
-        document.getElementById('gridContainer').style.display = 'block';
-
-        // 5. 선택된 장비 정보를 전역 변수에 저장
-        currentEqCode = eqCode;
-        currentSubCode = subCode;
-
-        // 6. 해당 장비의 교정 데이터를 서버(또는 가상 데이터)에서 불러와 그리드에 띄움
-        loadCalibrationGridData(eqCode, subCode);
+    // ==========================================
+    // 2. MySQL DB에서 장비 리스트를 불러와 사이드바 렌더링
+    // ==========================================
+    function fetchEquipmentListFromDB() {
+        fetch('/api/equipment/list/')
+            .then(response => response.json())
+            .then(res => {
+                if (res.status === 'success') {
+                    dbEquipmentList = res.data || [];
+                    renderSidebar();
+                } else {
+                    console.error("데이터 로드 실패:", res.message);
+                }
+            })
+            .catch(error => {
+                console.error("API 호출 오류:", error);
+                const container = document.getElementById('sidebarEquipmentList');
+                if (container) {
+                    container.innerHTML = '<div class="text-center text-muted p-4">DB에 연결할 수 없습니다.</div>';
+                }
+            });
     }
 
-    /**
-     * 선택한 장비의 보정 구간 데이터를 불러와 AG-Grid 테이블을 그리는 함수
-     */
-    function loadCalibrationGridData(eqCode, subCode) {
-        const gridDiv = document.querySelector('#calibrationGrid');
+    function renderSidebar(filterText = "") {
+    const container = document.getElementById('sidebarEquipmentList');
+    if (!container) return;
+    container.innerHTML = "";
+
+    if (!dbEquipmentList || dbEquipmentList.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted p-4 small">등록된 장비가 없습니다.</div>';
+        return;
+    }
+
+    const q = filterText.trim().toLowerCase();
+
+    dbEquipmentList.forEach(eq => {
+        // 검색 조건: 장비명 또는 하위 장비 코드/이름
+        const matchMain = (eq.name || "").toLowerCase().includes(q) || (eq.id || "").toLowerCase().includes(q);
+        const matchSub = (eq.subItems || []).some(sub => (sub.name || "").toLowerCase().includes(q) || (sub.code || "").toLowerCase().includes(q));
+
+        if (!matchMain && !matchSub) return;
+
+        const badgeClass = eq.status === '정상' ? 'bg-primary' : 'bg-secondary';
+        const bgStyle = eq.status === '정상' ? 'background-color: #f4f8ff;' : 'background-color: #f8f9fa;';
+
+        let subHtml = "";
+        (eq.subItems || []).forEach(sub => {
+            // [코드] 정격용량 형태 (불필요한 '센서' 단어 삭제 및 중복 장비명 제거)
+            const titleName = `[${sub.code}] ${sub.capacity}`; 
+            
+            subHtml += `
+                <div class="text-primary text-truncate sub-eq-item mb-1" 
+                     onclick="selectSubEquipment(this, '${sub.code} ${sub.capacity}', '${eq.id}', '${sub.code}')">
+                    &nbsp;ㄴ <strong>${sub.code}</strong> <small>(${sub.capacity})</small>
+                </div>
+            `;
+        });
+
+        const cardHtml = `
+            <div class="card border-primary mb-3 shadow-sm" style="border-radius: 8px; ${bgStyle}">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start mb-1">
+                        <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">[${eq.id}] ${eq.name}</h6>
+                        <span class="badge ${badgeClass}" style="font-size: 10px;">${eq.status || '정상'}</span>
+                    </div>
+                    <div class="border-top pt-2 mt-2" style="font-size: 12px;">
+                        ${subHtml || '<div class="text-muted small">등록된 하위항목 없음</div>'}
+                    </div>
+                </div>
+            </div>
+        `;
+        container.innerHTML += cardHtml;
+    });
+}
+
+    function filterEquipmentList() {
+        const inputEl = document.getElementById('eqSearchInput');
+        if (inputEl) renderSidebar(inputEl.value);
+    }
+
+    // ==========================================
+    // 3. 좌측 하위 항목 클릭 시 상세화면 & AG-Grid 호출
+    // ==========================================
+    function selectSubEquipment(element, titleName, eqCode, subCode) {
+    // 1. 선택 표시 활성화
+    document.querySelectorAll('.sub-eq-item').forEach(el => el.classList.remove('active'));
+    if (element) element.classList.add('active');
+
+    // 2. 제목 및 상태 표시
+    document.getElementById('displayEqTitle').textContent = titleName;
+    document.getElementById('headerEqCode').textContent = "장비코드: [" + eqCode + "]";
+    document.getElementById('headerEqStatus').textContent = "하위항목: " + subCode;
+
+    // 3. UI 보이게 설정
+    document.getElementById('emptySelectGuide').style.display = 'none';
+    document.getElementById('subEqSpecBox').style.display = 'block';
+    document.getElementById('gridContainer').style.display = 'block';
+
+    currentEqCode = eqCode;
+    currentSubCode = subCode;
+
+    // 4. 데이터 찾아오기
+    const parentEq = dbEquipmentList.find(e => e.id === eqCode);
+    const subEq = parentEq?.subItems.find(s => s.code === subCode);
+
+    // 5. 입력창(input)에 value값 할당 및 만료일 체크 로직
+    if (subEq) {
+        const expireDateVal = subEq.expireDate || '';
         
-        // 이미 생성된 그리드가 있다면 데이터만 새것으로 업데이트
-        if (gridOptions && gridOptions.api) {
-            gridOptions.api.setRowData(getMockData(eqCode, subCode));
+        document.getElementById('specCertNo').value = subEq.certNo || '';
+        document.getElementById('specIssuedBy').value = subEq.issuedBy || '';
+        document.getElementById('specCapacity').value = subEq.capacity || '';
+        document.getElementById('specDate').value = subEq.date || '';
+        document.getElementById('specExpireDate').value = expireDateVal;
+        document.getElementById('specLoadCount').value = (subEq.loads ? subEq.loads.length : 0) + ' 개 구간';
+
+        // 💡 [추가] 날짜 체크 로직 실행 (경고창 및 빨간 테두리 적용)
+        checkExpiryDate(expireDateVal);
+    }
+
+    // 6. 그리드 데이터 로드
+    loadCalibrationGridData(eqCode, subCode, subEq);
+}
+
+function checkExpiryDate(expireDateStr) {
+    const expireInput = document.getElementById('specExpireDate');
+    const msgDiv = document.getElementById('expiryWarning');
+    
+    if (!expireDateStr) return;
+
+    const expireDate = new Date(expireDateStr);
+    const today = new Date();
+    const diffTime = expireDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // 1. 평상시 상태 (파란색)
+    expireInput.style.border = "2px solid #0d6efd"; 
+    expireInput.style.color = "#0d6efd"; // 💡 날짜 텍스트 색상 파란색
+    if (msgDiv) {
+        msgDiv.style.display = "none";
+    }
+
+    // 2. 경고 상태 (30일 이내 또는 만료)
+    if (diffDays <= 30) {
+        expireInput.style.border = "2px solid red"; // 빨간 테두리
+        expireInput.style.color = "red";           // 💡 날짜 텍스트 색상 빨간색
+        
+        if (msgDiv) {
+            msgDiv.style.display = "block";
+            msgDiv.style.color = "red";
+            msgDiv.textContent = diffDays < 0 ? `❌ 교정 만료됨!` : `⚠️ 교정 만료 ${diffDays}일 전입니다!`;
+        }
+    }
+}
+
+    // ==========================================
+    // 4. AG-Grid 데이터 셋업 및 렌더링
+    // ==========================================
+    function loadCalibrationGridData(eqCode, subCode, subEqData) {
+    const gridDiv = document.querySelector('#calibrationGrid');
+    
+    const rowData = [];
+    const loads = subEqData?.loads || [];
+    loads.forEach((item, idx) => {
+        rowData.push({
+            id: idx + 1,
+            raw_val: item.raw || 0,
+            std_val: item.std || 0
+        });
+    });
+
+    if (gridOptions && gridOptions.api) {
+        gridOptions.api.setRowData(rowData);
+        return;
+    }
+
+    gridOptions = {
+        columnDefs: [
+            // 💡 체크박스 추가
+            { headerName: "", field: "checkbox", width: 40, checkboxSelection: true, headerCheckboxSelection: true },
+            { headerName: "순번", field: "id", width: 80 },
+            { headerName: "지시하중 (kN)", field: "raw_val", editable: true, flex: 1 },
+            { headerName: "기준하중 (kN)", field: "std_val", editable: true, flex: 1 },
+            { headerName: "오차(%)", valueGetter: "((data.std_val - data.raw_val) / (data.raw_val || 1) * 100).toFixed(2) + '%'", width: 120 }
+        ],
+        defaultColDef: { resizable: true },
+        rowSelection: 'multiple', // 여러 개 선택 가능
+        rowData: rowData
+    };
+
+    new agGrid.Grid(gridDiv, gridOptions);
+}
+
+    function saveCalibrationData() {
+    if (!currentSubCode) {
+        alert("선택된 하위 장비가 없습니다.");
+        return;
+    }
+
+    const selectedNodes = gridOptions.api.getSelectedNodes();
+    if (selectedNodes.length === 0) {
+        alert("수정(저장)할 행을 체크박스로 선택해주세요!");
+        return;
+    }
+
+    const rowData = selectedNodes.map(node => node.data);
+
+    fetch('/api/calibration/save/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sub_code: currentSubCode,
+            items: rowData
+        })
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (res.status === 'success') {
+            alert("변경사항이 DB에 저장되었습니다.");
+            gridOptions.api.deselectAll();
+            
+            // 🚀 [추가된 핵심 코드] 저장 성공 후 DB 데이터를 다시 불러와 그리드 갱신
+            fetchEquipmentListFromDB(); 
+        } else {
+            alert("저장 실패: " + res.message);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("서버 통신 오류");
+    });
+}
+
+// 행 추가: 가장 마지막 순번(id)을 계산하여 추가
+function addGridRow() {
+    const newRow = { id: gridOptions.api.getDisplayedRowCount() + 1, raw_val: 0, std_val: 0 };
+    gridOptions.api.applyTransaction({ add: [newRow] });
+}
+
+// 행 삭제: 체크된 행만 삭제
+function deleteGridRow() {
+    const selectedNodes = gridOptions.api.getSelectedNodes();
+    if (selectedNodes.length === 0) {
+        alert("삭제할 행을 체크박스에서 선택하세요.");
+        return;
+    }
+    const selectedData = selectedNodes.map(node => node.data);
+    gridOptions.api.applyTransaction({ remove: selectedData });
+}
+
+// 스펙 수정 저장 함수
+function saveSpecData() {
+    if (!currentSubCode) return;
+
+    // 현재 그리드에 떠있는 데이터 개수를 가져옵니다.
+    const loadCount = gridOptions ? gridOptions.api.getDisplayedRowCount() : 0;
+
+    const payload = {
+        sub_code: currentSubCode,
+        cert_no: document.getElementById('specCertNo').value,
+        issued_by: document.getElementById('specIssuedBy').value,
+        capacity: document.getElementById('specCapacity').value,
+        cal_date: document.getElementById('specDate').value,
+        expire_date: document.getElementById('specExpireDate').value,
+        load_count: loadCount // 💡 서버로 데이터 개수 전달
+    };
+
+    fetch('/api/equipment/update-spec/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.status === 'success') {
+            alert("상세 스펙이 수정되었습니다.");
+            fetchEquipmentListFromDB(); // 목록 갱신
+        } else {
+            alert("저장 실패: " + data.message);
+        }
+    });
+}
+
+    // ==========================================
+    // 5. 모달 제어 및 7번 지시/기준하중 동적 테이블
+    // ==========================================
+    function openRegistrationModal() {
+        const isSubMode = document.getElementById('subModeSwitch').checked;
+        const mainArea = document.getElementById('mainRegFormArea');
+        const subArea = document.getElementById('subRegFormArea');
+        const label = document.getElementById('regModalLabel');
+
+        if (isSubMode) {
+            label.innerHTML = '<i class="bi bi-gauge me-1"></i> 하위장비(로드셀/센서) 등록';
+            if (mainArea) mainArea.style.display = 'none';
+            if (subArea) subArea.style.display = 'block';
+
+            const parentSelect = document.getElementById('subParentSelect');
+            if (parentSelect) {
+                parentSelect.innerHTML = '<option value="" disabled selected>상위 메인장비를 선택해주세요</option>';
+                dbEquipmentList.forEach(eq => {
+                    parentSelect.innerHTML += `<option value="${eq.id}">[${eq.id}] ${eq.name}</option>`;
+                });
+                if (currentEqCode) parentSelect.value = currentEqCode;
+            }
+        } else {
+            label.innerHTML = '<i class="bi bi-server me-1"></i> 신규 메인장비 등록';
+            if (mainArea) mainArea.style.display = 'block';
+            if (subArea) subArea.style.display = 'none';
+        }
+
+        if (regModalInstance) regModalInstance.show();
+    }
+
+    // 성적서 기본 6개 구간(지시/기준 쌍) 세팅
+    function initLoadTable(initialData = null) {
+        const tbody = document.getElementById('loadTableBody');
+        if (!tbody) return;
+        tbody.innerHTML = "";
+        
+        const defaultRows = initialData || [
+            { raw: "0.0", std: "0.00" },
+            { raw: "60.0", std: "60.27" },
+            { raw: "120.0", std: "120.81" },
+            { raw: "180.0", std: "181.20" },
+            { raw: "240.0", std: "241.97" },
+            { raw: "270.0", std: "272.22" }
+        ];
+
+        defaultRows.forEach(item => {
+            const rawVal = typeof item === 'object' ? (item.raw !== undefined ? item.raw : "0.0") : item;
+            const stdVal = typeof item === 'object' ? (item.std !== undefined ? item.std : "0.00") : item;
+            addLoadRow(rawVal, stdVal);
+        });
+    }
+
+    // 4개 컬럼(No, 지시하중, 기준하중, 삭제)에 맞춘 행 추가
+    function addLoadRow(rawVal = "", stdVal = "") {
+        const tbody = document.getElementById('loadTableBody');
+        if (!tbody) return;
+        
+        const rowCount = tbody.children.length + 1;
+        const tr = document.createElement('tr');
+        
+        tr.innerHTML = `
+            <td class="bg-light align-middle fw-bold text-muted">${rowCount}</td>
+            <td class="p-1">
+                <input type="number" step="0.001" class="form-control form-control-sm text-center fw-bold text-dark load-input-raw" 
+                       placeholder="0.0" value="${rawVal}">
+            </td>
+            <td class="p-1">
+                <input type="number" step="0.001" class="form-control form-control-sm text-center fw-bold text-primary load-input-std" 
+                       placeholder="0.00" value="${stdVal}">
+            </td>
+            <td class="align-middle">
+                <button type="button" class="btn btn-link text-danger p-0 m-0" onclick="removeLoadRow(this)" title="삭제">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+        updateTableRowNumbers();
+    }
+
+    function removeLoadRow(btn) {
+        const tbody = document.getElementById('loadTableBody');
+        if (!tbody || tbody.children.length <= 1) {
+            alert("최소 1개 이상의 하중 데이터 구간이 필요합니다.");
+            return;
+        }
+        btn.closest('tr').remove();
+        updateTableRowNumbers();
+    }
+
+    function updateTableRowNumbers() {
+        const tbody = document.getElementById('loadTableBody');
+        if (!tbody) return;
+        Array.from(tbody.children).forEach((row, index) => {
+            if (row.children[0]) row.children[0].textContent = index + 1;
+        });
+    }
+
+    function getLoadPairsFromTable() {
+        const tbody = document.getElementById('loadTableBody');
+        if (!tbody) return [];
+        
+        const loads = [];
+        Array.from(tbody.children).forEach(row => {
+            const rawEl = row.querySelector('.load-input-raw');
+            const stdEl = row.querySelector('.load-input-std');
+            if (rawEl && stdEl) {
+                if (rawEl.value !== "" || stdEl.value !== "") {
+                    loads.push({
+                        raw: parseFloat(rawEl.value || 0),
+                        std: parseFloat(stdEl.value || 0)
+                    });
+                }
+            }
+        });
+        return loads;
+    }
+
+    // ==========================================
+    // 6. 신규 장비 MySQL DB 실시간 저장 (POST)
+    // ==========================================
+    function saveRegistrationData() {
+    const isSubMode = document.getElementById('subModeSwitch').checked;
+    let payload = {};
+
+    if (!isSubMode) {
+        // [메인 장비 모드] 기존과 동일
+        const name = document.getElementById('mainNameInput').value.trim();
+        const status = document.getElementById('mainStatusInput').value;
+        if (!name) { alert("1. 장비명을 입력해주세요."); return; }
+        const generatedId = "EQ_" + Math.floor(1000 + Math.random() * 9000);
+        payload = { is_sub_mode: false, id: generatedId, name: name, status: status };
+    } else {
+        // [하위 장비 모드] 여러 개의 단(Stage) 정보 수집
+        // 1. 기본 정보 수집
+    const parentId = document.getElementById('subParentSelect').value;
+    const code = document.getElementById('subCodeInput').value.trim();
+    const certNo = document.getElementById('subCertNoInput').value.trim();
+    const issuedBy = document.getElementById('subIssuedByInput').value.trim();
+    const date = document.getElementById('subDateInput').value;
+    const expireDate = document.getElementById('subExpireDateInput').value;
+
+    if (!parentId) { alert("대상 메인장비를 선택해주세요."); return; }
+    if (!code || !certNo) { alert("장비코드와 교정성적서번호는 필수입니다."); return; }
+
+    // 2. [추가된 부분] 여러 개의 Stage와 Load 데이터 수집
+    const stages = [];
+    document.querySelectorAll('.stage-block').forEach(block => {
+        const loads = [];
+        block.querySelectorAll('.load-table-body tr').forEach(tr => {
+            const raw = tr.querySelector('.raw-val').value;
+            const std = tr.querySelector('.std-val').value;
+            if (raw !== "" && std !== "") { // 빈 값은 제외
+                loads.push({ raw: raw, std: std });
+            }
+        });
+
+        stages.push({
+            name: block.querySelector('.stage-name').value,
+            capacity: block.querySelector('.stage-capacity').value,
+            loads: loads
+        });
+    });
+
+    if (stages.length === 0) { alert("최소 1개 이상의 단(Stage)과 하중 데이터를 입력해주세요."); return; }
+
+    // 3. payload 완성 (이제 stages 배열이 들어갑니다)
+    payload = {
+        is_sub_mode: true,
+        parent_id: parentId,
+        code: code,
+        name: code + " 센서",
+        cert_no: certNo,
+        issued_by: issuedBy || '미지정',
+        date: date,
+        expire_date: expireDate,
+        stages: stages // 여기서 stages 배열을 서버로 보냅니다
+    };
+}
+
+    // 서버로 데이터 전송
+    fetch('/api/equipment/save/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (res.status === 'success') {
+            alert(res.message);
+            if (regModalInstance) regModalInstance.hide();
+            fetchEquipmentListFromDB();
+            
+            // 입력 폼 초기화
+            document.getElementById('mainNameInput').value = "";
+            document.getElementById('subCodeInput').value = "";
+            document.getElementById('subCertNoInput').value = "";
+            document.querySelectorAll('.stage-row').forEach(row => row.remove()); // 단 입력행 초기화
+            initLoadTable();
+        } else {
+            alert("저장 실패: " + res.message);
+        }
+    })
+    .catch(err => {
+        console.error("저장 통신 에러:", err);
+        alert("서버 연결에 실패했습니다.");
+    });
+}
+
+    // ==========================================
+    // 7. 🔍 특수문자 방어 안전 검색 컨트롤러
+    // ==========================================
+    function escapeRegExp(string) {
+        return string ? string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    }
+
+    function handleSearchKeyup(event) {
+        executeSearch();
+        if (event.key === 'Enter' || event.keyCode === 13) {
+            event.preventDefault();
+            const inputEl = document.getElementById('eqSearchInput');
+            if (inputEl) inputEl.blur();
+        }
+    }
+
+    function executeSearch() {
+        const searchInput = document.getElementById('eqSearchInput');
+        if (!searchInput) return;
+        
+        const query = searchInput.value.trim().toLowerCase();
+        if (!query) {
+            renderSidebar();
             return;
         }
 
-        // AG-Grid 컬럼 및 옵션 최초 설정
-        gridOptions = {
-            columnDefs: [
-                { headerName: "순번", field: "id", width: 80, textAlign: "center" },
-                { headerName: "지시하중 (X, 계측값)", field: "raw_val", editable: true, flex: 1 },
-                { headerName: "기준하중 (Y, 성적서 보정값)", field: "std_val", editable: true, flex: 1 },
-                { headerName: "보정 오차(%)", valueGetter: "((data.std_val - data.raw_val) / data.raw_val * 100).toFixed(2) + '%'", width: 150 }
-            ],
-            defaultColDef: {
-                resizable: true,
-                sortable: true
-            },
-            rowData: getMockData(eqCode, subCode)
-        };
+        const container = document.getElementById('sidebarEquipmentList');
+        if (!container) return;
+        container.innerHTML = ""; 
 
-        new agGrid.Grid(gridDiv, gridOptions);
-    }
+        let matchCount = 0;
+        const safeQuery = escapeRegExp(query);
+        const highlightRegex = new RegExp(`(${safeQuery})`, 'gi');
 
-    /**
-     * 테스트용 가상 보정 데이터를 반환하는 함수 (추후 Django API fetch로 교체할 부분)
-     */
-    function getMockData(eqCode, subCode) {
-        if (subCode === '100kN_Cell') {
-            return [
-                { id: 1, raw_val: 0.0, std_val: 0.0 },
-                { id: 2, raw_val: 20.0, std_val: 20.12 },
-                { id: 3, raw_val: 50.0, std_val: 50.35 },
-                { id: 4, raw_val: 100.0, std_val: 100.80 }
-            ];
-        } else if (subCode === '300kN_Cell') {
-            return [
-                { id: 1, raw_val: 0.0, std_val: 0.0 },
-                { id: 2, raw_val: 100.0, std_val: 101.50 },
-                { id: 3, raw_val: 200.0, std_val: 202.80 },
-                { id: 4, raw_val: 300.0, std_val: 304.10 }
-            ];
-        } else {
-            return [
-                { id: 1, raw_val: 10.0, std_val: 10.05 },
-                { id: 2, raw_val: 50.0, std_val: 50.15 }
-            ];
+        (dbEquipmentList || []).forEach(eq => {
+            const eqName = String(eq.name || "").toLowerCase();
+            const eqId = String(eq.id || "").toLowerCase();
+            
+            const isMainMatch = eqName.includes(query) || eqId.includes(query);
+            
+            const matchingSubItems = (eq.subItems || []).filter(sub => {
+                const subName = String(sub.name || "").toLowerCase();
+                const subCode = String(sub.code || "").toLowerCase();
+                const subCap = String(sub.capacity || "").toLowerCase();
+                return subName.includes(query) || subCode.includes(query) || subCap.includes(query);
+            });
+
+            const isSubMatch = matchingSubItems.length > 0;
+            if (!isMainMatch && !isSubMatch) return;
+
+            matchCount++;
+
+            const badgeClass = eq.status === '정상' ? 'bg-primary' : 'bg-secondary';
+            const bgStyle = eq.status === '정상' ? 'background-color: #f4f8ff;' : 'background-color: #f8f9fa;';
+
+            let subHtml = "";
+            const displaySubItems = isMainMatch ? (eq.subItems || []) : matchingSubItems;
+
+            displaySubItems.forEach(sub => {
+                const titleName = `${eq.name} - [${sub.name}]`;
+                const highlightedName = String(sub.name || "").replace(highlightRegex, '<span class="bg-warning text-dark px-1 rounded">$1</span>');
+                const highlightedCode = String(sub.code || "").replace(highlightRegex, '<span class="bg-warning text-dark px-1 rounded">$1</span>');
+
+                subHtml += `
+                    <div class="text-primary text-truncate sub-eq-item mb-1" 
+                         onclick="selectSubEquipment(this, '${titleName}', '${eq.id}', '${sub.code}')">
+                        &nbsp;ㄴ [${highlightedCode}] ${highlightedName} (${sub.capacity || '-'})
+                    </div>
+                `;
+            });
+
+            const highlightedMainName = isMainMatch 
+                ? String(eq.name || "").replace(highlightRegex, '<span class="bg-warning text-dark px-1 rounded">$1</span>') 
+                : (eq.name || "");
+
+            const cardHtml = `
+                <div class="card border-primary mb-3 shadow-sm" style="border-radius: 8px; ${bgStyle}">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">
+                                [${eq.id}] ${highlightedMainName}
+                            </h6>
+                            <span class="badge ${badgeClass}" style="font-size: 10px;">${eq.status || '정상'}</span>
+                        </div>
+                        <p class="text-muted mb-2" style="font-size: 11px;">
+                            <i class="bi bi-calendar-check me-1"></i>최근 등록: ${eq.date || '-'}
+                        </p>
+                        <div class="border-top pt-2" style="font-size: 12px;">
+                            ${subHtml || '<div class="text-muted small">일치하는 하위항목 없음</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += cardHtml;
+        });
+
+        if (matchCount === 0) {
+            container.innerHTML = `
+                <div class="text-center text-muted p-5 small">
+                    <i class="bi bi-search fs-3 d-block mb-2 text-secondary"></i>
+                    "<b>${query}</b>"에 대한 검색 결과가 없습니다.<br>
+                    <span class="text-secondary" style="font-size: 11px;">장비명, 코드, 정격용량을 다시 확인해 주세요.</span>
+                </div>
+            `;
         }
     }
 
-    function saveCalibrationData() {
-        alert("현재 그리드의 보정 데이터가 [" + currentEqCode + "] 장비 DB로 저장됩니다.");
-    }
+// 단 추가 함수
+function addStageRow() {
+    const container = document.getElementById('stageContainer');
+    const div = document.createElement('div');
+    div.className = 'd-flex gap-2 mb-1 stage-row';
+    div.innerHTML = `
+        <input type="text" class="form-control form-control-sm stage-name" placeholder="단 이름(예: 1단)">
+        <input type="text" class="form-control form-control-sm stage-capacity" placeholder="용량(kN)">
+        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">×</button>
+    `;
+    container.appendChild(div);
+}
+    
+let stageCount = 0;
+
+function addStageBlock() {
+    stageCount++;
+    const container = document.getElementById('stageContainer');
+    const block = document.createElement('div');
+    block.className = 'stage-block border p-2 mb-3 bg-light';
+    block.innerHTML = `
+        <div class="row g-2 mb-2">
+            <div class="col-6"><input type="text" class="form-control form-control-sm stage-name" placeholder="단 이름 (예: 1단)"></div>
+            <div class="col-5"><input type="text" class="form-control form-control-sm stage-capacity" placeholder="용량 (kN)"></div>
+            <div class="col-1"><button class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">×</button></div>
+        </div>
+        <table class="table table-sm table-bordered bg-white load-table">
+            <thead><tr><th>지시하중</th><th>기준하중</th><th style="width:40px;"></th></tr></thead>
+            <tbody class="load-table-body">
+                <tr>
+                    <td><input type="number" class="form-control form-control-sm raw-val"></td>
+                    <td><input type="number" class="form-control form-control-sm std-val"></td>
+                    <td><button class="btn btn-sm btn-light" onclick="this.parentElement.parentElement.remove()">-</button></td>
+                </tr>
+            </tbody>
+        </table>
+        <button class="btn btn-xs btn-secondary" onclick="addLoadRow(this)">+ 행 추가</button>
+    `;
+    container.appendChild(block);
+}
+
+function addLoadRow(btn) {
+    const tbody = btn.parentElement.querySelector('.load-table-body');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><input type="number" class="form-control form-control-sm raw-val"></td>
+        <td><input type="number" class="form-control form-control-sm std-val"></td>
+        <td><button class="btn btn-sm btn-light" onclick="this.parentElement.parentElement.remove()">-</button></td>
+    `;
+    tbody.appendChild(tr);
+}
+    
 </script>
 
 </body>

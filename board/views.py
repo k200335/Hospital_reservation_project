@@ -4330,6 +4330,258 @@ def calibration_main(request):
     from django.shortcuts import render
     return render(request, 'calibration.html')
 
-# ----------------------여기부터 교정성적서 보정------------end
+
+# 좌측 사이드바 장비 목록 트리 조회 API (GET) - 안전성 강화 버전
+# ==========================================
+def get_equipment_list(request):
+    try:
+        with connections['default'].cursor() as cursor:
+            # 1) 메인 장비 조회
+            cursor.execute("SELECT eq_code, eq_name, status, reg_date FROM cal_main_eq ORDER BY eq_code DESC")
+            main_rows = cursor.fetchall()
+            
+            equipment_list = []
+            for m in main_rows:
+                eq_code, eq_name, status, reg_date = m
+                sub_items = []
+                
+                # 2) 하위 장비(센서) 조회
+                cursor.execute("""
+                    SELECT sub_code, sub_name, cert_no, issued_by, cal_date, expire_date 
+                    FROM cal_sub_eq WHERE parent_code = %s ORDER BY sub_code ASC
+                """, [eq_code])
+                sub_rows = cursor.fetchall()
+                
+                for s in sub_rows:
+                    sub_code, sub_name, cert_no, issued_by, cal_date, expire_date = s
+                    
+                    # [신규] 3) 해당 하위장비의 '단(Stage)' 목록 조회
+                    cursor.execute("""
+                        SELECT id, stage_name, capacity 
+                        FROM cal_sub_eq_stages WHERE sub_code = %s ORDER BY id ASC
+                    """, [sub_code])
+                    stage_rows = cursor.fetchall()
+                    
+                    stages = []
+                    for st in stage_rows:
+                        stage_id, stage_name, capacity = st
+                        
+                        # [신규] 4) 해당 '단'에 속한 하중 데이터 조회
+                        cursor.execute("""
+                            SELECT raw_val, std_val 
+                            FROM cal_load_data WHERE stage_id = %s ORDER BY id ASC
+                        """, [stage_id])
+                        load_rows = cursor.fetchall()
+                        
+                        loads = [{'raw': float(row[0] or 0.0), 'std': float(row[1] or 0.0)} for row in load_rows]
+                        
+                        stages.append({
+                            'stageId': stage_id,
+                            'stageName': stage_name,
+                            'capacity': capacity,
+                            'loads': loads
+                        })
+                    
+                    sub_items.append({
+                        'code': sub_code,
+                        'name': sub_name,
+                        'certNo': cert_no,
+                        'issuedBy': issued_by,
+                        'date': str(cal_date or ''),
+                        'expireDate': str(expire_date or ''),
+                        'stages': stages # 'loads' 대신 이제 'stages' 목록을 전달
+                    })
+                
+                equipment_list.append({
+                    'id': eq_code,
+                    'name': eq_name,
+                    'status': status,
+                    'date': str(reg_date or ''),
+                    'subItems': sub_items
+                })
+        return JsonResponse({'status': 'success', 'data': equipment_list})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+
+@csrf_exempt
+def save_equipment_to_mysql(request):
+    """
+    모달창에서 전송된 JSON 데이터를 받아 
+    메인장비(cal_main_eq) 또는 하위장비(cal_sub_eq + cal_load_data)를 저장/갱신합니다.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        is_sub_mode = data.get('is_sub_mode', False)
+
+        with connections['default'].cursor() as cursor:
+            
+            # [모드 A] 메인 장비 저장
+            if not is_sub_mode:
+                sql = """
+                    INSERT INTO cal_main_eq (eq_code, eq_name, status, reg_date)
+                    VALUES (%s, %s, %s, CURDATE())
+                    ON DUPLICATE KEY UPDATE
+                        eq_name = VALUES(eq_name),
+                        status = VALUES(status)
+                """
+                cursor.execute(sql, [
+                    data.get('id'), 
+                    data.get('name'), 
+                    data.get('status', '정상')
+                ])
+                
+                return JsonResponse({
+                    'status': 'success', 
+                    'message': f"메인장비 [{data.get('name')}] 저장이 완료되었습니다!"
+                })
+
+            # [모드 B] 하위 장비(센서) + 7번 지시/기준하중 표 저장
+            else:
+                sub_code = data.get('code')
+                parent_code = data.get('parent_id')
+                
+                # ① 하위장비 필수항목 저장
+                sub_sql = """
+                    INSERT INTO cal_sub_eq (
+                        sub_code, parent_code, sub_name, capacity, 
+                        cert_no, issued_by, cal_date, expire_date
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        parent_code = VALUES(parent_code),
+                        sub_name = VALUES(sub_name),
+                        capacity = VALUES(capacity),
+                        cert_no = VALUES(cert_no),
+                        issued_by = VALUES(issued_by),
+                        cal_date = VALUES(cal_date),
+                        expire_date = VALUES(expire_date)
+                """
+                cursor.execute(sub_sql, [
+                    sub_code,
+                    parent_code,
+                    data.get('name', f"{sub_code} 센서"),
+                    data.get('capacity'),
+                    data.get('cert_no'),
+                    data.get('issued_by', '미지정'),
+                    data.get('date'),
+                    data.get('expire_date')
+                ])
+
+                # ② 7번 지시하중/기준하중 표 데이터 저장 (에러 해결 핵심 부분!)
+                loads = data.get('loads', [])
+                if loads:
+                    cursor.execute("DELETE FROM cal_load_data WHERE sub_code = %s", [sub_code])
+                    
+                    load_sql = """
+                        INSERT INTO cal_load_data (sub_code, seq, raw_val, std_val)
+                        VALUES (%s, %s, %s, %s)
+                    """
+                    
+                    load_params = []
+                    for idx, item in enumerate(loads):
+                        # 프론트엔드에서 딕셔너리({raw: x, std: y})로 보냈는지, 숫자 배열로 보냈는지 안전하게 분기 처리!
+                        if isinstance(item, dict):
+                            raw_val = float(item.get('raw', item.get('raw_val', 0.0)))
+                            std_val = float(item.get('std', item.get('std_val', 0.0)))
+                        else:
+                            # 만약 단일 숫자로 넘어올 경우 raw와 std를 동일하게 설정
+                            raw_val = float(item)
+                            std_val = float(item)
+                            
+                        load_params.append((sub_code, idx + 1, raw_val, std_val))
+
+                    # DB에 일괄 다중 삽입!
+                    cursor.executemany(load_sql, load_params)
+
+                return JsonResponse({
+                    'status': 'success', 
+                    'message': f"하위장비 [{sub_code}] 및 하중 데이터 {len(loads)}개 구간 저장이 완료되었습니다!"
+                })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f"DB 저장 중 오류 발생: {str(e)}"})
+    
+
+# ==========================================
+# 4. 우측 AG-Grid 테이블 보정 데이터 DB 저장 API (POST)
+# ==========================================
+@csrf_exempt
+def save_calibration_grid_data(request):
+    """
+    우측 AG-Grid 테이블에서 수정한 구간별 지시하중(X) 및 기준하중(Y) 데이터를
+    ON DUPLICATE KEY UPDATE 구문으로 일괄 갱신합니다.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'Invalid method'})
+
+    try:
+        data = json.loads(request.body)
+        sub_code = data.get('sub_code')
+        items = data.get('items', [])  # AG-Grid의 전체 행 데이터 배열
+
+        if not items or not sub_code:
+            return JsonResponse({'status': 'error', 'message': '저장할 보정 데이터가 없습니다.'})
+
+        with connections['default'].cursor() as cursor:
+            sql = """
+                INSERT INTO cal_load_data (sub_code, seq, raw_val, std_val)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    raw_val = VALUES(raw_val),
+                    std_val = VALUES(std_val)
+            """
+            
+            params = [
+                (
+                    sub_code, 
+                    row.get('id'), 
+                    float(row.get('raw_val', 0)), 
+                    float(row.get('std_val', 0))
+                )
+                for row in items
+            ]
+            
+            cursor.executemany(sql, params)
+
+        return JsonResponse({
+            'status': 'success', 
+            'message': f"[{sub_code}] 센서의 보정 데이터 {len(items)}개 구간이 DB에 저장되었습니다!"
+        })
+
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f"그리드 저장 실패: {str(e)}"})
+    
+    
+    
+@csrf_exempt
+def update_equipment_spec(request):
+    try:
+        data = json.loads(request.body)
+        sub_code = data.get('sub_code')
+        
+        with connections['default'].cursor() as cursor:
+            # 💡 만약 DB 테이블에 load_count 컬럼이 없다면, 아래 UPDATE문에서 load_count 관련 내용은 제외하세요!
+            cursor.execute("""
+                UPDATE cal_sub_eq 
+                SET cert_no = %s, issued_by = %s, capacity = %s, 
+                    cal_date = %s, expire_date = %s
+                WHERE sub_code = %s
+            """, [
+                data.get('cert_no'), 
+                data.get('issued_by'), 
+                data.get('capacity'), 
+                data.get('cal_date'), 
+                data.get('expire_date'), 
+                sub_code
+            ])
+            
+        return JsonResponse({'status': 'success'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)})
+    
+    # ----------------------여기부터 교정성적서 보정------------end
         
 
