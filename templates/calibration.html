@@ -92,15 +92,7 @@
                         <div>
                             <span class="text-muted small fw-bold me-2" id="headerEqCode">선택된 장비 없음</span>
                             <span class="text-muted small" id="headerEqStatus">좌측 목록에서 장비를 선택해주세요.</span>
-                        </div>
-                        <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-outline-primary px-2 py-1" style="font-size: 11px;" onclick="alert('엑셀 성적서 업로드 기능 연동')">
-                                <i class="bi bi-file-earmark-arrow-up me-1"></i> 성적서 업로드
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary px-2 py-1" style="font-size: 11px;" onclick="alert('보정값 엑셀 다운로드')">
-                                <i class="bi bi-file-earmark-excel me-1"></i> 양식 다운로드
-                            </button>
-                        </div>
+                        </div>                        
                     </div>
 
                     <h5 class="fw-bold text-primary mb-3" id="displayEqTitle" style="font-size: 16px;">
@@ -222,8 +214,7 @@
                             <!-- 💡 [신규 추가] 엑셀 Ctrl+V용 원클릭 클립보드 복사 버튼! -->
                             <button type="button" class="btn btn-sm btn-success fw-bold px-2 py-1 shadow-sm" style="font-size: 11px;" onclick="copyGridToClipboard()" title="열린 엑셀에 Ctrl+V로 붙여넣기"><i class="bi bi-clipboard-check me-1"></i>값복사</button>
 
-                            <!-- 기존 DB 저장 및 엑셀 다운로드 버튼 -->
-                            <button type="button" class="btn btn-sm btn-primary fw-bold px-3 py-1 shadow-sm" style="font-size: 11px;" onclick="saveCurrentPresetToDB()"><i class="bi bi-save me-1"></i>템플릿 DB 저장</button>
+                            <!-- 엑셀 다운로드 버튼 -->                            
                             <button type="button" class="btn btn-sm btn-dark fw-bold px-2 py-1 shadow-sm" style="font-size: 11px;" onclick="exportInterpExcel()"><i class="bi bi-file-earmark-excel me-1"></i>엑셀</button>
                         </div>
                     </div>
@@ -1401,38 +1392,6 @@ function refreshInterpSeq() {
     interpGridOptions.api.forEachNode(node => node.setDataValue('id', idx++));
 }
 
-// ==========================================
-// 6. 💾 [DB 저장] 현재 표의 하중을 DB 템플릿으로 덮어쓰기!
-// ==========================================
-function saveCurrentPresetToDB() {
-    if (!currentActivePresetId) {
-        alert("선택된 시험 템플릿이 없습니다. 먼저 검색에서 시험 종목을 선택하거나 신규 등록하세요.");
-        return;
-    }
-    const loads = [];
-    interpGridOptions.api.forEachNode(node => {
-        const val = parseFloat(node.data.input_val);
-        if (!isNaN(val)) loads.push(val);
-    });
-    if (loads.length === 0) { alert("저장할 하중 데이터가 없습니다."); return; }
-
-    const loadsStr = loads.join(', ');
-    if (!confirm(`"[${currentActivePresetName}]" 시험 종목의 기본 하중 배열을\n[${loadsStr}] (총 ${loads.length}개)\n(으)로 영구 업데이트 하시겠습니까?`)) return;
-
-    fetch('/api/preset/update/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: currentActivePresetId, default_loads: loadsStr })
-    })
-    .then(res => res.json())
-    .then(res => {
-        if (res.status === 'success') {
-            alert("✅ 템플릿 하중 배열이 성공적으로 DB에 업데이트되었습니다!");
-            fetchTestPresetsFromDB();
-        } else { alert("저장 실패: " + res.message); }
-    })
-    .catch(err => alert("서버 통신 오류"));
-}
 
 // ==========================================
 // 7. ➕ [모달 제어] 신규 시험항목 DB 등록
