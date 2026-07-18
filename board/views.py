@@ -49,7 +49,6 @@ import openpyxl
 
 
 
-
 def receipt_list(request):
     search_type = request.GET.get('search_type', 'rqcode')
     search_value = request.GET.get('search_value', '')
@@ -4403,12 +4402,14 @@ def get_equipment_list(request):
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': str(e)})
 
-@csrf_exempt
-def save_equipment_to_mysql(request):
-    """
+
+
+"""
     모달창에서 전송된 JSON 데이터를 받아 
     메인장비(cal_main_eq) 또는 하위장비(cal_sub_eq + cal_load_data)를 저장/갱신합니다.
     """
+@csrf_exempt
+def save_equipment_to_mysql(request):
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'})
 
@@ -4417,102 +4418,187 @@ def save_equipment_to_mysql(request):
         is_sub_mode = data.get('is_sub_mode', False)
 
         with connections['default'].cursor() as cursor:
-            
-            # [모드 A] 메인 장비 저장
             if not is_sub_mode:
-                sql = """
-                    INSERT INTO cal_main_eq (eq_code, eq_name, status, reg_date)
-                    VALUES (%s, %s, %s, CURDATE())
-                    ON DUPLICATE KEY UPDATE
-                        eq_name = VALUES(eq_name),
-                        status = VALUES(status)
-                """
-                cursor.execute(sql, [
-                    data.get('id'), 
-                    data.get('name'), 
-                    data.get('status', '정상')
-                ])
-                
-                return JsonResponse({
-                    'status': 'success', 
-                    'message': f"메인장비 [{data.get('name')}] 저장이 완료되었습니다!"
-                })
+                # [메인 장비 저장]
+                sql = """INSERT INTO cal_main_eq (eq_code, eq_name, status, reg_date) VALUES (%s, %s, %s, CURDATE())
+                         ON DUPLICATE KEY UPDATE eq_name = VALUES(eq_name), status = VALUES(status)"""
+                cursor.execute(sql, [data.get('id'), data.get('name'), data.get('status', '정상')])
+                return JsonResponse({'status': 'success', 'message': "메인장비 저장이 완료되었습니다!"})
 
-            # [모드 B] 하위 장비(센서) + 7번 지시/기준하중 표 저장
             else:
+                # [하위 장비 모드]
                 sub_code = data.get('code')
                 parent_code = data.get('parent_id')
                 
-                # ① 하위장비 필수항목 저장
-                sub_sql = """
-                    INSERT INTO cal_sub_eq (
-                        sub_code, parent_code, sub_name, capacity, 
-                        cert_no, issued_by, cal_date, expire_date
-                    )
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ON DUPLICATE KEY UPDATE
-                        parent_code = VALUES(parent_code),
-                        sub_name = VALUES(sub_name),
-                        capacity = VALUES(capacity),
-                        cert_no = VALUES(cert_no),
-                        issued_by = VALUES(issued_by),
-                        cal_date = VALUES(cal_date),
-                        expire_date = VALUES(expire_date)
-                """
-                cursor.execute(sub_sql, [
-                    sub_code,
-                    parent_code,
-                    data.get('name', f"{sub_code} 센서"),
-                    data.get('capacity'),
-                    data.get('cert_no'),
-                    data.get('issued_by', '미지정'),
-                    data.get('date'),
-                    data.get('expire_date')
-                ])
+                # ① 하위장비 기본 정보 저장 (capacity 컬럼 제외됨)
+                sub_sql = """INSERT INTO cal_sub_eq (sub_code, parent_code, sub_name, cert_no, issued_by, cal_date, expire_date)
+                             VALUES (%s, %s, %s, %s, %s, %s, %s)
+                             ON DUPLICATE KEY UPDATE parent_code = VALUES(parent_code), sub_name = VALUES(sub_name), 
+                             cert_no = VALUES(cert_no), issued_by = VALUES(issued_by), cal_date = VALUES(cal_date), expire_date = VALUES(expire_date)"""
+                cursor.execute(sub_sql, [sub_code, parent_code, data.get('name'), data.get('cert_no'), data.get('issued_by'), data.get('date'), data.get('expire_date')])
 
-                # ② 7번 지시하중/기준하중 표 데이터 저장 (에러 해결 핵심 부분!)
-                loads = data.get('loads', [])
-                if loads:
-                    cursor.execute("DELETE FROM cal_load_data WHERE sub_code = %s", [sub_code])
+                # ② 스테이지(Stage) 및 하중 데이터 저장
+                stages = data.get('stages', [])
+                for stage in stages:
+                    # 스테이지 저장
+                    cursor.execute("""INSERT INTO cal_sub_eq_stages (sub_code, stage_name, capacity) VALUES (%s, %s, %s)""", 
+                                   [sub_code, stage.get('name'), stage.get('capacity')])
+                    stage_id = cursor.lastrowid # 방금 생성된 stage의 ID
                     
-                    load_sql = """
-                        INSERT INTO cal_load_data (sub_code, seq, raw_val, std_val)
-                        VALUES (%s, %s, %s, %s)
-                    """
-                    
-                    load_params = []
-                    for idx, item in enumerate(loads):
-                        # 프론트엔드에서 딕셔너리({raw: x, std: y})로 보냈는지, 숫자 배열로 보냈는지 안전하게 분기 처리!
-                        if isinstance(item, dict):
-                            raw_val = float(item.get('raw', item.get('raw_val', 0.0)))
-                            std_val = float(item.get('std', item.get('std_val', 0.0)))
-                        else:
-                            # 만약 단일 숫자로 넘어올 경우 raw와 std를 동일하게 설정
-                            raw_val = float(item)
-                            std_val = float(item)
-                            
-                        load_params.append((sub_code, idx + 1, raw_val, std_val))
+                    # 해당 스테이지의 하중 데이터 저장
+                    loads = stage.get('loads', [])
+                    if loads:
+                        load_sql = "INSERT INTO cal_load_data (stage_id, raw_val, std_val) VALUES (%s, %s, %s)"
+                        load_params = [(stage_id, float(item['raw']), float(item['std'])) for item in loads]
+                        cursor.executemany(load_sql, load_params)
 
-                    # DB에 일괄 다중 삽입!
-                    cursor.executemany(load_sql, load_params)
-
-                return JsonResponse({
-                    'status': 'success', 
-                    'message': f"하위장비 [{sub_code}] 및 하중 데이터 {len(loads)}개 구간 저장이 완료되었습니다!"
-                })
+                return JsonResponse({'status': 'success', 'message': f"장비 [{sub_code}] 및 스테이지 데이터 저장이 완료되었습니다!"})
 
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f"DB 저장 중 오류 발생: {str(e)}"})
-    
 
 # ==========================================
 # 4. 우측 AG-Grid 테이블 보정 데이터 DB 저장 API (POST)
 # ==========================================
 @csrf_exempt
 def save_calibration_grid_data(request):
+  """우측 AG-Grid에서 체크된 데이터의 '순번' 또는 'DB ID'를 스마트 매핑하여 중복 추가(INSERT) 없이 정확하게 기존 행을
+
+  UPDATE 합니다.
+  """
+  if request.method != "POST":
+    return JsonResponse({"status": "error", "message": "Invalid method"})
+
+  try:
+    data = json.loads(request.body)
+    sub_code = data.get("sub_code")
+    items = data.get("items", [])  # 프론트에서 체크된 행들만 넘어옴
+
+    if not items or not sub_code:
+      return JsonResponse({
+          "status": "error",
+          "message": "저장할 보정 데이터가 없습니다.",
+      })
+
+    # 1. 단(stage_name) 기준으로 그룹화 및 공백 제거
+    stage_groups = {}
+    for row in items:
+      s_name = str(row.get("stage_name", "1단")).strip()
+      if not s_name:
+        s_name = "1단"
+
+      if s_name not in stage_groups:
+        stage_groups[s_name] = {
+            "capacity": str(row.get("stage_capacity", "")).strip(),
+            "loads": [],
+        }
+      stage_groups[s_name]["loads"].append({
+          "id": row.get("id"),  # 화면상의 순번(1, 2, 3...) 또는 DB 기본키
+          "raw_val": float(row.get("raw_val", 0.0)),
+          "std_val": float(row.get("std_val", 0.0)),
+      })
+
+    # 2. 트랜잭션 적용 (기존 데이터 절대 삭제 안 함!)
+    with transaction.atomic():
+      with connections["default"].cursor() as cursor:
+        for s_name, s_data in stage_groups.items():
+          cap_val = s_data["capacity"]
+          loads_list = s_data["loads"]
+
+          # ① 단(Stage) 정보 조회 또는 생성
+          cursor.execute(
+              """
+                        SELECT id FROM cal_sub_eq_stages 
+                        WHERE sub_code = %s AND stage_name = %s
+                    """,
+              [sub_code, s_name],
+          )
+          row = cursor.fetchone()
+
+          if row:
+            stage_id = row[0]
+            if cap_val:
+              cursor.execute(
+                  """
+                                UPDATE cal_sub_eq_stages 
+                                SET capacity = %s 
+                                WHERE id = %s
+                            """,
+                  [cap_val, stage_id],
+              )
+          else:
+            cursor.execute(
+                """
+                            INSERT INTO cal_sub_eq_stages (sub_code, stage_name, capacity, created_at)
+                            VALUES (%s, %s, %s, NOW())
+                        """,
+                [sub_code, s_name, cap_val],
+            )
+            stage_id = cursor.lastrowid
+
+          # ② 💡 [핵심 해결] 해당 단(stage_id)에 이미 저장된 DB 기본키(id) 목록을 순서대로 조회
+          cursor.execute(
+              """
+                        SELECT id FROM cal_load_data 
+                        WHERE stage_id = %s ORDER BY id ASC
+                    """,
+              [stage_id],
+          )
+          existing_db_ids = [r[0] for r in cursor.fetchall()]
+
+          # ③ 넘어온 각 하중 데이터를 정확한 DB 기본키에 매핑하여 UPDATE
+          for item in loads_list:
+            req_id = item.get("id")
+            target_db_id = None
+
+            if req_id and str(req_id).isdigit():
+              req_id_int = int(req_id)
+              # Case A: 넘어온 번호가 DB의 실제 기본키(id) 목록에 있는 경우
+              if req_id_int in existing_db_ids:
+                target_db_id = req_id_int
+              # Case B: 넘어온 번호가 화면상 '순번'(1, 2, 3...)인 경우 -> 순서 인덱스로 DB 기본키 자동 매핑
+              elif 0 < req_id_int <= len(existing_db_ids):
+                target_db_id = existing_db_ids[req_id_int - 1]
+
+            # 💡 대상 DB 기본키가 매핑되면 무조건 UPDATE (rowcount 조건 확인 안 함!)
+            if target_db_id is not None:
+              cursor.execute(
+                  """
+                                UPDATE cal_load_data 
+                                SET raw_val = %s, std_val = %s 
+                                WHERE id = %s
+                            """,
+                  [item["raw_val"], item["std_val"], target_db_id],
+              )
+            else:
+              # DB에 아예 없거나 새로 추가(+ 행 추가)된 번호인 경우에만 신규 INSERT
+              cursor.execute(
+                  """
+                                INSERT INTO cal_load_data (stage_id, raw_val, std_val)
+                                VALUES (%s, %s, %s)
+                            """,
+                  [stage_id, item["raw_val"], item["std_val"]],
+              )
+
+    return JsonResponse({
+        "status": "success",
+        "message": (
+            f"[{sub_code}] 선택한 보정 데이터가 신규 중복 없이 정확하게"
+            " 수정(업데이트)되었습니다!"
+        ),
+    })
+
+  except Exception as e:
+    return JsonResponse({
+        "status": "error",
+        "message": f"그리드 저장 실패: {str(e)}",
+    })
+    
+
+@csrf_exempt
+def update_equipment_spec(request):
     """
-    우측 AG-Grid 테이블에서 수정한 구간별 지시하중(X) 및 기준하중(Y) 데이터를
-    ON DUPLICATE KEY UPDATE 구문으로 일괄 갱신합니다.
+    상단 '교정성적서 상세 스펙' 박스에서 수정한 정보(cal_sub_eq 테이블의 실제 존재 컬럼)를 업데이트합니다.
     """
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'})
@@ -4520,67 +4606,190 @@ def save_calibration_grid_data(request):
     try:
         data = json.loads(request.body)
         sub_code = data.get('sub_code')
-        items = data.get('items', [])  # AG-Grid의 전체 행 데이터 배열
-
-        if not items or not sub_code:
-            return JsonResponse({'status': 'error', 'message': '저장할 보정 데이터가 없습니다.'})
-
-        with connections['default'].cursor() as cursor:
-            sql = """
-                INSERT INTO cal_load_data (sub_code, seq, raw_val, std_val)
-                VALUES (%s, %s, %s, %s)
-                ON DUPLICATE KEY UPDATE
-                    raw_val = VALUES(raw_val),
-                    std_val = VALUES(std_val)
-            """
-            
-            params = [
-                (
-                    sub_code, 
-                    row.get('id'), 
-                    float(row.get('raw_val', 0)), 
-                    float(row.get('std_val', 0))
-                )
-                for row in items
-            ]
-            
-            cursor.executemany(sql, params)
-
-        return JsonResponse({
-            'status': 'success', 
-            'message': f"[{sub_code}] 센서의 보정 데이터 {len(items)}개 구간이 DB에 저장되었습니다!"
-        })
-
-    except Exception as e:
-        return JsonResponse({'status': 'error', 'message': f"그리드 저장 실패: {str(e)}"})
-    
-    
-    
-@csrf_exempt
-def update_equipment_spec(request):
-    try:
-        data = json.loads(request.body)
-        sub_code = data.get('sub_code')
+        
+        if not sub_code:
+            return JsonResponse({'status': 'error', 'message': '장비 코드가 없습니다.'})
         
         with connections['default'].cursor() as cursor:
-            # 💡 만약 DB 테이블에 load_count 컬럼이 없다면, 아래 UPDATE문에서 load_count 관련 내용은 제외하세요!
+            # 💡 주의: cal_sub_eq 테이블에는 capacity 컬럼이 없으므로 해당 컬럼을 제외하고 업데이트합니다!
             cursor.execute("""
                 UPDATE cal_sub_eq 
-                SET cert_no = %s, issued_by = %s, capacity = %s, 
-                    cal_date = %s, expire_date = %s
+                SET cert_no = %s, 
+                    issued_by = %s, 
+                    cal_date = %s, 
+                    expire_date = %s,
+                    updated_at = NOW()
                 WHERE sub_code = %s
             """, [
-                data.get('cert_no'), 
-                data.get('issued_by'), 
-                data.get('capacity'), 
-                data.get('cal_date'), 
-                data.get('expire_date'), 
+                data.get('cert_no', ''), 
+                data.get('issued_by', ''), 
+                data.get('cal_date') or None, 
+                data.get('expire_date') or None, 
                 sub_code
             ])
             
-        return JsonResponse({'status': 'success'})
+        return JsonResponse({'status': 'success', 'message': '상세 스펙이 수정되었습니다.'})
     except Exception as e:
-        return JsonResponse({'status': 'error', 'message': str(e)})
+        return JsonResponse({'status': 'error', 'message': f"스펙 저장 실패: {str(e)}"})
+    
+    
+@csrf_exempt
+def list_test_presets(request):
+  """전체 시험 종목 하중 템플릿 목록 조회 (GET)"""
+  try:
+    with connections["default"].cursor() as cursor:
+      cursor.execute(
+          "SELECT id, test_name, default_loads, description FROM"
+          " cal_test_presets ORDER BY test_name ASC"
+      )
+      rows = cursor.fetchall()
+      data = [
+          {
+              "id": r[0],
+              "test_name": r[1],
+              "default_loads": r[2],
+              "description": r[3],
+          }
+          for r in rows
+      ]
+    return JsonResponse({"status": "success", "data": data})
+  except Exception as e:
+    return JsonResponse({"status": "error", "message": str(e)})
+
+
+@csrf_exempt
+def create_test_preset(request):
+  """신규 시험 종목 및 하중 배열 DB 등록 (POST)"""
+  if request.method != "POST":
+    return JsonResponse({"status": "error", "message": "Invalid method"})
+  try:
+    data = json.loads(request.body)
+    t_name = data.get("test_name", "").strip()
+    loads = data.get("default_loads", "").strip()
+    desc = data.get("description", "").strip()
+
+    with connections["default"].cursor() as cursor:
+      cursor.execute(
+          """
+                INSERT INTO cal_test_presets (test_name, default_loads, description, created_at)
+                VALUES (%s, %s, %s, NOW())
+            """,
+          [t_name, loads, desc],
+      )
+      new_id = cursor.lastrowid
+    return JsonResponse({"status": "success", "id": new_id})
+  except Exception as e:
+    return JsonResponse({"status": "error", "message": str(e)})
+
+
+@csrf_exempt
+def update_test_preset(request):
+  """현재 그리드의 수정한 하중 배열로 기존 DB 템플릿 덮어쓰기 (POST)"""
+  if request.method != "POST":
+    return JsonResponse({"status": "error", "message": "Invalid method"})
+  try:
+    data = json.loads(request.body)
+    p_id = data.get("id")
+    loads = data.get("default_loads", "").strip()
+
+    with connections["default"].cursor() as cursor:
+      cursor.execute(
+          """
+                UPDATE cal_test_presets 
+                SET default_loads = %s, updated_at = NOW() 
+                WHERE id = %s
+            """,
+          [loads, p_id],
+      )
+    return JsonResponse({"status": "success"})
+  except Exception as e:
+    return JsonResponse({"status": "error", "message": str(e)})
+    
+    
+@csrf_exempt  # CSRF 오류 방지 (실무에서는 토큰 방식을 권장합니다)
+def export_calibration_excel(request):
+    if request.method == 'POST':
+        try:
+            # 1. 프론트엔드(JS)에서 보낸 JSON 데이터 수신
+            data = json.loads(request.body)
+            header = data.get('header', {})
+            rows = data.get('rows', [])
+
+            # 2. 서버에 저장된 엑셀 템플릿 파일 불러오기
+            template_path = os.path.join(
+                settings.BASE_DIR, 'static', 'excel_templates', '보정.xlsx'
+            )
+            wb = openpyxl.load_workbook(template_path)
+            ws = wb.active  # 현재 활성화된 시트 선택
+
+            # 3. ⭐ [헤더 입력] 말씀하신 정확한 셀 위치에 데이터 쏙쏙 채우기!
+            ws['C2'] = f"장비코드 : {header.get('sub_code', '')}"  # 장비코드
+            ws['C5'] = header.get('cert_no', '')  # 성적서 번호
+            ws['C6'] = header.get('issued_by', '')  # 발행기관
+            ws['C7'] = header.get('cert_date', '')  # 교정일자
+            ws['C8'] = header.get('expire_date', '')  # 교정만료일
+
+            # 4. ⭐ [표 데이터 입력] A12 셀부터 7개 열을 아래로 순차적으로 채우기!
+            start_row = 12
+            for idx, row_data in enumerate(rows):
+                current_row = start_row + idx
+                ws.cell(
+                    row=current_row, column=1, value=row_data.get('stage', '')
+                )  # A: 적용단
+                ws.cell(
+                    row=current_row, column=2, value=row_data.get('cap', '')
+                )  # B: 단 용량
+                ws.cell(
+                    row=current_row,
+                    column=3,
+                    value=row_data.get('raw_range', ''),
+                )  # C: 지시하중
+                ws.cell(
+                    row=current_row,
+                    column=4,
+                    value=row_data.get('std_range', ''),
+                )  # D: 기준하중
+                ws.cell(
+                    row=current_row,
+                    column=5,
+                    value=row_data.get('formula', ''),
+                )  # E: 보정함수(식)
+                ws.cell(
+                    row=current_row,
+                    column=6,
+                    value=float(row_data.get('input_val', 0)),
+                )  # F: 하중입력값
+                ws.cell(
+                    row=current_row,
+                    column=7,
+                    value=float(row_data.get('calc_val', 0)),
+                )  # G: 보정하중
+
+            # 5. 완성된 파일을 가상 메모리에 저장하여 클라이언트로 다운로드 전송
+            output = BytesIO()
+            wb.save(output)
+            output.seek(0)
+
+            filename = f"보정성적서_{header.get('sub_code', 'result')}.xlsx"
+            response = HttpResponse(
+                output.read(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response["Content-Disposition"] = (
+                f'attachment; filename="{filename}"'
+            )
+            return response
+
+        except Exception as e:
+            return HttpResponse(
+                f"엑셀 생성 오류: {str(e)}", status=500, content_type="text/plain"
+            )
+
+    return HttpResponse("잘못된 접근입니다.", status=400)
+    
+    
+    
+    
     
     # ----------------------여기부터 교정성적서 보정------------end
         

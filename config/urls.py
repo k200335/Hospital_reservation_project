@@ -211,6 +211,33 @@ urlpatterns = [
     
     # [추가] 교정성적서 상세 스펙 수정 API 경로
     path('api/equipment/update-spec/', views.update_equipment_spec, name='update_equipment_spec'),
+    
+    # =========================================================================
+    # 2. 💡 [신규 추가] 실무 하중 템플릿 관리 API (하단 독립 계산기 및 모달용)
+    # =========================================================================
+    # ① 1,000개 시험 종목 목록 불러오기 (초고속 자동완성 검색 바용)
+    path(
+        "api/preset/list/", views.list_test_presets, name="list_test_presets"
+    ),
+    # ② 신규 시험 종목 및 하중 배열 DB 등록 (모달 입력창용)
+    path(
+        "api/preset/create/",
+        views.create_test_preset,
+        name="create_test_preset",
+    ),
+    # ③ 현재 그리드의 수정한 하중으로 DB 템플릿 덮어쓰기 (템플릿 DB 저장 버튼용)
+    path(
+        "api/preset/update/",
+        views.update_test_preset,
+        name="update_test_preset",
+    ),
+    
+    # urls.py의 urlpatterns 리스트 안에 아래 줄을 추가해 주세요.
+    path(
+        'api/export-excel/',
+        views.export_calibration_excel,
+        name='export_calibration_excel',
+    ),
 
 
 

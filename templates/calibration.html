@@ -36,9 +36,13 @@
 <body>
 
 <div class="container-fluid p-0">
+    <!-- 💡 [3단 레이아웃 핵심] 1행(row) 안에 좌(1번) / 중(2번) / 우(3번) 컬럼을 나란히 배치 -->
     <div class="row g-0">
         
-        <div class="col-md-3 col-lg-3 border-end bg-light p-0" style="min-height: calc(100vh - 120px);">
+        <!-- ================================================================= -->
+        <!-- ① [1번 좌측] 장비 검색 및 사이드바 리스트 (화면의 약 20% 차지) -->
+        <!-- ================================================================= -->
+        <div class="col-xxl-2 col-xl-3 col-lg-3 border-end bg-light p-0" style="min-height: calc(100vh - 60px);">
             
             <div class="bg-primary text-white fw-bold p-3 fs-6 d-flex align-items-center justify-content-between">
                 <span><i class="bi bi-cpu me-1"></i> 교정성적서 보정관리</span>
@@ -69,45 +73,53 @@
                 </div>
             </div>
 
-            <div id="sidebarEquipmentList" class="p-3" style="max-height: calc(100vh - 260px); overflow-y: auto;">
-                </div>
+            <div id="sidebarEquipmentList" class="p-3" style="max-height: calc(100vh - 200px); overflow-y: auto;">
+            </div>
+            
         </div>
 
-        <div class="col-md-9 col-lg-9 p-4 bg-white" style="min-height: calc(100vh - 120px);">
+
+        <!-- ================================================================= -->
+        <!-- ② [2번 중앙] 교정성적서 상세 스펙 & 기준점 그리드 (화면의 약 40% 차지) -->
+        <!-- ================================================================= -->
+        <div class="col-xxl-5 col-xl-5 col-lg-9 p-3 bg-white border-end" style="min-height: calc(100vh - 60px);">
             
-            <div class="card shadow-sm border-0 mb-4" style="border: 1px solid #dee2e6 !important;">
-                <div class="card-body p-4">
+            <div class="card shadow-sm border-0 h-100" style="border: 1px solid #dee2e6 !important;">
+                <div class="card-body p-3 d-flex flex-column">
                     
+                    <!-- 장비 헤더 상태바 -->
                     <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
                         <div>
                             <span class="text-muted small fw-bold me-2" id="headerEqCode">선택된 장비 없음</span>
                             <span class="text-muted small" id="headerEqStatus">좌측 목록에서 장비를 선택해주세요.</span>
                         </div>
                         <div class="d-flex gap-2">
-                            <button class="btn btn-sm btn-outline-primary px-3" onclick="alert('엑셀 성적서 업로드 기능 연동')">
-                                <i class="bi bi-file-earmark-arrow-up me-1"></i> 교정성적서 업로드
+                            <button class="btn btn-sm btn-outline-primary px-2 py-1" style="font-size: 11px;" onclick="alert('엑셀 성적서 업로드 기능 연동')">
+                                <i class="bi bi-file-earmark-arrow-up me-1"></i> 성적서 업로드
                             </button>
-                            <button class="btn btn-sm btn-outline-secondary px-3" onclick="alert('보정값 엑셀 다운로드')">
+                            <button class="btn btn-sm btn-outline-secondary px-2 py-1" style="font-size: 11px;" onclick="alert('보정값 엑셀 다운로드')">
                                 <i class="bi bi-file-earmark-excel me-1"></i> 양식 다운로드
                             </button>
                         </div>
                     </div>
 
-                    <h4 class="fw-bold text-primary mb-3" id="displayEqTitle">
+                    <h5 class="fw-bold text-primary mb-3" id="displayEqTitle" style="font-size: 16px;">
                         좌측 리스트에서 장비(로드셀)를 클릭해주세요.
-                    </h4>
+                    </h5>
 
-                    <div id="equipmentDetailArea">
+                    <div id="equipmentDetailArea" class="flex-grow-1 d-flex flex-column">
                         
-                        <div id="emptySelectGuide" class="text-center py-5 bg-light border rounded">
+                        <!-- 선택 안내 메시지 -->
+                        <div id="emptySelectGuide" class="text-center py-5 bg-light border rounded my-auto">
                             <i class="bi bi-arrow-left-circle fs-2 text-muted mb-2 d-block"></i>
                             <p class="text-muted small mb-0">해당 장비의 보정 구간(지시하중/기준하중)을 조회하거나 수정하려면<br>좌측 파란색 하위항목(ㄴ [코드] 이름)을 클릭하세요.</p>
                         </div>
 
-                        <div id="subEqSpecBox" class="p-3 mb-4 bg-light border rounded" style="display: none; background-color: #f8fbfd !important; border-color: #cce5ff !important;">
+                        <!-- 상세 스펙 입력 박스 -->
+                        <div id="subEqSpecBox" class="p-3 mb-3 bg-light border rounded" style="display: none; background-color: #f8fbfd !important; border-color: #cce5ff !important;">
                             <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-2">
                                 <h6 class="fw-bold text-dark mb-0" style="font-size: 13px;">
-                                    <i class="bi bi-file-earmark-check-fill text-primary me-1"></i> 교정성적서 상세 스펙 (수정 가능)
+                                    <i class="bi bi-file-earmark-check-fill text-primary me-1"></i> 교정성적서 상세 스펙
                                 </h6>
                                 <button class="btn btn-sm btn-primary py-0 px-2" onclick="saveSpecData()" style="font-size: 11px;">
                                     <i class="bi bi-save me-1"></i> 스펙 수정 저장
@@ -116,7 +128,7 @@
                             
                             <div class="row g-2" style="font-size: 12px;">
                                 <div class="col-md-4">
-                                    <span class="text-muted d-block mb-1">교정성적서번호:</span>
+                                    <span class="text-muted d-block mb-1">성적서번호:</span>
                                     <input type="text" id="specCertNo" class="form-control form-control-sm">
                                 </div>
                                 <div class="col-md-4">
@@ -137,27 +149,89 @@
                                     <div id="expiryWarning" class="mt-1 fw-bold" style="font-size: 11px; display: none;"></div>
                                 </div>
                                 <div class="col-md-4">
-                                    <span class="text-muted d-block mb-1">기준하중 데이터 수:</span>
+                                    <span class="text-muted d-block mb-1">데이터 수:</span>
                                     <input type="text" id="specLoadCount" class="form-control form-control-sm" readonly style="background:#eee;">
                                 </div>
                             </div>
                         </div>
 
-                        <div id="gridContainer" style="display: none;">
+                        <!-- 💡 상단 기준점 그리드 (화면 높이에 맞춰 자동 확장) -->
+                        <div id="gridContainer" class="flex-grow-1 d-flex flex-column" style="display: none;">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="small fw-bold text-dark"><i class="bi bi-table me-1"></i>구간별 선형보간 기준점 데이터</span>
                                 <div class="d-flex gap-1">
-                                <button class="btn btn-sm btn-outline-success py-0 px-2" onclick="addGridRow()"><i class="bi bi-plus"></i> 행 추가</button>
-                                <button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="deleteGridRow()"><i class="bi bi-trash"></i> 행 삭제</button>
-                                <button class="btn btn-sm btn-primary py-0 px-3" onclick="saveCalibrationData()">변경사항 DB 저장</button>
+                                    <button class="btn btn-sm btn-outline-success py-0 px-2" style="font-size: 11px;" onclick="addGridRow()"><i class="bi bi-plus"></i> 행 추가</button>
+                                    <button class="btn btn-sm btn-outline-danger py-0 px-2" style="font-size: 11px;" onclick="deleteGridRow()"><i class="bi bi-trash"></i> 행 삭제</button>
+                                    <button class="btn btn-sm btn-primary py-0 px-2" style="font-size: 11px;" onclick="saveCalibrationData()">DB 저장</button>
+                                </div>
                             </div>
-                            </div>
-                            <div id="calibrationGrid" class="ag-theme-alpine" style="height: 380px; width: 100%;"></div>
+                            <div id="calibrationGrid" class="ag-theme-alpine flex-grow-1" style="width: 100%; min-height: 400px;"></div>
                         </div>
 
                     </div>
 
                 </div>
+            </div>
+
+        </div>
+                
+        <!-- ================================================================= -->
+        <!-- ③ [3번 우측] 실무 하중 선형보간 보정 계산기 (화면의 약 40% 차지) -->
+        <!-- ================================================================= -->
+        <div class="col-xxl-5 col-xl-4 col-lg-12 p-3 bg-white" style="min-height: calc(100vh - 60px);">
+            
+            <div class="card border-success shadow-sm h-100 d-flex flex-column" style="border-radius: 8px;">
+                
+                <!-- 💡 1. 상단 초록색 헤더: '검색창 & 신규 버튼' 시원하게 배치 -->
+                <div class="card-header bg-success text-white d-flex justify-content-between align-items-center py-2 flex-wrap gap-2">
+                    <h6 class="mb-0 fw-bold text-nowrap" style="font-size: 14px;"><i class="bi bi-calculator me-1"></i>실무 보정 계산기</h6>
+                    <div class="input-group input-group-sm flex-grow-1 position-relative" style="max-width: 350px;">
+                        <span class="input-group-text bg-white text-success fw-bold"><i class="bi bi-search"></i></span>
+                        <input type="text" id="presetSearchInput" class="form-control fw-bold" placeholder="시험 종목 검색 (예: 벽돌, 평판...)" autocomplete="off" oninput="filterPresetDropdown()">
+                        <button class="btn btn-warning text-dark fw-bold px-3" type="button" onclick="openNewPresetModal()" title="신규 등록"><i class="bi bi-plus-circle me-1"></i>신규</button>
+                        <!-- 자동완성 드롭다운 목록 -->
+                        <ul id="presetDropdownList" class="list-group position-absolute w-100 shadow" style="top: 100%; left: 0; z-index: 1050; max-height: 250px; overflow-y: auto; display: none;"></ul>
+                    </div>
+                </div>
+
+                <!-- 💡 2. 카드 본문: 컨트롤 버튼 및 [시험 적용 단] 드롭다운 배치 -->
+                <div class="card-body p-3 d-flex flex-column flex-grow-1">
+                    <!-- ⭐ [핵심 추가] 표 바로 위에 "시험 적용 단(1단/2단) 드롭다운" + "컨트롤 버튼들" 나란히 배치! -->
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom flex-wrap gap-2">
+                        
+                        <!-- 💡 [추가된 부분] 만능시험기 등에서 2단(2000kN) 곡선으로 일괄 보정할 수 있는 드롭다운! -->
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="small fw-bold text-dark text-nowrap"><i class="bi bi-table me-1"></i>표 컨트롤</span>
+                            <div class="input-group input-group-sm shadow-sm" style="width: auto;">
+                                <span class="input-group-text bg-primary text-white fw-bold" style="font-size: 11px;"><i class="bi bi-layers-fill me-1"></i>시험 적용 단</span>
+                                <select id="globalStageSelect" class="form-select form-select-sm fw-bold text-primary" style="font-size: 11px; min-width: 130px; cursor: pointer;" onchange="applyGlobalStageToAll(this.value)">
+                                    <option value="1단">1단 (기본)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- 행 추가/삭제/재계산/저장/엑셀 다운로드 버튼 그룹 -->
+                        <div class="d-flex gap-1 flex-wrap">
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold px-2 py-1" style="font-size: 11px;" onclick="addInterpRow()"><i class="bi bi-plus-lg me-1"></i>행 추가</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-2 py-1" style="font-size: 11px;" onclick="deleteInterpRow()"><i class="bi bi-trash me-1"></i>행 삭제</button>
+                            <button type="button" class="btn btn-sm btn-outline-info text-dark fw-bold px-2 py-1" style="font-size: 11px;" onclick="recalculateAllInterp()" title="전체 재계산"><i class="bi bi-arrow-clockwise me-1"></i>재계산</button>
+                            
+                            <!-- 구분선 -->
+                            <div class="vr mx-1" style="min-height: 24px;"></div>
+                            
+                            <!-- 💡 [신규 추가] 엑셀 Ctrl+V용 원클릭 클립보드 복사 버튼! -->
+                            <button type="button" class="btn btn-sm btn-success fw-bold px-2 py-1 shadow-sm" style="font-size: 11px;" onclick="copyGridToClipboard()" title="열린 엑셀에 Ctrl+V로 붙여넣기"><i class="bi bi-clipboard-check me-1"></i>값복사</button>
+
+                            <!-- 기존 DB 저장 및 엑셀 다운로드 버튼 -->
+                            <button type="button" class="btn btn-sm btn-primary fw-bold px-3 py-1 shadow-sm" style="font-size: 11px;" onclick="saveCurrentPresetToDB()"><i class="bi bi-save me-1"></i>템플릿 DB 저장</button>
+                            <button type="button" class="btn btn-sm btn-dark fw-bold px-2 py-1 shadow-sm" style="font-size: 11px;" onclick="exportInterpExcel()"><i class="bi bi-file-earmark-excel me-1"></i>엑셀</button>
+                        </div>
+                    </div>
+
+                    <!-- 하단 실무 계산기 그리드 (화면 높이에 맞춰 자동 확장) -->
+                    <div id="interpolationGrid" class="ag-theme-alpine flex-grow-1" style="width: 100%; min-height: 430px;"></div>
+                </div>
+
             </div>
 
         </div>
@@ -233,40 +307,16 @@
                             <input type="date" id="subExpireDateInput" class="form-control form-control-sm" value="2027-01-14">
                         </div>
                         
-                        <div id="stageWrapper">
-                            <label class="form-label fw-bold text-primary">6. 단(Stage) 및 하중 데이터 관리</label>
-                            <div id="stageContainer"></div>
-                            <button type="button" class="btn btn-sm btn-outline-primary mb-3" onclick="addStageBlock()">
-                                <i class="bi bi-plus-circle"></i> 단(Stage) 추가하기
-                            </button>
-                        </div>        
+                        <label class="form-label fw-bold text-primary">6. 단(Stage) 및 하중 데이터 관리</label>
+                            <div id="stageContainer">
+                                </div>
+                            <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addStageBlock()">
+                                <i class="bi bi-plus-circle"></i> + 단(Stage) 추가하기
+                            </button>     
 
                     </div>
 
-                    <div class="border-top pt-3">
-                        <div class="d-flex justify-content-between align-items-end mb-2">
-                            <label class="form-label fw-bold mb-0">7. 지시하중 / 기준하중 (kN) 테이블 <span class="text-danger">*</span></label>
-                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-2" onclick="addLoadRow()" style="font-size: 11px;">
-                                <i class="bi bi-plus"></i> 행 추가
-                            </button>
-                        </div>
-                        
-                        <div class="table-responsive border rounded" style="max-height: 200px; overflow-y: auto;">
-                            <table class="table table-sm table-bordered text-center mb-0" style="font-size: 12px;">
-                                <thead class="table-light sticky-top">
-                                    <tr>
-                                        <th style="width: 50px;">No.</th>
-                                        <th>지시하중 (kN)</th>
-                                        <th>기준하중 (kN)</th>
-                                        <th style="width: 50px;">삭제</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="loadTableBody">
-                                    </tbody>
-                            </table>
-                        </div>
-                        <small class="text-muted" style="font-size: 11px;">* 성적서의 지시하중(X)과 기준하중(Y)을 쌍으로 입력해주세요.</small>
-                    </div>
+                    
 
                 </div>
 
@@ -281,29 +331,63 @@
     </div>
 </div>
 
+
+<!-- ================================================================= -->
+<!-- ➕ [모달 창] 신규 시험항목 하중 템플릿 등록 팝업 -->
+<!-- ================================================================= -->
+<div class="modal fade" id="newPresetModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content border-success shadow">
+            <div class="modal-header bg-success text-white py-2">
+                <h6 class="modal-title fw-bold"><i class="bi bi-plus-circle-fill me-1"></i>신규 시험항목 하중 템플릿 등록</h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-dark">1. 시험 종목명 <span class="text-danger">*</span></label>
+                    <input type="text" id="newPresetNameInput" class="form-control form-control-sm fw-bold" placeholder="예: 고강도 콘크리트 틔움 시험">
+                </div>
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-dark">2. 기본 하중값 배열 (kN) <span class="text-danger">*</span></label>
+                    <input type="text" id="newPresetLoadsInput" class="form-control form-control-sm fw-bold text-primary" placeholder="예: 200, 400, 600, 800, 1000">
+                    <div class="form-text" style="font-size: 11px;">숫자를 콤마(,)로 구분해서 입력하세요. 입력한 개수만큼 표 행이 자동 생성됩니다.</div>
+                </div>
+                <div class="mb-1">
+                    <label class="form-label small fw-bold text-muted">3. 설명 또는 비고 (선택)</label>
+                    <input type="text" id="newPresetDescInput" class="form-control form-control-sm" placeholder="예: KS F 2405 규격 적용">
+                </div>
+            </div>
+            <div class="modal-footer py-2 bg-light">
+                <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">취소</button>
+                <button type="button" class="btn btn-sm btn-success fw-bold" onclick="createNewPresetDB()">DB 등록 및 즉시 적용</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
 <script>
     // ==========================================
-    // 1. 전역 변수 설정
+    // 1. 전역 변수 및 초기화
     // ==========================================
     let gridOptions = null;
     let currentEqCode = "";
     let currentSubCode = "";
     let regModalInstance = null;
-    let dbEquipmentList = []; // MySQL DB에서 로드한 데이터를 보관하는 배열
+    let dbEquipmentList = []; // MySQL DB 데이터 보관 배열
 
-    // 페이지 로드 시 실행
     document.addEventListener("DOMContentLoaded", function() {
         const modalEl = document.getElementById('regModal');
         if (modalEl) regModalInstance = new bootstrap.Modal(modalEl);
         
-        fetchEquipmentListFromDB(); // 1. 로딩 즉시 MySQL DB에서 장비목록 호출
-        initLoadTable(); // 모달 내 7번 지시/기준하중 기본 6개 구간 세팅
+        fetchEquipmentListFromDB(); // DB에서 장비목록 호출
+        initStageBlocks();          // 모달 내 다중 단(Stage) 기본 세팅
     });
 
     // ==========================================
-    // 2. MySQL DB에서 장비 리스트를 불러와 사이드바 렌더링
+    // 2. 장비 목록 조회 및 사이드바 렌더링
     // ==========================================
     function fetchEquipmentListFromDB() {
         fetch('/api/equipment/list/')
@@ -326,477 +410,61 @@
     }
 
     function renderSidebar(filterText = "") {
-    const container = document.getElementById('sidebarEquipmentList');
-    if (!container) return;
-    container.innerHTML = "";
+        const container = document.getElementById('sidebarEquipmentList');
+        if (!container) return;
+        container.innerHTML = "";
 
-    if (!dbEquipmentList || dbEquipmentList.length === 0) {
-        container.innerHTML = '<div class="text-center text-muted p-4 small">등록된 장비가 없습니다.</div>';
-        return;
-    }
-
-    const q = filterText.trim().toLowerCase();
-
-    dbEquipmentList.forEach(eq => {
-        // 검색 조건: 장비명 또는 하위 장비 코드/이름
-        const matchMain = (eq.name || "").toLowerCase().includes(q) || (eq.id || "").toLowerCase().includes(q);
-        const matchSub = (eq.subItems || []).some(sub => (sub.name || "").toLowerCase().includes(q) || (sub.code || "").toLowerCase().includes(q));
-
-        if (!matchMain && !matchSub) return;
-
-        const badgeClass = eq.status === '정상' ? 'bg-primary' : 'bg-secondary';
-        const bgStyle = eq.status === '정상' ? 'background-color: #f4f8ff;' : 'background-color: #f8f9fa;';
-
-        let subHtml = "";
-        (eq.subItems || []).forEach(sub => {
-            // [코드] 정격용량 형태 (불필요한 '센서' 단어 삭제 및 중복 장비명 제거)
-            const titleName = `[${sub.code}] ${sub.capacity}`; 
-            
-            subHtml += `
-                <div class="text-primary text-truncate sub-eq-item mb-1" 
-                     onclick="selectSubEquipment(this, '${sub.code} ${sub.capacity}', '${eq.id}', '${sub.code}')">
-                    &nbsp;ㄴ <strong>${sub.code}</strong> <small>(${sub.capacity})</small>
-                </div>
-            `;
-        });
-
-        const cardHtml = `
-            <div class="card border-primary mb-3 shadow-sm" style="border-radius: 8px; ${bgStyle}">
-                <div class="card-body p-3">
-                    <div class="d-flex justify-content-between align-items-start mb-1">
-                        <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">[${eq.id}] ${eq.name}</h6>
-                        <span class="badge ${badgeClass}" style="font-size: 10px;">${eq.status || '정상'}</span>
-                    </div>
-                    <div class="border-top pt-2 mt-2" style="font-size: 12px;">
-                        ${subHtml || '<div class="text-muted small">등록된 하위항목 없음</div>'}
-                    </div>
-                </div>
-            </div>
-        `;
-        container.innerHTML += cardHtml;
-    });
-}
-
-    function filterEquipmentList() {
-        const inputEl = document.getElementById('eqSearchInput');
-        if (inputEl) renderSidebar(inputEl.value);
-    }
-
-    // ==========================================
-    // 3. 좌측 하위 항목 클릭 시 상세화면 & AG-Grid 호출
-    // ==========================================
-    function selectSubEquipment(element, titleName, eqCode, subCode) {
-    // 1. 선택 표시 활성화
-    document.querySelectorAll('.sub-eq-item').forEach(el => el.classList.remove('active'));
-    if (element) element.classList.add('active');
-
-    // 2. 제목 및 상태 표시
-    document.getElementById('displayEqTitle').textContent = titleName;
-    document.getElementById('headerEqCode').textContent = "장비코드: [" + eqCode + "]";
-    document.getElementById('headerEqStatus').textContent = "하위항목: " + subCode;
-
-    // 3. UI 보이게 설정
-    document.getElementById('emptySelectGuide').style.display = 'none';
-    document.getElementById('subEqSpecBox').style.display = 'block';
-    document.getElementById('gridContainer').style.display = 'block';
-
-    currentEqCode = eqCode;
-    currentSubCode = subCode;
-
-    // 4. 데이터 찾아오기
-    const parentEq = dbEquipmentList.find(e => e.id === eqCode);
-    const subEq = parentEq?.subItems.find(s => s.code === subCode);
-
-    // 5. 입력창(input)에 value값 할당 및 만료일 체크 로직
-    if (subEq) {
-        const expireDateVal = subEq.expireDate || '';
-        
-        document.getElementById('specCertNo').value = subEq.certNo || '';
-        document.getElementById('specIssuedBy').value = subEq.issuedBy || '';
-        document.getElementById('specCapacity').value = subEq.capacity || '';
-        document.getElementById('specDate').value = subEq.date || '';
-        document.getElementById('specExpireDate').value = expireDateVal;
-        document.getElementById('specLoadCount').value = (subEq.loads ? subEq.loads.length : 0) + ' 개 구간';
-
-        // 💡 [추가] 날짜 체크 로직 실행 (경고창 및 빨간 테두리 적용)
-        checkExpiryDate(expireDateVal);
-    }
-
-    // 6. 그리드 데이터 로드
-    loadCalibrationGridData(eqCode, subCode, subEq);
-}
-
-function checkExpiryDate(expireDateStr) {
-    const expireInput = document.getElementById('specExpireDate');
-    const msgDiv = document.getElementById('expiryWarning');
-    
-    if (!expireDateStr) return;
-
-    const expireDate = new Date(expireDateStr);
-    const today = new Date();
-    const diffTime = expireDate - today;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    // 1. 평상시 상태 (파란색)
-    expireInput.style.border = "2px solid #0d6efd"; 
-    expireInput.style.color = "#0d6efd"; // 💡 날짜 텍스트 색상 파란색
-    if (msgDiv) {
-        msgDiv.style.display = "none";
-    }
-
-    // 2. 경고 상태 (30일 이내 또는 만료)
-    if (diffDays <= 30) {
-        expireInput.style.border = "2px solid red"; // 빨간 테두리
-        expireInput.style.color = "red";           // 💡 날짜 텍스트 색상 빨간색
-        
-        if (msgDiv) {
-            msgDiv.style.display = "block";
-            msgDiv.style.color = "red";
-            msgDiv.textContent = diffDays < 0 ? `❌ 교정 만료됨!` : `⚠️ 교정 만료 ${diffDays}일 전입니다!`;
-        }
-    }
-}
-
-    // ==========================================
-    // 4. AG-Grid 데이터 셋업 및 렌더링
-    // ==========================================
-    function loadCalibrationGridData(eqCode, subCode, subEqData) {
-    const gridDiv = document.querySelector('#calibrationGrid');
-    
-    const rowData = [];
-    const loads = subEqData?.loads || [];
-    loads.forEach((item, idx) => {
-        rowData.push({
-            id: idx + 1,
-            raw_val: item.raw || 0,
-            std_val: item.std || 0
-        });
-    });
-
-    if (gridOptions && gridOptions.api) {
-        gridOptions.api.setRowData(rowData);
-        return;
-    }
-
-    gridOptions = {
-        columnDefs: [
-            // 💡 체크박스 추가
-            { headerName: "", field: "checkbox", width: 40, checkboxSelection: true, headerCheckboxSelection: true },
-            { headerName: "순번", field: "id", width: 80 },
-            { headerName: "지시하중 (kN)", field: "raw_val", editable: true, flex: 1 },
-            { headerName: "기준하중 (kN)", field: "std_val", editable: true, flex: 1 },
-            { headerName: "오차(%)", valueGetter: "((data.std_val - data.raw_val) / (data.raw_val || 1) * 100).toFixed(2) + '%'", width: 120 }
-        ],
-        defaultColDef: { resizable: true },
-        rowSelection: 'multiple', // 여러 개 선택 가능
-        rowData: rowData
-    };
-
-    new agGrid.Grid(gridDiv, gridOptions);
-}
-
-    function saveCalibrationData() {
-    if (!currentSubCode) {
-        alert("선택된 하위 장비가 없습니다.");
-        return;
-    }
-
-    const selectedNodes = gridOptions.api.getSelectedNodes();
-    if (selectedNodes.length === 0) {
-        alert("수정(저장)할 행을 체크박스로 선택해주세요!");
-        return;
-    }
-
-    const rowData = selectedNodes.map(node => node.data);
-
-    fetch('/api/calibration/save/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            sub_code: currentSubCode,
-            items: rowData
-        })
-    })
-    .then(response => response.json())
-    .then(res => {
-        if (res.status === 'success') {
-            alert("변경사항이 DB에 저장되었습니다.");
-            gridOptions.api.deselectAll();
-            
-            // 🚀 [추가된 핵심 코드] 저장 성공 후 DB 데이터를 다시 불러와 그리드 갱신
-            fetchEquipmentListFromDB(); 
-        } else {
-            alert("저장 실패: " + res.message);
-        }
-    })
-    .catch(err => {
-        console.error(err);
-        alert("서버 통신 오류");
-    });
-}
-
-// 행 추가: 가장 마지막 순번(id)을 계산하여 추가
-function addGridRow() {
-    const newRow = { id: gridOptions.api.getDisplayedRowCount() + 1, raw_val: 0, std_val: 0 };
-    gridOptions.api.applyTransaction({ add: [newRow] });
-}
-
-// 행 삭제: 체크된 행만 삭제
-function deleteGridRow() {
-    const selectedNodes = gridOptions.api.getSelectedNodes();
-    if (selectedNodes.length === 0) {
-        alert("삭제할 행을 체크박스에서 선택하세요.");
-        return;
-    }
-    const selectedData = selectedNodes.map(node => node.data);
-    gridOptions.api.applyTransaction({ remove: selectedData });
-}
-
-// 스펙 수정 저장 함수
-function saveSpecData() {
-    if (!currentSubCode) return;
-
-    // 현재 그리드에 떠있는 데이터 개수를 가져옵니다.
-    const loadCount = gridOptions ? gridOptions.api.getDisplayedRowCount() : 0;
-
-    const payload = {
-        sub_code: currentSubCode,
-        cert_no: document.getElementById('specCertNo').value,
-        issued_by: document.getElementById('specIssuedBy').value,
-        capacity: document.getElementById('specCapacity').value,
-        cal_date: document.getElementById('specDate').value,
-        expire_date: document.getElementById('specExpireDate').value,
-        load_count: loadCount // 💡 서버로 데이터 개수 전달
-    };
-
-    fetch('/api/equipment/update-spec/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.status === 'success') {
-            alert("상세 스펙이 수정되었습니다.");
-            fetchEquipmentListFromDB(); // 목록 갱신
-        } else {
-            alert("저장 실패: " + data.message);
-        }
-    });
-}
-
-    // ==========================================
-    // 5. 모달 제어 및 7번 지시/기준하중 동적 테이블
-    // ==========================================
-    function openRegistrationModal() {
-        const isSubMode = document.getElementById('subModeSwitch').checked;
-        const mainArea = document.getElementById('mainRegFormArea');
-        const subArea = document.getElementById('subRegFormArea');
-        const label = document.getElementById('regModalLabel');
-
-        if (isSubMode) {
-            label.innerHTML = '<i class="bi bi-gauge me-1"></i> 하위장비(로드셀/센서) 등록';
-            if (mainArea) mainArea.style.display = 'none';
-            if (subArea) subArea.style.display = 'block';
-
-            const parentSelect = document.getElementById('subParentSelect');
-            if (parentSelect) {
-                parentSelect.innerHTML = '<option value="" disabled selected>상위 메인장비를 선택해주세요</option>';
-                dbEquipmentList.forEach(eq => {
-                    parentSelect.innerHTML += `<option value="${eq.id}">[${eq.id}] ${eq.name}</option>`;
-                });
-                if (currentEqCode) parentSelect.value = currentEqCode;
-            }
-        } else {
-            label.innerHTML = '<i class="bi bi-server me-1"></i> 신규 메인장비 등록';
-            if (mainArea) mainArea.style.display = 'block';
-            if (subArea) subArea.style.display = 'none';
-        }
-
-        if (regModalInstance) regModalInstance.show();
-    }
-
-    // 성적서 기본 6개 구간(지시/기준 쌍) 세팅
-    function initLoadTable(initialData = null) {
-        const tbody = document.getElementById('loadTableBody');
-        if (!tbody) return;
-        tbody.innerHTML = "";
-        
-        const defaultRows = initialData || [
-            { raw: "0.0", std: "0.00" },
-            { raw: "60.0", std: "60.27" },
-            { raw: "120.0", std: "120.81" },
-            { raw: "180.0", std: "181.20" },
-            { raw: "240.0", std: "241.97" },
-            { raw: "270.0", std: "272.22" }
-        ];
-
-        defaultRows.forEach(item => {
-            const rawVal = typeof item === 'object' ? (item.raw !== undefined ? item.raw : "0.0") : item;
-            const stdVal = typeof item === 'object' ? (item.std !== undefined ? item.std : "0.00") : item;
-            addLoadRow(rawVal, stdVal);
-        });
-    }
-
-    // 4개 컬럼(No, 지시하중, 기준하중, 삭제)에 맞춘 행 추가
-    function addLoadRow(rawVal = "", stdVal = "") {
-        const tbody = document.getElementById('loadTableBody');
-        if (!tbody) return;
-        
-        const rowCount = tbody.children.length + 1;
-        const tr = document.createElement('tr');
-        
-        tr.innerHTML = `
-            <td class="bg-light align-middle fw-bold text-muted">${rowCount}</td>
-            <td class="p-1">
-                <input type="number" step="0.001" class="form-control form-control-sm text-center fw-bold text-dark load-input-raw" 
-                       placeholder="0.0" value="${rawVal}">
-            </td>
-            <td class="p-1">
-                <input type="number" step="0.001" class="form-control form-control-sm text-center fw-bold text-primary load-input-std" 
-                       placeholder="0.00" value="${stdVal}">
-            </td>
-            <td class="align-middle">
-                <button type="button" class="btn btn-link text-danger p-0 m-0" onclick="removeLoadRow(this)" title="삭제">
-                    <i class="bi bi-trash"></i>
-                </button>
-            </td>
-        `;
-        tbody.appendChild(tr);
-        updateTableRowNumbers();
-    }
-
-    function removeLoadRow(btn) {
-        const tbody = document.getElementById('loadTableBody');
-        if (!tbody || tbody.children.length <= 1) {
-            alert("최소 1개 이상의 하중 데이터 구간이 필요합니다.");
+        if (!dbEquipmentList || dbEquipmentList.length === 0) {
+            container.innerHTML = '<div class="text-center text-muted p-4 small">등록된 장비가 없습니다.</div>';
             return;
         }
-        btn.closest('tr').remove();
-        updateTableRowNumbers();
-    }
 
-    function updateTableRowNumbers() {
-        const tbody = document.getElementById('loadTableBody');
-        if (!tbody) return;
-        Array.from(tbody.children).forEach((row, index) => {
-            if (row.children[0]) row.children[0].textContent = index + 1;
-        });
-    }
+        const q = filterText.trim().toLowerCase();
 
-    function getLoadPairsFromTable() {
-        const tbody = document.getElementById('loadTableBody');
-        if (!tbody) return [];
-        
-        const loads = [];
-        Array.from(tbody.children).forEach(row => {
-            const rawEl = row.querySelector('.load-input-raw');
-            const stdEl = row.querySelector('.load-input-std');
-            if (rawEl && stdEl) {
-                if (rawEl.value !== "" || stdEl.value !== "") {
-                    loads.push({
-                        raw: parseFloat(rawEl.value || 0),
-                        std: parseFloat(stdEl.value || 0)
-                    });
+        dbEquipmentList.forEach(eq => {
+            const matchMain = (eq.name || "").toLowerCase().includes(q) || (eq.id || "").toLowerCase().includes(q);
+            const matchSub = (eq.subItems || []).some(sub => (sub.name || "").toLowerCase().includes(q) || (sub.code || "").toLowerCase().includes(q));
+
+            if (!matchMain && !matchSub) return;
+
+            const badgeClass = eq.status === '정상' ? 'bg-primary' : 'bg-secondary';
+            const bgStyle = eq.status === '정상' ? 'background-color: #f4f8ff;' : 'background-color: #f8f9fa;';
+
+            let subHtml = "";
+            (eq.subItems || []).forEach(sub => {
+                // 💡 [핵심 수정] 1단, 2단 용량을 모두 연결하여 표시 (오타 방지를 위해 인덱스 sIdx+1 사용)
+                let capVal = sub.capacity || '-';
+                if (sub.stages && sub.stages.length > 0) {
+                    capVal = sub.stages.map((stg, sIdx) => `${sIdx + 1}단: ${stg.capacity || ''}`).join(' / ');
                 }
-            }
+                
+                subHtml += `
+                    <div class="text-primary text-truncate sub-eq-item mb-1" 
+                         onclick="selectSubEquipment(this, '${sub.code} (${capVal})', '${eq.id}', '${sub.code}')">
+                        &nbsp;ㄴ <strong>${sub.code}</strong> <small>(${capVal})</small>
+                    </div>
+                `;
+            });
+
+            const cardHtml = `
+                <div class="card border-primary mb-3 shadow-sm" style="border-radius: 8px; ${bgStyle}">
+                    <div class="card-body p-3">
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <h6 class="fw-bold text-dark mb-0" style="font-size: 14px;">[${eq.id}] ${eq.name}</h6>
+                            <span class="badge ${badgeClass}" style="font-size: 10px;">${eq.status || '정상'}</span>
+                        </div>
+                        <div class="border-top pt-2 mt-2" style="font-size: 12px;">
+                            ${subHtml || '<div class="text-muted small">등록된 하위항목 없음</div>'}
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.innerHTML += cardHtml;
         });
-        return loads;
     }
 
     // ==========================================
-    // 6. 신규 장비 MySQL DB 실시간 저장 (POST)
-    // ==========================================
-    function saveRegistrationData() {
-    const isSubMode = document.getElementById('subModeSwitch').checked;
-    let payload = {};
-
-    if (!isSubMode) {
-        // [메인 장비 모드] 기존과 동일
-        const name = document.getElementById('mainNameInput').value.trim();
-        const status = document.getElementById('mainStatusInput').value;
-        if (!name) { alert("1. 장비명을 입력해주세요."); return; }
-        const generatedId = "EQ_" + Math.floor(1000 + Math.random() * 9000);
-        payload = { is_sub_mode: false, id: generatedId, name: name, status: status };
-    } else {
-        // [하위 장비 모드] 여러 개의 단(Stage) 정보 수집
-        // 1. 기본 정보 수집
-    const parentId = document.getElementById('subParentSelect').value;
-    const code = document.getElementById('subCodeInput').value.trim();
-    const certNo = document.getElementById('subCertNoInput').value.trim();
-    const issuedBy = document.getElementById('subIssuedByInput').value.trim();
-    const date = document.getElementById('subDateInput').value;
-    const expireDate = document.getElementById('subExpireDateInput').value;
-
-    if (!parentId) { alert("대상 메인장비를 선택해주세요."); return; }
-    if (!code || !certNo) { alert("장비코드와 교정성적서번호는 필수입니다."); return; }
-
-    // 2. [추가된 부분] 여러 개의 Stage와 Load 데이터 수집
-    const stages = [];
-    document.querySelectorAll('.stage-block').forEach(block => {
-        const loads = [];
-        block.querySelectorAll('.load-table-body tr').forEach(tr => {
-            const raw = tr.querySelector('.raw-val').value;
-            const std = tr.querySelector('.std-val').value;
-            if (raw !== "" && std !== "") { // 빈 값은 제외
-                loads.push({ raw: raw, std: std });
-            }
-        });
-
-        stages.push({
-            name: block.querySelector('.stage-name').value,
-            capacity: block.querySelector('.stage-capacity').value,
-            loads: loads
-        });
-    });
-
-    if (stages.length === 0) { alert("최소 1개 이상의 단(Stage)과 하중 데이터를 입력해주세요."); return; }
-
-    // 3. payload 완성 (이제 stages 배열이 들어갑니다)
-    payload = {
-        is_sub_mode: true,
-        parent_id: parentId,
-        code: code,
-        name: code + " 센서",
-        cert_no: certNo,
-        issued_by: issuedBy || '미지정',
-        date: date,
-        expire_date: expireDate,
-        stages: stages // 여기서 stages 배열을 서버로 보냅니다
-    };
-}
-
-    // 서버로 데이터 전송
-    fetch('/api/equipment/save/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-    })
-    .then(response => response.json())
-    .then(res => {
-        if (res.status === 'success') {
-            alert(res.message);
-            if (regModalInstance) regModalInstance.hide();
-            fetchEquipmentListFromDB();
-            
-            // 입력 폼 초기화
-            document.getElementById('mainNameInput').value = "";
-            document.getElementById('subCodeInput').value = "";
-            document.getElementById('subCertNoInput').value = "";
-            document.querySelectorAll('.stage-row').forEach(row => row.remove()); // 단 입력행 초기화
-            initLoadTable();
-        } else {
-            alert("저장 실패: " + res.message);
-        }
-    })
-    .catch(err => {
-        console.error("저장 통신 에러:", err);
-        alert("서버 연결에 실패했습니다.");
-    });
-}
-
-    // ==========================================
-    // 7. 🔍 특수문자 방어 안전 검색 컨트롤러
+    // 3. 검색 기능 (하이라이트 포함)
     // ==========================================
     function escapeRegExp(string) {
         return string ? string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
@@ -832,19 +500,19 @@ function saveSpecData() {
         (dbEquipmentList || []).forEach(eq => {
             const eqName = String(eq.name || "").toLowerCase();
             const eqId = String(eq.id || "").toLowerCase();
-            
             const isMainMatch = eqName.includes(query) || eqId.includes(query);
             
             const matchingSubItems = (eq.subItems || []).filter(sub => {
                 const subName = String(sub.name || "").toLowerCase();
                 const subCode = String(sub.code || "").toLowerCase();
-                const subCap = String(sub.capacity || "").toLowerCase();
-                return subName.includes(query) || subCode.includes(query) || subCap.includes(query);
+                let capStr = sub.capacity || "";
+                if (sub.stages && sub.stages.length > 0) {
+                    capStr = sub.stages.map((stg, sIdx) => `${sIdx + 1}단: ${stg.capacity || ''}`).join(' / ');
+                }
+                return subName.includes(query) || subCode.includes(query) || capStr.toLowerCase().includes(query);
             });
 
-            const isSubMatch = matchingSubItems.length > 0;
-            if (!isMainMatch && !isSubMatch) return;
-
+            if (!isMainMatch && matchingSubItems.length === 0) return;
             matchCount++;
 
             const badgeClass = eq.status === '정상' ? 'bg-primary' : 'bg-secondary';
@@ -854,14 +522,19 @@ function saveSpecData() {
             const displaySubItems = isMainMatch ? (eq.subItems || []) : matchingSubItems;
 
             displaySubItems.forEach(sub => {
-                const titleName = `${eq.name} - [${sub.name}]`;
-                const highlightedName = String(sub.name || "").replace(highlightRegex, '<span class="bg-warning text-dark px-1 rounded">$1</span>');
+                let capVal = sub.capacity || '-';
+                if (sub.stages && sub.stages.length > 0) {
+                    capVal = sub.stages.map((stg, sIdx) => `${sIdx + 1}단: ${stg.capacity || ''}`).join(' / ');
+                }
+
+                const titleName = `${sub.code} (${capVal})`;
+                const highlightedName = String(sub.name || sub.code || "").replace(highlightRegex, '<span class="bg-warning text-dark px-1 rounded">$1</span>');
                 const highlightedCode = String(sub.code || "").replace(highlightRegex, '<span class="bg-warning text-dark px-1 rounded">$1</span>');
 
                 subHtml += `
                     <div class="text-primary text-truncate sub-eq-item mb-1" 
                          onclick="selectSubEquipment(this, '${titleName}', '${eq.id}', '${sub.code}')">
-                        &nbsp;ㄴ [${highlightedCode}] ${highlightedName} (${sub.capacity || '-'})
+                        &nbsp;ㄴ [${highlightedCode}] ${highlightedName} (${capVal})
                     </div>
                 `;
             });
@@ -902,58 +575,1255 @@ function saveSpecData() {
         }
     }
 
-// 단 추가 함수
-function addStageRow() {
-    const container = document.getElementById('stageContainer');
-    const div = document.createElement('div');
-    div.className = 'd-flex gap-2 mb-1 stage-row';
-    div.innerHTML = `
-        <input type="text" class="form-control form-control-sm stage-name" placeholder="단 이름(예: 1단)">
-        <input type="text" class="form-control form-control-sm stage-capacity" placeholder="용량(kN)">
-        <button type="button" class="btn btn-sm btn-outline-danger" onclick="this.parentElement.remove()">×</button>
-    `;
-    container.appendChild(div);
-}
-    
-let stageCount = 0;
+    // ==========================================
+    // 4. 장비 상세 조회 및 AG-Grid 제어
+    // ==========================================
+    function selectSubEquipment(element, titleName, eqCode, subCode) {
+        document.querySelectorAll('.sub-eq-item').forEach(el => el.classList.remove('active'));
+        if (element) element.classList.add('active');
 
-function addStageBlock() {
-    stageCount++;
-    const container = document.getElementById('stageContainer');
-    const block = document.createElement('div');
-    block.className = 'stage-block border p-2 mb-3 bg-light';
-    block.innerHTML = `
-        <div class="row g-2 mb-2">
-            <div class="col-6"><input type="text" class="form-control form-control-sm stage-name" placeholder="단 이름 (예: 1단)"></div>
-            <div class="col-5"><input type="text" class="form-control form-control-sm stage-capacity" placeholder="용량 (kN)"></div>
-            <div class="col-1"><button class="btn btn-sm btn-danger" onclick="this.parentElement.parentElement.remove()">×</button></div>
-        </div>
-        <table class="table table-sm table-bordered bg-white load-table">
-            <thead><tr><th>지시하중</th><th>기준하중</th><th style="width:40px;"></th></tr></thead>
-            <tbody class="load-table-body">
-                <tr>
-                    <td><input type="number" class="form-control form-control-sm raw-val"></td>
-                    <td><input type="number" class="form-control form-control-sm std-val"></td>
-                    <td><button class="btn btn-sm btn-light" onclick="this.parentElement.parentElement.remove()">-</button></td>
-                </tr>
-            </tbody>
-        </table>
-        <button class="btn btn-xs btn-secondary" onclick="addLoadRow(this)">+ 행 추가</button>
-    `;
-    container.appendChild(block);
+        currentEqCode = eqCode;
+        currentSubCode = subCode;
+
+        const parentEq = dbEquipmentList.find(e => e.id === eqCode);
+        const subEq = parentEq?.subItems.find(s => s.code === subCode);
+
+        let capacityVal = subEq?.capacity || '';
+        let totalLoadsCount = 0;
+
+        if (subEq) {
+            const expireDateVal = subEq.expireDate || '';
+            
+            // 💡 [핵심] 정격용량 텍스트 생성 시 인덱스(sIdx + 1)를 사용해 '1단:', '2단:' 순서로 강제 고정!
+            if (subEq.stages && subEq.stages.length > 0) {
+                capacityVal = subEq.stages.map((stg, sIdx) => `${sIdx + 1}단: ${stg.capacity || ''}`).join(' / ');
+                subEq.stages.forEach(stg => totalLoadsCount += (stg.loads || []).length);
+            } else {
+                totalLoadsCount = (subEq.loads || []).length;
+            }
+
+            document.getElementById('specCertNo').value = subEq.certNo || '';
+            document.getElementById('specIssuedBy').value = subEq.issuedBy || '';
+            document.getElementById('specCapacity').value = capacityVal;
+            document.getElementById('specDate').value = subEq.date || '';
+            document.getElementById('specExpireDate').value = expireDateVal;
+            document.getElementById('specLoadCount').value = totalLoadsCount + ' 개 구간';
+
+            checkExpiryDate(expireDateVal);
+
+            
+        }
+
+        // 💡 [핵심] 상단 파란색 큰 타이틀도 정격용량 박스와 토시 하나 안 틀리고 똑같이 나오도록 설정!
+        const fullTitle = `${subCode} (${capacityVal})`;
+        document.getElementById('displayEqTitle').textContent = fullTitle;
+        document.getElementById('headerEqCode').textContent = "장비코드: [" + eqCode + "]";
+        document.getElementById('headerEqStatus').textContent = "하위항목: " + subCode;
+
+        document.getElementById('emptySelectGuide').style.display = 'none';
+        document.getElementById('subEqSpecBox').style.display = 'block';
+        document.getElementById('gridContainer').style.display = 'block';
+
+        loadCalibrationGridData(eqCode, subCode, subEq);
+        updateGlobalStageDropdown();
+    }
+
+    function checkExpiryDate(expireDateStr) {
+        const expireInput = document.getElementById('specExpireDate');
+        const msgDiv = document.getElementById('expiryWarning');
+        if (!expireDateStr) return;
+
+        const expireDate = new Date(expireDateStr);
+        const today = new Date();
+        const diffDays = Math.ceil((expireDate - today) / (1000 * 60 * 60 * 24));
+
+        expireInput.style.border = "2px solid #0d6efd"; 
+        expireInput.style.color = "#0d6efd"; 
+        if (msgDiv) msgDiv.style.display = "none";
+
+        if (diffDays <= 30) {
+            expireInput.style.border = "2px solid red";
+            expireInput.style.color = "red"; 
+            if (msgDiv) {
+                msgDiv.style.display = "block";
+                msgDiv.style.color = "red";
+                msgDiv.textContent = diffDays < 0 ? `❌ 교정 만료됨!` : `⚠️ 교정 만료 ${diffDays}일 전입니다!`;
+            }
+        }
+    }
+
+    // ==========================================
+    // 💡 [신규 추가] 단(Stage)별로 순번(1, 2, 3...)을 독립적으로 재정렬하는 함수
+    // ==========================================
+    function refreshStageSeq() {
+        if (!gridOptions || !gridOptions.api) return;
+        
+        const stageCounters = {};
+        
+        gridOptions.api.forEachNode(node => {
+            const sName = String(node.data.stage_name || "1단").trim();
+            stageCounters[sName] = (stageCounters[sName] || 0) + 1;
+            node.data.id = stageCounters[sName]; // 단별로 1, 2, 3... 독립 순번 부여
+        });
+        
+        // 입력 중인 셀의 포커스를 잃지 않고 '순번' 열만 가볍게 새로고침
+        gridOptions.api.refreshCells({ columns: ['id'], force: true });
+    }
+
+    // ==========================================
+    // 4. 장비 상세 조회 및 AG-Grid 데이터 로드
+    // ==========================================
+    function loadCalibrationGridData(eqCode, subCode, subEqData) {
+        const gridDiv = document.querySelector('#calibrationGrid');
+        const rowData = [];
+        const stages = subEqData?.stages || [];
+        
+        if (stages && stages.length > 0) {
+            stages.forEach((stg, sIdx) => {
+                const stageName = stg.name || `${sIdx + 1}단`;
+                const stageCap = stg.capacity || "";
+                
+                (stg.loads || []).forEach((item, idx) => {
+                    rowData.push({
+                        db_id: item.id || null,           // DB 고유 기본키는 db_id에 안전하게 보관
+                        id: idx + 1,                      // 화면 표시용 순번 (단별로 1부터 시작)
+                        stage_name: stageName,
+                        stage_capacity: stageCap,
+                        raw_val: item.raw || item.raw_val || 0,
+                        std_val: item.std || item.std_val || 0
+                    });
+                });
+            });
+        } else {
+            const loads = subEqData?.loads || [];
+            loads.forEach((item, idx) => {
+                rowData.push({
+                    db_id: item.id || null,
+                    id: idx + 1,
+                    stage_name: "1단",
+                    stage_capacity: subEqData?.capacity || "",
+                    raw_val: item.raw || item.raw_val || 0,
+                    std_val: item.std || item.std_val || 0
+                });
+            });
+        }
+
+        if (gridOptions && gridOptions.api) {
+            gridOptions.api.setRowData(rowData);
+            refreshStageSeq(); // 로드 직후 순번 정렬
+            return;
+        }
+
+        gridOptions = {
+            columnDefs: [
+                { headerName: "", field: "checkbox", width: 40, checkboxSelection: true, headerCheckboxSelection: true },
+                { 
+                    headerName: "구분(단)", 
+                    field: "stage_name", 
+                    width: 110, 
+                    editable: true, 
+                    cellStyle: { fontWeight: 'bold', color: '#0d6efd' } 
+                },
+                { headerName: "단 용량", field: "stage_capacity", width: 130, editable: true },
+                { 
+                    headerName: "순번", 
+                    field: "id", 
+                    width: 70, 
+                    editable: false, 
+                    cellStyle: { textAlign: 'center', color: '#6c757d', fontWeight: 'bold' } 
+                },
+                { headerName: "지시하중 (kN)", field: "raw_val", editable: true, flex: 1 },
+                { headerName: "기준하중 (kN)", field: "std_val", editable: true, flex: 1 },
+                { headerName: "오차(%)", valueGetter: "((data.std_val - data.raw_val) / (data.raw_val || 1) * 100).toFixed(2) + '%'", width: 110 }
+            ],
+            defaultColDef: { resizable: true },
+            rowSelection: 'multiple',
+            rowData: rowData,
+            onCellValueChanged: function(params) {
+                // 💡 사용자가 '구분(단)' 이름을 직접 수정하면 순번을 즉시 재계산!
+                if (params.colDef.field === 'stage_name') {
+                    refreshStageSeq();
+                }
+            }
+        };
+
+        new agGrid.Grid(gridDiv, gridOptions);
+        refreshStageSeq();
+    }
+
+    // ==========================================
+    // 💡 스마트 행 추가 (체크한 행 바로 아래에 같은 단으로 삽입)
+    // ==========================================
+    function addGridRow() {
+        if (!gridOptions || !gridOptions.api) return;
+        
+        const selectedNodes = gridOptions.api.getSelectedNodes();
+        let targetStageName = "1단";
+        let targetStageCap = "";
+        let insertIndex = undefined;
+        
+        // 1. 체크박스로 선택한 행이 있다면, 그 행의 단 정보와 위치를 따라감!
+        if (selectedNodes.length > 0) {
+            const lastSelectedNode = selectedNodes[selectedNodes.length - 1];
+            targetStageName = lastSelectedNode.data.stage_name || "1단";
+            targetStageCap = lastSelectedNode.data.stage_capacity || "";
+            
+            // 선택한 행 바로 아랫줄에 삽입되도록 인덱스 지정
+            if (lastSelectedNode.rowIndex !== null && lastSelectedNode.rowIndex !== undefined) {
+                insertIndex = lastSelectedNode.rowIndex + 1;
+            }
+        } else {
+            // 2. 선택한 행이 없다면 가장 마지막 줄의 단 정보를 따라감
+            const count = gridOptions.api.getDisplayedRowCount();
+            if (count > 0) {
+                const lastRow = gridOptions.api.getDisplayedRowAtIndex(count - 1).data;
+                targetStageName = lastRow.stage_name || "1단";
+                targetStageCap = lastRow.stage_capacity || "";
+            }
+        }
+
+        const newRow = { 
+            db_id: null,
+            id: 0, 
+            stage_name: targetStageName, 
+            stage_capacity: targetStageCap, 
+            raw_val: 0, 
+            std_val: 0 
+        };
+        
+        // 원하는 위치에 행 삽입
+        if (insertIndex !== undefined) {
+            gridOptions.api.applyTransaction({ add: [newRow], addIndex: insertIndex });
+        } else {
+            gridOptions.api.applyTransaction({ add: [newRow] });
+        }
+        
+        // 💡 삽입 즉시 1단, 2단별로 순번(1, 2, 3...) 자동 재정렬!
+        refreshStageSeq();
+    }
+
+    // ==========================================
+    // 행 삭제
+    // ==========================================
+    function deleteGridRow() {
+        if (!gridOptions || !gridOptions.api) return;
+        const selectedNodes = gridOptions.api.getSelectedNodes();
+        if (selectedNodes.length === 0) {
+            alert("삭제할 행을 체크박스에서 선택하세요.");
+            return;
+        }
+        const selectedData = selectedNodes.map(node => node.data);
+        gridOptions.api.applyTransaction({ remove: selectedData });
+        
+        // 💡 삭제 후에도 빈자리 없이 단별로 순번 자동 재정렬!
+        refreshStageSeq();
+    }
+
+    // ==========================================
+    // 5. 데이터 저장 API 호출
+    // ==========================================
+    function saveCalibrationData() {
+        if (!currentSubCode) {
+            alert("선택된 하위 장비가 없습니다.");
+            return;
+        }
+
+        const selectedNodes = gridOptions.api.getSelectedNodes();
+        if (selectedNodes.length === 0) {
+            alert("수정(저장)할 행을 체크박스로 선택해주세요!");
+            return;
+        }
+
+        const allRowData = [];
+        gridOptions.api.forEachNode(node => allRowData.push(node.data));
+        
+        const stageMap = {};
+        allRowData.forEach(row => {
+            const sName = String(row.stage_name || "1단").trim();
+            if (!stageMap[sName]) {
+                stageMap[sName] = {
+                    name: sName,
+                    capacity: String(row.stage_capacity || "").trim(),
+                    loads: []
+                };
+            }
+            stageMap[sName].loads.push({
+                id: row.db_id || row.id, // DB 기본키가 있으면 보내고, 없으면 화면 순번 전송
+                raw_val: parseFloat(row.raw_val || 0),
+                std_val: parseFloat(row.std_val || 0)
+            });
+        });
+        const updatedStages = Object.values(stageMap);
+
+        const rowData = selectedNodes.map(node => node.data);
+
+        fetch('/api/calibration/save/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sub_code: currentSubCode,
+                items: rowData,
+                stages: updatedStages
+            })
+        })
+        .then(response => response.json())
+        .then(res => {
+            if (res.status === 'success') {
+                alert("변경사항이 DB에 저장되었습니다.");
+                gridOptions.api.deselectAll();
+                fetchEquipmentListFromDB(); 
+            } else {
+                alert("저장 실패: " + res.message);
+            }
+        })
+        .catch(err => {
+            console.error(err);
+            alert("서버 통신 오류");
+        });
+    }
+
+    function saveSpecData() {
+        if (!currentSubCode) return;
+        const loadCount = gridOptions ? gridOptions.api.getDisplayedRowCount() : 0;
+
+        const payload = {
+            sub_code: currentSubCode,
+            cert_no: document.getElementById('specCertNo').value,
+            issued_by: document.getElementById('specIssuedBy').value,
+            capacity: document.getElementById('specCapacity').value,
+            cal_date: document.getElementById('specDate').value,
+            expire_date: document.getElementById('specExpireDate').value,
+            load_count: loadCount
+        };
+
+        fetch('/api/equipment/update-spec/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert("상세 스펙이 수정되었습니다.");
+                fetchEquipmentListFromDB();
+            } else {
+                alert("저장 실패: " + data.message);
+            }
+        });
+    }
+
+    // ==========================================
+    // 6. 모달 제어 및 다중 단(Stage) 등록 기능
+    // ==========================================
+    function openRegistrationModal() {
+        const isSubMode = document.getElementById('subModeSwitch').checked;
+        const mainArea = document.getElementById('mainRegFormArea');
+        const subArea = document.getElementById('subRegFormArea');
+        const label = document.getElementById('regModalLabel');
+
+        if (isSubMode) {
+            label.innerHTML = '<i class="bi bi-gauge me-1"></i> 하위장비(로드셀/센서) 등록';
+            if (mainArea) mainArea.style.display = 'none';
+            if (subArea) subArea.style.display = 'block';
+
+            const parentSelect = document.getElementById('subParentSelect');
+            if (parentSelect) {
+                parentSelect.innerHTML = '<option value="" disabled selected>상위 메인장비를 선택해주세요</option>';
+                dbEquipmentList.forEach(eq => {
+                    parentSelect.innerHTML += `<option value="${eq.id}">[${eq.id}] ${eq.name}</option>`;
+                });
+                if (currentEqCode) parentSelect.value = currentEqCode;
+            }
+            initStageBlocks(); // 하위 모달 진입 시 Stage 폼 초기화
+        } else {
+            label.innerHTML = '<i class="bi bi-server me-1"></i> 신규 메인장비 등록';
+            if (mainArea) mainArea.style.display = 'block';
+            if (subArea) subArea.style.display = 'none';
+        }
+
+        if (regModalInstance) regModalInstance.show();
+    }
+
+    function initStageBlocks() {
+        const container = document.getElementById('stageContainer');
+        if (!container) return;
+        container.innerHTML = '';
+        addStageBlock('1단'); // 기본 1단 생성
+    }
+
+    function addStageBlock(name = '') {
+        const container = document.getElementById('stageContainer');
+        if (!container) return;
+        
+        const div = document.createElement('div');
+        div.className = 'stage-block border p-3 mb-3 bg-light position-relative';
+        div.innerHTML = `
+            <button class="btn btn-sm btn-danger position-absolute top-0 end-0 m-1" onclick="this.parentElement.remove()">×</button>
+            <div class="row g-2 mb-2">
+                <div class="col-6"><input type="text" class="form-control form-control-sm stage-name" value="${name}" placeholder="단 이름 (예: 1단)"></div>
+                <div class="col-6"><input type="text" class="form-control form-control-sm stage-capacity" placeholder="용량 (kN)"></div>
+            </div>
+            <table class="table table-sm table-bordered bg-white load-table">
+                <thead class="table-light"><tr><th>지시하중 (kN)</th><th>기준하중 (kN)</th><th style="width:40px;"></th></tr></thead>
+                <tbody class="load-table-body">
+                </tbody>
+            </table>
+            <button class="btn btn-xs btn-secondary" type="button" onclick="addStageLoadRow(this)">+ 하중 행 추가</button>
+        `;
+        container.appendChild(div);
+
+        // 단이 생성될 때 기본 6행 자동 추가
+        const addBtn = div.querySelector('.btn-secondary');
+        for (let i = 0; i < 6; i++) {
+            addStageLoadRow(addBtn); 
+        }
+    }
+
+    // [이름 변경됨] 모달 단(Stage) 내부의 하중 행 추가 함수 (구 addLoadRow 와 충돌 방지)
+    function addStageLoadRow(btn) {
+        const tbody = btn.parentElement.querySelector('.load-table-body');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td><input type="number" step="0.001" class="form-control form-control-sm raw-val" placeholder="0.0"></td>
+            <td><input type="number" step="0.001" class="form-control form-control-sm std-val" placeholder="0.00"></td>
+            <td><button type="button" class="btn btn-sm btn-light text-danger" onclick="this.closest('tr').remove()">×</button></td>
+        `;
+        tbody.appendChild(tr);
+    }
+
+    function saveRegistrationData() {
+        const isSubMode = document.getElementById('subModeSwitch').checked;
+        let payload = {};
+
+        if (!isSubMode) {
+            // [메인 장비 모드]
+            const name = document.getElementById('mainNameInput').value.trim();
+            const status = document.getElementById('mainStatusInput').value;
+            if (!name) { alert("장비명을 입력해주세요."); return; }
+            const generatedId = "EQ_" + Math.floor(1000 + Math.random() * 9000);
+            payload = { is_sub_mode: false, id: generatedId, name: name, status: status };
+        } else {
+            // [하위 장비 모드 - 다중 단(Stage) 데이터 수집]
+            const parentId = document.getElementById('subParentSelect').value;
+            const code = document.getElementById('subCodeInput').value.trim();
+            const certNo = document.getElementById('subCertNoInput').value.trim();
+            const issuedBy = document.getElementById('subIssuedByInput').value.trim();
+            const date = document.getElementById('subDateInput').value;
+            const expireDate = document.getElementById('subExpireDateInput').value;
+
+            if (!parentId) { alert("대상 메인장비를 선택해주세요."); return; }
+            if (!code || !certNo) { alert("장비코드와 교정성적서번호는 필수입니다."); return; }
+
+            const stages = [];
+            document.querySelectorAll('.stage-block').forEach(block => {
+                const loads = [];
+                block.querySelectorAll('.load-table-body tr').forEach(tr => {
+                    const raw = tr.querySelector('.raw-val').value;
+                    const std = tr.querySelector('.std-val').value;
+                    if (raw !== "" && std !== "") {
+                        loads.push({ raw: raw, std: std });
+                    }
+                });
+
+                stages.push({
+                    name: block.querySelector('.stage-name').value || "기본단",
+                    capacity: block.querySelector('.stage-capacity').value || "",
+                    loads: loads
+                });
+            });
+
+            if (stages.length === 0) { 
+                alert("최소 1개 이상의 단(Stage)과 하중 데이터를 입력해주세요."); 
+                return; 
+            }
+
+            payload = {
+                is_sub_mode: true,
+                parent_id: parentId,
+                code: code,
+                name: code + " 센서",
+                cert_no: certNo,
+                issued_by: issuedBy || '미지정',
+                date: date,
+                expire_date: expireDate,
+                stages: stages 
+            };
+        }
+
+        fetch('/api/equipment/save/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(response => response.json())
+        .then(res => {
+            if (res.status === 'success') {
+                alert(res.message);
+                if (regModalInstance) regModalInstance.hide();
+                fetchEquipmentListFromDB();
+                
+                // 폼 초기화
+                if (!isSubMode) {
+                    document.getElementById('mainNameInput').value = "";
+                } else {
+                    document.getElementById('subCodeInput').value = "";
+                    document.getElementById('subCertNoInput').value = "";
+                    initStageBlocks();
+                }
+            } else {
+                alert("저장 실패: " + res.message);
+            }
+        })
+        .catch(err => {
+            console.error("저장 통신 에러:", err);
+            alert("서버 연결에 실패했습니다.");
+        });
+    }
+
+
+// ==========================================
+// 💡 전역 변수 (선형보간 템플릿 전용)
+// ==========================================
+let interpGridOptions = null;
+let dbPresetList = []; // DB에서 불러온 천 가지 시험항목 배열
+let currentActivePresetId = null;
+let currentActivePresetName = "기본 자유 입력 모드";
+let newPresetModalInstance = null;
+
+// 페이지 로드 시 템플릿 목록 불러오기 및 그리드 초기화
+document.addEventListener("DOMContentLoaded", function() {
+    const modalEl = document.getElementById('newPresetModal');
+    if (modalEl && typeof bootstrap !== 'undefined') {
+        newPresetModalInstance = new bootstrap.Modal(modalEl);
+    }
+    fetchTestPresetsFromDB();
+    initInterpolationGrid([0, 10, 20, 30, 40, 50, 60, 70]);
+});
+
+// ==========================================
+// 1. DB에서 시험 종목 템플릿 목록 로드 (GET)
+// ==========================================
+function fetchTestPresetsFromDB() {
+    fetch('/api/preset/list/')
+        .then(res => res.json())
+        .then(res => {
+            if (res.status === 'success') {
+                dbPresetList = res.data || [];
+            }
+        })
+        .catch(err => console.error("템플릿 목록 로드 실패:", err));
 }
 
-function addLoadRow(btn) {
-    const tbody = btn.parentElement.querySelector('.load-table-body');
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-        <td><input type="number" class="form-control form-control-sm raw-val"></td>
-        <td><input type="number" class="form-control form-control-sm std-val"></td>
-        <td><button class="btn btn-sm btn-light" onclick="this.parentElement.parentElement.remove()">-</button></td>
-    `;
-    tbody.appendChild(tr);
+// ==========================================
+// 2. 🔍 1,000개 종목 자동완성 검색 바 로직
+// ==========================================
+function filterPresetDropdown() {
+    const inputEl = document.getElementById('presetSearchInput');
+    const listEl = document.getElementById('presetDropdownList');
+    if (!inputEl || !listEl) return;
+
+    const query = inputEl.value.trim().toLowerCase();
+    if (!query) {
+        listEl.style.display = 'none';
+        return;
+    }
+
+    const filtered = dbPresetList.filter(item => 
+        String(item.test_name).toLowerCase().includes(query) || 
+        String(item.description || "").toLowerCase().includes(query)
+    );
+
+    listEl.innerHTML = "";
+    if (filtered.length === 0) {
+        listEl.innerHTML = `<li class="list-group-item text-muted small py-2">"${query}" 일치 항목 없음. [신규]를 눌러 등록하세요.</li>`;
+    } else {
+        filtered.forEach(item => {
+            listEl.innerHTML += `
+                <li class="list-group-item list-group-item-action py-2 d-flex justify-content-between align-items-center" 
+                    style="cursor: pointer;" onclick="selectPresetItem(${item.id}, '${item.test_name}', '${item.default_loads}')">
+                    <div>
+                        <strong class="text-dark fs-6">${item.test_name}</strong>
+                        <div class="text-muted" style="font-size: 11px;">하중: [${item.default_loads}] ${item.description ? ' - '+item.description : ''}</div>
+                    </div>
+                    <span class="badge bg-success rounded-pill">적용</span>
+                </li>
+            `;
+        });
+    }
+    listEl.style.display = 'block';
 }
+
+// 바탕 클릭 시 드롭다운 닫기
+document.addEventListener('click', function(e) {
+    const listEl = document.getElementById('presetDropdownList');
+    const inputEl = document.getElementById('presetSearchInput');
+    if (listEl && inputEl && e.target !== inputEl && !listEl.contains(e.target)) {
+        listEl.style.display = 'none';
+    }
+});
+
+// 검색 목록에서 항목 선택 시 표에 하중 쫙 뿌리기!
+function selectPresetItem(id, name, loadsStr) {
+    currentActivePresetId = id;
+    currentActivePresetName = name;
+
+    // 💡 방어 코드: 요소가 존재할 때만 값을 넣도록 변경!
+    const nameDisplay = document.getElementById('currentPresetNameDisplay');
+    if (nameDisplay) {
+        nameDisplay.textContent = name;
+    }
+
+    const searchInput = document.getElementById('presetSearchInput');
+    if (searchInput) {
+        searchInput.value = name;
+    }
+
+    const dropdown = document.getElementById('presetDropdownList');
+    if (dropdown) {
+        dropdown.style.display = 'none';
+    }
+
+    const loadArray = String(loadsStr).split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+    initInterpolationGrid(loadArray.length > 0 ? loadArray : [0, 10, 20]);
+}
+
+
+// ==========================================
+// 2. 💡 [핵심] 드롭다운에서 단(예: 2단)을 선택했을 때 표 전체 일괄 변경 및 즉시 재계산!
+// ==========================================
+function applyGlobalStageToAll(targetStage) {
+    if (!interpGridOptions || !interpGridOptions.api) return;
     
+    // 1) 그리드 내 모든 행의 '적용 단'을 마우스로 선택한 단(예: 2단)으로 일괄 변경
+    interpGridOptions.api.forEachNode(node => {
+        node.setDataValue('stage_name', targetStage);
+    });
+    
+    // 2) 바뀐 단(2단)의 기준점 데이터를 바탕으로 보정하중 즉시 전체 재계산!
+    recalculateAllInterp();
+}
+
+
+// ==========================================
+// 3. 선형보간 그리드 렌더링 (하중 배열 맞춤 생성)
+// ==========================================
+function initInterpolationGrid(loadArray, subEqData = null) {
+    const gridDiv = document.querySelector('#interpolationGrid');
+    if (!gridDiv) return;
+
+    if (subEqData) {
+        window.currentSubEqData = subEqData;
+        updateGlobalStageDropdown(subEqData); // 드롭다운 갱신
+    }
+
+    // 현재 드롭다운에 선택되어 있는 단(기본값)을 가져옴
+    const currentStage = document.getElementById('globalStageSelect')?.value || "1단";
+    const stages = window.currentSubEqData?.stages || [];
+    const stageNamesList = stages.length > 0 ? stages.map(s => s.name || "1단") : ["1단"];
+
+    const rowData = [];
+    loadArray.forEach((val, idx) => {
+        rowData.push({
+            id: idx + 1,
+            stage_name: currentStage, // 💡 무조건 1단이 아니라, 현재 선택된 단으로 쏙 들어감!
+            input_val: val,
+            calc_val: 0.00,
+            diff_val: 0.00
+        });
+    });
+
+    if (interpGridOptions && interpGridOptions.api) {
+        // 드롭다운 에디터 옵션도 최신 단 목록으로 업데이트
+        const colDefs = interpGridOptions.api.getColumnDefs();
+        colDefs.forEach(col => {
+            if (col.field === 'stage_name') col.cellEditorParams = { values: stageNamesList };
+        });
+        interpGridOptions.api.setColumnDefs(colDefs);
+        interpGridOptions.api.setRowData(rowData);
+        recalculateAllInterp();
+        return;
+    }
+
+    interpGridOptions = {
+        columnDefs: [
+            { headerName: "", field: "checkbox", width: 45, checkboxSelection: true, headerCheckboxSelection: true },
+            { headerName: "순번", field: "id", width: 70, cellStyle: { textAlign: 'center', color: '#6c757d', fontWeight: 'bold' } },
+            { 
+                headerName: "적용 단", 
+                field: "stage_name", 
+                width: 110, 
+                editable: true, 
+                cellEditor: 'agSelectCellEditor',
+                cellEditorParams: { values: stageNamesList },
+                cellStyle: { fontWeight: 'bold', color: '#0d6efd', textAlign: 'center', cursor: 'pointer', backgroundColor: '#f0f8ff' } 
+            },
+            { 
+                headerName: "하중 (kN) [입력]", 
+                field: "input_val", 
+                editable: true, 
+                flex: 1,
+                cellStyle: { fontWeight: 'bold', backgroundColor: '#fafffa', color: '#000', textAlign: 'right' },
+                valueFormatter: params => params.value !== undefined ? parseFloat(params.value).toFixed(2) : ''
+            },
+            { 
+                headerName: "보정하중 (kN) [자동결과]", 
+                field: "calc_val", 
+                editable: false, 
+                flex: 1,
+                cellStyle: { fontWeight: 'bold', color: '#d63384', backgroundColor: '#fff0f6', textAlign: 'right', fontSize: '15px' },
+                valueFormatter: params => params.value !== undefined ? parseFloat(params.value).toFixed(2) : ''
+            },
+            { 
+                headerName: "보정값 차이 (+/-)", 
+                field: "diff_val", 
+                width: 130,
+                editable: false,
+                cellStyle: params => ({
+                    textAlign: 'right',
+                    color: params.value > 0 ? 'red' : (params.value < 0 ? 'blue' : 'black')
+                }),
+                valueFormatter: params => params.value !== undefined ? (params.value > 0 ? '+' : '') + parseFloat(params.value).toFixed(2) + ' kN' : ''
+            }
+        ],
+        defaultColDef: { resizable: true, sortable: false },
+        rowSelection: 'multiple',
+        rowData: rowData,
+        onCellValueChanged: function(params) {
+            if (params.colDef.field === 'input_val' || params.colDef.field === 'stage_name') {
+                executeLinearInterpolationForRow(params.node);
+            }
+        }
+    };
+
+    new agGrid.Grid(gridDiv, interpGridOptions);
+    recalculateAllInterp();
+}
+
+// ==========================================
+// 4. 단일 행 선형보간 계산 (상단 그리드 참조)
+// ==========================================
+function executeLinearInterpolationForRow(rowNode) {
+    if (!gridOptions || !gridOptions.api) return;
+
+    const targetStage = String(rowNode.data.stage_name || "1단").trim();
+    const targetX = parseFloat(rowNode.data.input_val);
+    if (isNaN(targetX)) return;
+
+    const baselinePoints = [];
+    gridOptions.api.forEachNode(node => {
+        const sName = String(node.data.stage_name || "1단").trim();
+        if (sName === targetStage) {
+            baselinePoints.push({
+                x: parseFloat(node.data.raw_val || 0),
+                y: parseFloat(node.data.std_val || 0)
+            });
+        }
+    });
+
+    if (baselinePoints.length === 0) {
+        rowNode.setDataValue('calc_val', 0);
+        rowNode.setDataValue('diff_val', 0);
+        return;
+    }
+
+    baselinePoints.sort((a, b) => a.x - b.x);
+    let calculatedY = 0.00;
+
+    if (targetX <= baselinePoints[0].x) {
+        if (baselinePoints.length > 1 && baselinePoints[0].x !== baselinePoints[1].x) {
+            const p0 = baselinePoints[0], p1 = baselinePoints[1];
+            calculatedY = p0.y + ((targetX - p0.x) * (p1.y - p0.y)) / (p1.x - p0.x);
+        } else { calculatedY = baselinePoints[0].y; }
+    } else if (targetX >= baselinePoints[baselinePoints.length - 1].x) {
+        const len = baselinePoints.length;
+        if (len > 1 && baselinePoints[len - 2].x !== baselinePoints[len - 1].x) {
+            const p0 = baselinePoints[len - 2], p1 = baselinePoints[len - 1];
+            calculatedY = p0.y + ((targetX - p0.x) * (p1.y - p0.y)) / (p1.x - p0.x);
+        } else { calculatedY = baselinePoints[len - 1].y; }
+    } else {
+        for (let i = 0; i < baselinePoints.length - 1; i++) {
+            const p0 = baselinePoints[i], p1 = baselinePoints[i + 1];
+            if (targetX >= p0.x && targetX <= p1.x) {
+                if (p1.x === p0.x) calculatedY = p0.y;
+                else calculatedY = p0.y + ((targetX - p0.x) * (p1.y - p0.y)) / (p1.x - p0.x);
+                break;
+            }
+        }
+    }
+
+    const finalY = parseFloat(calculatedY.toFixed(2));
+    const diff = parseFloat((finalY - targetX).toFixed(2));
+    rowNode.setDataValue('calc_val', finalY);
+    rowNode.setDataValue('diff_val', diff);
+}
+
+function recalculateAllInterp() {
+    if (!interpGridOptions || !interpGridOptions.api) return;
+    interpGridOptions.api.forEachNode(node => executeLinearInterpolationForRow(node));
+}
+
+// ==========================================
+// 5. 행 추가 및 삭제
+// ==========================================
+function addInterpRow() {
+    if (!interpGridOptions || !interpGridOptions.api) return;
+    const count = interpGridOptions.api.getDisplayedRowCount();
+    
+    // 💡 현재 드롭다운에 선택된 단을 가져와서 새 행에도 똑같이 적용
+    const currentStage = document.getElementById('globalStageSelect')?.value || "1단";
+    let lastInput = 0;
+    
+    if (count > 0) {
+        const lastRow = interpGridOptions.api.getDisplayedRowAtIndex(count - 1).data;
+        lastInput = parseFloat(lastRow.input_val || 0) + 10;
+    }
+    
+    interpGridOptions.api.applyTransaction({ 
+        add: [{ id: count + 1, stage_name: currentStage, input_val: lastInput, calc_val: 0, diff_val: 0 }] 
+    });
+    refreshInterpSeq();
+    
+    const newNode = interpGridOptions.api.getDisplayedRowAtIndex(count);
+    if (newNode) executeLinearInterpolationForRow(newNode);
+}
+
+function deleteInterpRow() {
+    if (!interpGridOptions || !interpGridOptions.api) return;
+    const selectedNodes = interpGridOptions.api.getSelectedNodes();
+    if (selectedNodes.length === 0) { alert("삭제할 행을 선택하세요."); return; }
+    interpGridOptions.api.applyTransaction({ remove: selectedNodes.map(n => n.data) });
+    refreshInterpSeq();
+}
+
+function refreshInterpSeq() {
+    if (!interpGridOptions || !interpGridOptions.api) return;
+    let idx = 1;
+    interpGridOptions.api.forEachNode(node => node.setDataValue('id', idx++));
+}
+
+// ==========================================
+// 6. 💾 [DB 저장] 현재 표의 하중을 DB 템플릿으로 덮어쓰기!
+// ==========================================
+function saveCurrentPresetToDB() {
+    if (!currentActivePresetId) {
+        alert("선택된 시험 템플릿이 없습니다. 먼저 검색에서 시험 종목을 선택하거나 신규 등록하세요.");
+        return;
+    }
+    const loads = [];
+    interpGridOptions.api.forEachNode(node => {
+        const val = parseFloat(node.data.input_val);
+        if (!isNaN(val)) loads.push(val);
+    });
+    if (loads.length === 0) { alert("저장할 하중 데이터가 없습니다."); return; }
+
+    const loadsStr = loads.join(', ');
+    if (!confirm(`"[${currentActivePresetName}]" 시험 종목의 기본 하중 배열을\n[${loadsStr}] (총 ${loads.length}개)\n(으)로 영구 업데이트 하시겠습니까?`)) return;
+
+    fetch('/api/preset/update/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentActivePresetId, default_loads: loadsStr })
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.status === 'success') {
+            alert("✅ 템플릿 하중 배열이 성공적으로 DB에 업데이트되었습니다!");
+            fetchTestPresetsFromDB();
+        } else { alert("저장 실패: " + res.message); }
+    })
+    .catch(err => alert("서버 통신 오류"));
+}
+
+// ==========================================
+// 7. ➕ [모달 제어] 신규 시험항목 DB 등록
+// ==========================================
+function openNewPresetModal() {
+    document.getElementById('newPresetNameInput').value = "";
+    document.getElementById('newPresetLoadsInput').value = "";
+    document.getElementById('newPresetDescInput').value = "";
+    if (newPresetModalInstance) newPresetModalInstance.show();
+}
+
+function createNewPresetDB() {
+    const name = document.getElementById('newPresetNameInput').value.trim();
+    const loads = document.getElementById('newPresetLoadsInput').value.trim();
+    const desc = document.getElementById('newPresetDescInput').value.trim();
+
+    if (!name || !loads) { alert("시험 종목명과 기본 하중값 배열은 필수 입력 항목입니다."); return; }
+
+    fetch('/api/preset/create/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test_name: name, default_loads: loads, description: desc })
+    })
+    .then(res => res.json())
+    .then(res => {
+        if (res.status === 'success') {
+            alert(`✅ 신규 시험항목 "[${name}]" 이(가) 등록되었습니다!`);
+            if (newPresetModalInstance) newPresetModalInstance.hide();
+            fetchTestPresetsFromDB();
+            selectPresetItem(res.id, name, loads); // 등록 즉시 표에 적용!
+        } else { alert("등록 실패: " + res.message); }
+    })
+    .catch(err => alert("서버 통신 오류"));
+}
+
+
+// ==========================================
+// 📥 [엑셀 양식 다운로드] 서버의 '보정.xlsx' 템플릿에 데이터 채워 다운로드!
+// ==========================================
+function exportInterpExcel() {
+    if (!interpGridOptions || !interpGridOptions.api) {
+        alert("다운로드할 데이터가 없습니다.");
+        return;
+    }
+
+    // ⭐ 1. 메인 장비코드 대신 하위 장비코드(sub_code)를 1순위로 추출하도록 완벽 통일!
+    const sub_code = window.currentSubEqData?.sub_code || window.currentSubEqData?.code || "한장-만능필-200T-01";
+    const certNo = document.getElementById('specCertNo')?.value || "";
+    const issuedBy = document.getElementById('specIssuedBy')?.value || "";
+    const certDate = document.getElementById('specDate')?.value || "";
+    const expireDate = document.getElementById('specExpireDate')?.value || "";
+
+    // ⭐ 2. 위에서 만든 sub_code를 에러 없이 안전하게 연결!
+    const headerData = {
+        sub_code: sub_code,
+        cert_no: certNo,
+        issued_by: issuedBy,
+        cert_date: certDate,
+        expire_date: expireDate
+    };
+
+    // 2. 표 데이터 수집 (선택된 행 또는 전체 행)
+    let targetNodes = interpGridOptions.api.getSelectedNodes();
+    if (targetNodes.length === 0) {
+        interpGridOptions.api.forEachNode(node => targetNodes.push(node));
+    }
+    if (targetNodes.length === 0) {
+        alert("다운로드할 데이터가 없습니다.");
+        return;
+    }
+    targetNodes.sort((a, b) => a.rowIndex - b.rowIndex);
+
+    // 보조 함수: 단 용량 추출
+    function getCapacityStr(stageName) {
+        if (window.currentSubEqData?.stages && Array.isArray(window.currentSubEqData.stages)) {
+            const stg = window.currentSubEqData.stages.find(s => (s.name || s.stage_name || s.stage) === stageName);
+            if (stg) {
+                const capVal = stg.capacity || stg.cap || stg.capa || stg.stage_cap || stg.stage_capacity || stg['단 용량'];
+                if (capVal) return String(capVal).trim();
+            }
+        }
+        let capFromGrid = "-";
+        if (typeof gridOptions !== 'undefined' && gridOptions && gridOptions.api) {
+            gridOptions.api.forEachNode(node => {
+                const sName = node.data?.stage_name || node.data?.stage || node.data?.gubun;
+                if (String(sName).trim() === stageName && capFromGrid === "-") {
+                    const val = node.data?.capacity || node.data?.cap || node.data?.capa || node.data?.stage_cap || node.data?.stage_capacity || node.data?.['단 용량'] || node.data?.['용량'];
+                    if (val) capFromGrid = String(val).trim();
+                }
+            });
+        }
+        return capFromGrid;
+    }
+
+    // 보조 함수: 보정식 및 구간 추출
+    function getFormulaDetails(stageName, inputX) {
+        let points = [];
+        if (typeof gridOptions !== 'undefined' && gridOptions && gridOptions.api) {
+            gridOptions.api.forEachNode(node => {
+                const sName = node.data?.stage_name || node.data?.stage || node.data?.gubun;
+                if (String(sName).trim() === stageName) {
+                    const x = parseFloat(node.data?.raw_val !== undefined ? node.data.raw_val : (node.data?.x_val || 0));
+                    const y = parseFloat(node.data?.std_val !== undefined ? node.data.std_val : (node.data?.y_val || 0));
+                    if (!isNaN(x) && !isNaN(y)) points.push({ x: x, y: y });
+                }
+            });
+        }
+        if (points.length < 2) return { rawRange: "-", stdRange: "-", formula: "-" };
+        points.sort((a, b) => a.x - b.x);
+
+        let p0 = points[0], p1 = points[points.length - 1];
+        for (let i = 0; i < points.length - 1; i++) {
+            if (inputX >= points[i].x && inputX <= points[i + 1].x) {
+                p0 = points[i];
+                p1 = points[i + 1];
+                break;
+            }
+        }
+        const rawRange = `${p0.x} ~ ${p1.x}`;
+        const stdRange = `${p0.y} ~ ${p1.y}`;
+        if (p1.x === p0.x) return { rawRange, stdRange, formula: `y = ${p0.y}` };
+        
+        const slope = (p1.y - p0.y) / (p1.x - p0.x);
+        const intercept = p0.y - (slope * p0.x);
+        const sign = intercept >= 0 ? "+" : "-";
+        const formula = `y = ${slope.toFixed(4)}x ${sign} ${Math.abs(intercept).toFixed(2)}`;
+        return { rawRange, stdRange, formula };
+    }
+
+    // 3. 백엔드로 보낼 행 데이터 리스트 조립
+    const rowsData = [];
+    targetNodes.forEach(node => {
+        const stageName = String(node.data?.stage_name || "1단").trim();
+        const inputVal = parseFloat(node.data?.input_val || 0);
+        const calcVal = parseFloat(node.data?.calc_val || 0);
+        const capacity = getCapacityStr(stageName);
+        const details = getFormulaDetails(stageName, inputVal);
+
+        rowsData.push({
+            stage: stageName,
+            cap: capacity,
+            raw_range: details.rawRange,
+            std_range: details.stdRange,
+            formula: details.formula,
+            input_val: inputVal,
+            calc_val: calcVal
+        });
+    });
+
+    // 4. 서버 API 호출 및 엑셀 파일 다운로드
+    fetch('/api/export-excel/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            header: headerData,
+            rows: rowsData
+        })
+    })
+    .then(response => {
+        if (!response.ok) {
+            return response.text().then(text => { throw new Error(text); });
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        // ⭐ 3. 다운로드되는 파일명도 안전하게 'sub_code'를 사용하도록 통일!
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `보정성적서_${sub_code}.xlsx`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    })
+    .catch(err => {
+        console.error("엑셀 다운로드 오류:", err);
+        alert("엑셀 다운로드 실패: " + err.message);
+    });
+}
+
+// ==========================================
+// 💡 모달 창 마우스 드래그 (크기 고정 + 좌표 이동 방식)
+// ==========================================
+document.addEventListener("DOMContentLoaded", function () {
+    // 이동을 적용할 모달 ID 목록
+    const draggableModals = ['regModal', 'newPresetModal'];
+
+    draggableModals.forEach(modalId => {
+        const modalEl = document.getElementById(modalId);
+        if (!modalEl) return;
+
+        const header = modalEl.querySelector('.modal-header');
+        const content = modalEl.querySelector('.modal-content');
+        if (!header || !content) return;
+
+        // 1. 헤더에 마우스를 올리면 이동 커서(십자 화살표)로 변경
+        header.style.cursor = 'move';
+        header.style.userSelect = 'none'; // 드래그 중 글자 파란색 선택 방지
+
+        let isDragging = false;
+        let startX = 0, startY = 0;
+        let currentX = 0, currentY = 0;
+
+        // 2. 마우스 클릭 시 이동 시작
+        header.addEventListener('mousedown', function (e) {
+            // 닫기 버튼(X) 클릭 시에는 이동되지 않도록 예외 처리
+            if (e.target.closest('.btn-close')) return;
+
+            isDragging = true;
+            startX = e.clientX - currentX;
+            startY = e.clientY - currentY;
+        });
+
+        // 3. 마우스 이동 중 창 위치 실시간 변경 (💡 핵심: transform 사용)
+        document.addEventListener('mousemove', function (e) {
+            if (!isDragging) return;
+            e.preventDefault(); // 브라우저 기본 드래그 간섭 방지
+
+            currentX = e.clientX - startX;
+            currentY = e.clientY - startY;
+
+            // 💡 [핵심 해결] position이나 width를 건드리지 않고 눈에 보이는 좌표만 부드럽게 이동!
+            content.style.transform = `translate(${currentX}px, ${currentY}px)`;
+            content.style.transition = 'none'; // 드래그 중 지연(렉) 현상 방지
+        });
+
+        // 4. 마우스 클릭 해제 시 이동 멈춤
+        document.addEventListener('mouseup', function () {
+            isDragging = false;
+        });
+
+        // 5. 모달 창이 닫힐 때 원래 위치로 깔끔하게 초기화
+        modalEl.addEventListener('hidden.bs.modal', function () {
+            currentX = 0;
+            currentY = 0;
+            content.style.transform = '';
+            content.style.transition = '';
+        });
+    });
+});
+
+// ==========================================
+// 💡 [만능 탐지기] 좌측 표 변수명이 뭐든 간에 1단, 2단을 무조건 찾아내는 드롭다운 생성 함수!
+// ==========================================
+// ==========================================
+// 💡 가운데 '구분(단)' 표에서 1단, 2단 읽어와서 드롭다운 만들기 (초간단 버전)
+// ==========================================
+function updateGlobalStageDropdown() {
+    const selectEl = document.getElementById('globalStageSelect');
+    if (!selectEl) return;
+
+    let stageSet = new Set();
+
+    // 가운데 기준점 표(gridOptions)의 [구분(단)] 열에서 글자만 쏙쏙 읽어옴!
+    if (typeof gridOptions !== 'undefined' && gridOptions && gridOptions.api) {
+        gridOptions.api.forEachNode(node => {
+            const sName = node.data?.stage_name || node.data?.stage || node.data?.gubun;
+            if (sName) stageSet.add(String(sName).trim());
+        });
+    }
+
+    // 드롭다운 HTML 생성
+    selectEl.innerHTML = "";
+    const stageList = Array.from(stageSet).sort();
+
+    if (stageList.length > 0) {
+        stageList.forEach(sName => {
+            selectEl.innerHTML += `<option value="${sName}">${sName}</option>`;
+        });
+    } else {
+        selectEl.innerHTML = `<option value="1단">1단 (기본)</option>`;
+    }
+}
+
+
+// ==========================================
+// 📋 [원클릭 엑셀 복사 V2.2] 단 용량까지 100% 완벽 추출하는 최종 복사 함수
+// ==========================================
+function copyGridToClipboard() {
+    if (!interpGridOptions || !interpGridOptions.api) {
+        alert("복사할 데이터가 없습니다.");
+        return;
+    }
+
+    // 1. 선택한 행이 있으면 선택한 행만, 없으면 표 전체 행을 대상 지정
+    let targetNodes = interpGridOptions.api.getSelectedNodes();
+    if (targetNodes.length === 0) {
+        interpGridOptions.api.forEachNode(node => targetNodes.push(node));
+    }
+    if (targetNodes.length === 0) {
+        alert("복사할 데이터가 없습니다.");
+        return;
+    }
+
+    targetNodes.sort((a, b) => a.rowIndex - b.rowIndex);
+
+    // ⭐ [핵심 업그레이드] 단 용량(Capacity) 필드명이 뭐든 간에 100% 찾아내는 함수!
+    function getCapacityStr(stageName) {
+        // 1) 장비 마스터 데이터(subEqData)에서 먼저 찾기
+        if (window.currentSubEqData?.stages && Array.isArray(window.currentSubEqData.stages)) {
+            const stg = window.currentSubEqData.stages.find(s => (s.name || s.stage_name || s.stage) === stageName);
+            if (stg) {
+                const capVal = stg.capacity || stg.cap || stg.capa || stg.stage_cap || stg.stage_capacity || stg['단 용량'];
+                if (capVal) return String(capVal).trim();
+            }
+        }
+        // 2) 만약 없다면 가운데 표(gridOptions)를 직접 훑어서 '용량' 데이터 추출!
+        let capFromGrid = "-";
+        if (typeof gridOptions !== 'undefined' && gridOptions && gridOptions.api) {
+            gridOptions.api.forEachNode(node => {
+                const sName = node.data?.stage_name || node.data?.stage || node.data?.gubun;
+                if (String(sName).trim() === stageName && capFromGrid === "-") {
+                    // 흔히 쓰이는 모든 용량 필드명 총동원!
+                    const val = node.data?.capacity || node.data?.cap || node.data?.capa || node.data?.stage_cap || node.data?.stage_capacity || node.data?.['단 용량'] || node.data?.['용량'];
+                    if (val) capFromGrid = String(val).trim();
+                }
+            });
+        }
+        return capFromGrid;
+    }
+
+    // 가운데 기준점 표(gridOptions)를 직접 읽어와 구간 및 보정식 생성
+    function getFormulaDetails(stageName, inputX) {
+        let points = [];
+        
+        if (typeof gridOptions !== 'undefined' && gridOptions && gridOptions.api) {
+            gridOptions.api.forEachNode(node => {
+                const sName = node.data?.stage_name || node.data?.stage || node.data?.gubun;
+                if (String(sName).trim() === stageName) {
+                    const x = parseFloat(node.data?.raw_val !== undefined ? node.data.raw_val : (node.data?.x_val || 0));
+                    const y = parseFloat(node.data?.std_val !== undefined ? node.data.std_val : (node.data?.y_val || 0));
+                    if (!isNaN(x) && !isNaN(y)) {
+                        points.push({ x: x, y: y });
+                    }
+                }
+            });
+        }
+
+        if (points.length < 2) return { rawRange: "-", stdRange: "-", formula: "-" };
+        points.sort((a, b) => a.x - b.x);
+
+        let p0 = points[0], p1 = points[points.length - 1];
+        for (let i = 0; i < points.length - 1; i++) {
+            if (inputX >= points[i].x && inputX <= points[i + 1].x) {
+                p0 = points[i];
+                p1 = points[i + 1];
+                break;
+            }
+        }
+
+        const rawRange = `${p0.x} ~ ${p1.x}`;
+        const stdRange = `${p0.y} ~ ${p1.y}`;
+
+        if (p1.x === p0.x) return { rawRange, stdRange, formula: `y = ${p0.y}` };
+        
+        const slope = (p1.y - p0.y) / (p1.x - p0.x);
+        const intercept = p0.y - (slope * p0.x);
+        const sign = intercept >= 0 ? "+" : "-";
+        const formula = `y = ${slope.toFixed(4)}x ${sign} ${Math.abs(intercept).toFixed(2)}`;
+
+        return { rawRange, stdRange, formula };
+    }
+
+    // 2. 엑셀 호환 7개 열 데이터 조립
+    let tsvString = "";
+    
+    targetNodes.forEach(node => {
+        const stageName = String(node.data?.stage_name || "1단").trim();
+        const inputVal = parseFloat(node.data?.input_val || 0);
+        const calcVal = parseFloat(node.data?.calc_val || 0);
+        
+        const capacity = getCapacityStr(stageName);
+        const details = getFormulaDetails(stageName, inputVal);
+        
+        // A열 ~ G열 조립 (탭 \t 으로 구분)
+        tsvString += `${stageName}\t${capacity}\t${details.rawRange}\t${details.stdRange}\t${details.formula}\t${inputVal.toFixed(2)}\t${calcVal.toFixed(2)}\n`;
+    });
+
+    // 3. 클립보드 복사 실행
+    navigator.clipboard.writeText(tsvString).then(() => {
+        alert(`✅ 총 ${targetNodes.length}개 구간의 [보정 근거 데이터 7개 열]이 완벽하게 복사되었습니다!\n\n엑셀의 [A2] 셀을 클릭하고 [Ctrl + V]를 눌러보세요!`);
+    }).catch(err => {
+        console.error("복사 실패:", err);
+        alert("브라우저 보안 설정으로 인해 복사하지 못했습니다.");
+    });
+}
+
+
 </script>
 
 </body>
