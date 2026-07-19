@@ -31,6 +31,17 @@
             color: #ffffff !important;
             font-weight: bold;
         }
+
+        .header-bg-section {
+    /* 좌측 파랑 ~ 우측 초록으로 이어지는 은은한 그라데이션 */
+    background: linear-gradient(to right, rgba(230, 242, 255, 0.8), rgba(230, 247, 237, 0.8));
+    
+    /* 깔끔한 디자인을 위한 마무리 */
+    border: 1px solid #dcdcdc; /* 얇은 테두리 */
+    border-radius: 8px;        /* 둥근 모서리 */
+    padding: 15px;             /* 내부 여백 */
+    margin-bottom: 15px;       /* 아래 영역과의 간격 */
+}
     </style>
 </head>
 <body>
@@ -88,11 +99,13 @@
                 <div class="card-body p-3 d-flex flex-column">
                     
                     <!-- 장비 헤더 상태바 -->
-                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
-                        <div>
+                    <!-- 💡 1. 부모 div에 w-100을 추가하여 가로 전체를 점유하게 만듭니다. -->
+                    <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3 w-100">
+                        <!-- 💡 2. header-bg-section 클래스에 flex-grow-1을 추가하거나 아래 CSS를 적용하세요 -->
+                        <div class="header-bg-section" style="flex-grow: 1;">
                             <span class="text-muted small fw-bold me-2" id="headerEqCode">선택된 장비 없음</span>
                             <span class="text-muted small" id="headerEqStatus">좌측 목록에서 장비를 선택해주세요.</span>
-                        </div>                        
+                        </div>                                       
                     </div>
 
                     <h5 class="fw-bold text-primary mb-3" id="displayEqTitle" style="font-size: 16px;">
@@ -204,18 +217,20 @@
 
                         <!-- 행 추가/삭제/재계산/저장/엑셀 다운로드 버튼 그룹 -->
                         <div class="d-flex gap-1 flex-wrap">
-                            <button type="button" class="btn btn-sm btn-outline-success fw-bold px-2 py-1" style="font-size: 11px;" onclick="addInterpRow()"><i class="bi bi-plus-lg me-1"></i>행 추가</button>
-                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-2 py-1" style="font-size: 11px;" onclick="deleteInterpRow()"><i class="bi bi-trash me-1"></i>행 삭제</button>
+                            
                             <button type="button" class="btn btn-sm btn-outline-info text-dark fw-bold px-2 py-1" style="font-size: 11px;" onclick="recalculateAllInterp()" title="전체 재계산"><i class="bi bi-arrow-clockwise me-1"></i>재계산</button>
-                            
-                            <!-- 구분선 -->
-                            <div class="vr mx-1" style="min-height: 24px;"></div>
-                            
                             <!-- 💡 [신규 추가] 엑셀 Ctrl+V용 원클릭 클립보드 복사 버튼! -->
                             <button type="button" class="btn btn-sm btn-success fw-bold px-2 py-1 shadow-sm" style="font-size: 11px;" onclick="copyGridToClipboard()" title="열린 엑셀에 Ctrl+V로 붙여넣기"><i class="bi bi-clipboard-check me-1"></i>값복사</button>
 
                             <!-- 엑셀 다운로드 버튼 -->                            
                             <button type="button" class="btn btn-sm btn-dark fw-bold px-2 py-1 shadow-sm" style="font-size: 11px;" onclick="exportInterpExcel()"><i class="bi bi-file-earmark-excel me-1"></i>엑셀</button>
+                            
+                            <!-- 구분선 -->
+                            <div class="vr mx-1" style="min-height: 24px;"></div>
+                            
+                            
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold px-2 py-1" style="font-size: 11px;" onclick="addInterpRow()"><i class="bi bi-plus-lg me-1"></i>행 추가</button>
+                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold px-2 py-1" style="font-size: 11px;" onclick="deleteInterpRow()"><i class="bi bi-trash me-1"></i>행 삭제</button>
                         </div>
                     </div>
 
@@ -570,6 +585,15 @@
     // 4. 장비 상세 조회 및 AG-Grid 제어
     // ==========================================
     function selectSubEquipment(element, titleName, eqCode, subCode) {
+        // 💡 [추가] 장비를 선택하는 즉시, 시험 종목 검색창을 초기화합니다!
+    const testSearchInput = document.querySelector('input[placeholder*="시험 종목"], .search-box input');
+    if (testSearchInput) {
+        testSearchInput.value = ""; // 입력값을 비웁니다.
+    }
+    // 시험 종목 관련 전역 변수가 있다면 그것도 초기화합니다.
+    window.currentActivePresetName = "";
+
+
         document.querySelectorAll('.sub-eq-item').forEach(el => el.classList.remove('active'));
         if (element) element.classList.add('active');
 
@@ -1432,6 +1456,29 @@ function createNewPresetDB() {
 // 📥 [엑셀 양식 다운로드] 서버의 '보정.xlsx' 템플릿에 데이터 채워 다운로드!
 // ==========================================
 function exportInterpExcel() {
+    // 💡 1. [안전장치] 데이터 검증 (값이 없으면 실행 차단)
+    const subCodeText = document.querySelector('.header-bg-section')?.textContent.trim() || "";
+    const testName = document.querySelector('input[placeholder*="시험 종목"], .search-box input')?.value.trim() || "";
+
+    if (!subCodeText || subCodeText === "장비명 확인불가") {
+        alert("⛔ 오류: 적용할 장비를 먼저 선택해 주세요.");
+        return;
+    }
+    if (!testName) {
+        alert("⛔ 오류: 실무 보정 계산기의 시험 종목을 먼저 선택해 주세요.");
+        return;
+    }
+
+    // 💡 2. [안전장치] 최종 확인 메시지
+    const isConfirmed = confirm(
+        `[품질관리 안전 확인]\n\n` +
+        `적용 장비: ${subCodeText}\n` +
+        `시험 종목: ${testName}\n\n` +
+        `이 내용으로 엑셀 성적서를 생성하시겠습니까?`
+    );
+    
+    if (!isConfirmed) return; // '취소' 클릭 시 다운로드 중단
+
     if (!interpGridOptions || !interpGridOptions.api) {
         alert("다운로드할 데이터가 없습니다.");
         return;
@@ -1568,6 +1615,13 @@ function exportInterpExcel() {
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
+
+        // 💡 [추가] 엑셀 다운로드 성공 후 시험 종목 검색창 초기화
+        const testSearchInput = document.querySelector('input[placeholder*="시험 종목"], .search-box input');
+        if (testSearchInput) {
+            testSearchInput.value = ""; 
+        }
+        window.currentActivePresetName = ""; // 전역 변수 초기화
     })
     .catch(err => {
         console.error("엑셀 다운로드 오류:", err);
@@ -1679,6 +1733,30 @@ function copyGridToClipboard() {
         return;
     }
 
+    // 💡 1. 좌측 장비와 우측 시험명을 다시 한번 정확히 읽어옵니다.
+    const subCodeText = document.querySelector('.header-bg-section')?.textContent.trim() || "";
+    const testName = document.querySelector('input[placeholder*="시험 종목"], .search-box input')?.value.trim() || "";
+
+    // 💡 2. 데이터가 하나라도 없으면 복사 자체를 차단!
+    if (!subCodeText || subCodeText === "장비명 확인불가") {
+        alert("⛔ 오류: 적용할 장비를 먼저 선택해 주세요.");
+        return;
+    }
+    if (!testName) {
+        alert("⛔ 오류: 실무 보정 계산기의 시험 종목을 먼저 선택해 주세요.");
+        return;
+    }
+
+    // 💡 3. 모든 데이터가 완벽할 때만 확인 메시지 노출
+    const isConfirmed = confirm(
+        `[품질관리 안전 확인]\n\n` +
+        `적용 장비: ${subCodeText}\n` +
+        `시험 종목: ${testName}\n\n` +
+        `이 내용으로 데이터를 복사하시겠습니까?`
+    );
+
+    if (!isConfirmed) return; // '취소' 누르면 여기서 바로 종료!
+
     // 1. 선택한 행이 있으면 선택한 행만, 없으면 표 전체 행을 대상 지정
     let targetNodes = interpGridOptions.api.getSelectedNodes();
     if (targetNodes.length === 0) {
@@ -1776,6 +1854,13 @@ function copyGridToClipboard() {
     // 3. 클립보드 복사 실행
     navigator.clipboard.writeText(tsvString).then(() => {
         alert(`✅ 총 ${targetNodes.length}개 구간의 [보정 근거 데이터 7개 열]이 완벽하게 복사되었습니다!\n\n엑셀의 [A2] 셀을 클릭하고 [Ctrl + V]를 눌러보세요!`);
+
+        // 💡 [수정할 곳 1: 여기에 추가] 복사 완료 후 검색창 자동 초기화
+        const testSearchInput = document.querySelector('input[placeholder*="시험 종목"], .search-box input');
+        if (testSearchInput) {
+            testSearchInput.value = ""; 
+        }
+        window.currentActivePresetName = ""; // 전역 변수 초기화
     }).catch(err => {
         console.error("복사 실패:", err);
         alert("브라우저 보안 설정으로 인해 복사하지 못했습니다.");
