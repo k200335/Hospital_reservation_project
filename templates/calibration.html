@@ -838,64 +838,49 @@
     // 5. 데이터 저장 API 호출
     // ==========================================
     function saveCalibrationData() {
-        if (!currentSubCode) {
-            alert("선택된 하위 장비가 없습니다.");
-            return;
-        }
-
-        const selectedNodes = gridOptions.api.getSelectedNodes();
-        if (selectedNodes.length === 0) {
-            alert("수정(저장)할 행을 체크박스로 선택해주세요!");
-            return;
-        }
-
-        const allRowData = [];
-        gridOptions.api.forEachNode(node => allRowData.push(node.data));
-        
-        const stageMap = {};
-        allRowData.forEach(row => {
-            const sName = String(row.stage_name || "1단").trim();
-            if (!stageMap[sName]) {
-                stageMap[sName] = {
-                    name: sName,
-                    capacity: String(row.stage_capacity || "").trim(),
-                    loads: []
-                };
-            }
-            stageMap[sName].loads.push({
-                id: row.db_id || row.id, // DB 기본키가 있으면 보내고, 없으면 화면 순번 전송
-                raw_val: parseFloat(row.raw_val || 0),
-                std_val: parseFloat(row.std_val || 0)
-            });
-        });
-        const updatedStages = Object.values(stageMap);
-
-        const rowData = selectedNodes.map(node => node.data);
-
-        fetch('/api/calibration/save/', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                sub_code: currentSubCode,
-                items: rowData,
-                stages: updatedStages
-            })
-        })
-        .then(response => response.json())
-        .then(res => {
-            if (res.status === 'success') {
-                alert("변경사항이 DB에 저장되었습니다.");
-                gridOptions.api.deselectAll();
-                fetchEquipmentListFromDB(); 
-            } else {
-                alert("저장 실패: " + res.message);
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            alert("서버 통신 오류");
-        });
+    if (!currentSubCode) {
+        alert("선택된 하위 장비가 없습니다.");
+        return;
     }
+
+    const selectedNodes = gridOptions.api.getSelectedNodes();
+    if (selectedNodes.length === 0) {
+        alert("수정(저장)할 행을 체크박스로 선택해주세요!");
+        return;
+    }
+
+    // 서버로 보낼 데이터를 확실하게 정리합니다.
+    const rowData = selectedNodes.map(node => ({
+        id: node.data.db_id || node.data.id,
+        stage_name: node.data.stage_name || "1단",
+        stage_capacity: node.data.stage_capacity || node.data.capacity || "", // capacity 필드 통일
+        raw_val: parseFloat(node.data.raw_val || 0),
+        std_val: parseFloat(node.data.std_val || 0)
+    }));
+
+    fetch('/api/calibration/save/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            sub_code: currentSubCode,
+            items: rowData // 이제 백엔드는 이 items만 보고 처리하면 됩니다.
+        })
+    })
+    .then(response => response.json())
+    .then(res => {
+        if (res.status === 'success') {
+            alert("변경사항이 DB에 저장되었습니다.");
+            gridOptions.api.deselectAll();
+            fetchEquipmentListFromDB(); 
+        } else {
+            alert("저장 실패: " + res.message);
+        }
+    })
+    .catch(err => {
+        console.error(err);
+        alert("서버 통신 오류");
+    });
+}
 
     function saveSpecData() {
         if (!currentSubCode) return;
@@ -1615,13 +1600,6 @@ function exportInterpExcel() {
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
-
-        // 💡 [추가] 엑셀 다운로드 성공 후 시험 종목 검색창 초기화
-        const testSearchInput = document.querySelector('input[placeholder*="시험 종목"], .search-box input');
-        if (testSearchInput) {
-            testSearchInput.value = ""; 
-        }
-        window.currentActivePresetName = ""; // 전역 변수 초기화
     })
     .catch(err => {
         console.error("엑셀 다운로드 오류:", err);
@@ -1851,20 +1829,25 @@ function copyGridToClipboard() {
         tsvString += `${stageName}\t${capacity}\t${details.rawRange}\t${details.stdRange}\t${details.formula}\t${inputVal.toFixed(2)}\t${calcVal.toFixed(2)}\n`;
     });
 
-    // 3. 클립보드 복사 실행
-    navigator.clipboard.writeText(tsvString).then(() => {
-        alert(`✅ 총 ${targetNodes.length}개 구간의 [보정 근거 데이터 7개 열]이 완벽하게 복사되었습니다!\n\n엑셀의 [A2] 셀을 클릭하고 [Ctrl + V]를 눌러보세요!`);
+    // 3. 클립보드 복사 실행 (보안 안정성 높은 execCommand 방식)
+    const textarea = document.createElement("textarea");
+    textarea.value = tsvString;
+    document.body.appendChild(textarea);
+    textarea.select();
 
-        // 💡 [수정할 곳 1: 여기에 추가] 복사 완료 후 검색창 자동 초기화
-        const testSearchInput = document.querySelector('input[placeholder*="시험 종목"], .search-box input');
-        if (testSearchInput) {
-            testSearchInput.value = ""; 
+    try {
+        const successful = document.execCommand('copy');
+        if (successful) {
+            alert(`✅ 총 ${targetNodes.length}개 구간의 데이터가 복사되었습니다!\n\n엑셀의 [A2] 셀을 클릭하고 [Ctrl + V]를 눌러보세요!`);
+        } else {
+            alert("복사에 실패했습니다.");
         }
-        window.currentActivePresetName = ""; // 전역 변수 초기화
-    }).catch(err => {
+    } catch (err) {
         console.error("복사 실패:", err);
         alert("브라우저 보안 설정으로 인해 복사하지 못했습니다.");
-    });
+    } finally {
+        document.body.removeChild(textarea);
+    }
 }
 
 

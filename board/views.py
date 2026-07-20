@@ -4462,143 +4462,120 @@ def save_equipment_to_mysql(request):
 # ==========================================
 @csrf_exempt
 def save_calibration_grid_data(request):
-  """우측 AG-Grid에서 체크된 데이터의 '순번' 또는 'DB ID'를 스마트 매핑하여 중복 추가(INSERT) 없이 정확하게 기존 행을
+    """
+    우측 AG-Grid에서 체크된 데이터의 '순번' 또는 'DB ID'를 스마트 매핑하여 
+    중복 추가(INSERT) 없이 정확하게 기존 행을 UPDATE 합니다.
+    """
+    if request.method != "POST":
+        return JsonResponse({"status": "error", "message": "Invalid method"})
 
-  UPDATE 합니다.
-  """
-  if request.method != "POST":
-    return JsonResponse({"status": "error", "message": "Invalid method"})
+    try:
+        data = json.loads(request.body)
+        sub_code = data.get("sub_code")
+        items = data.get("items", [])
 
-  try:
-    data = json.loads(request.body)
-    sub_code = data.get("sub_code")
-    items = data.get("items", [])  # 프론트에서 체크된 행들만 넘어옴
+        if not items or not sub_code:
+            return JsonResponse({
+                "status": "error",
+                "message": "저장할 보정 데이터가 없습니다.",
+            })
 
-    if not items or not sub_code:
-      return JsonResponse({
-          "status": "error",
-          "message": "저장할 보정 데이터가 없습니다.",
-      })
+        # 1. 단(stage_name) 기준으로 그룹화 및 공백 제거 (.strip() 사용)
+        stage_groups = {}
+        for row in items:
+            s_name = str(row.get("stage_name", "1단")).strip()
+            if not s_name:
+                s_name = "1단"
 
-    # 1. 단(stage_name) 기준으로 그룹화 및 공백 제거
-    stage_groups = {}
-    for row in items:
-      s_name = str(row.get("stage_name", "1단")).strip()
-      if not s_name:
-        s_name = "1단"
+            if s_name not in stage_groups:
+                stage_groups[s_name] = {
+                    "capacity": str(row.get("stage_capacity", "")).strip(),
+                    "loads": [],
+                }
+            stage_groups[s_name]["loads"].append({
+                "id": row.get("id"),
+                "raw_val": float(row.get("raw_val", 0.0)),
+                "std_val": float(row.get("std_val", 0.0)),
+            })
 
-      if s_name not in stage_groups:
-        stage_groups[s_name] = {
-            "capacity": str(row.get("stage_capacity", "")).strip(),
-            "loads": [],
-        }
-      stage_groups[s_name]["loads"].append({
-          "id": row.get("id"),  # 화면상의 순번(1, 2, 3...) 또는 DB 기본키
-          "raw_val": float(row.get("raw_val", 0.0)),
-          "std_val": float(row.get("std_val", 0.0)),
-      })
+        # 2. 트랜잭션 적용
+        with transaction.atomic():
+            with connections["default"].cursor() as cursor:
+                for s_name, s_data in stage_groups.items():
+                    cap_val = s_data["capacity"]
+                    loads_list = s_data["loads"]
 
-    # 2. 트랜잭션 적용 (기존 데이터 절대 삭제 안 함!)
-    with transaction.atomic():
-      with connections["default"].cursor() as cursor:
-        for s_name, s_data in stage_groups.items():
-          cap_val = s_data["capacity"]
-          loads_list = s_data["loads"]
-
-          # ① 단(Stage) 정보 조회 또는 생성
-          cursor.execute(
-              """
+                    # ① 단(Stage) 정보 조회 또는 생성
+                    cursor.execute("""
                         SELECT id FROM cal_sub_eq_stages 
                         WHERE sub_code = %s AND stage_name = %s
-                    """,
-              [sub_code, s_name],
-          )
-          row = cursor.fetchone()
+                    """, [sub_code, s_name])
+                    row = cursor.fetchone()
 
-          if row:
-            stage_id = row[0]
-            if cap_val:
-              cursor.execute(
-                  """
+                    if row:
+                        stage_id = row[0]
+                        if cap_val:
+                            cursor.execute("""
                                 UPDATE cal_sub_eq_stages 
                                 SET capacity = %s 
                                 WHERE id = %s
-                            """,
-                  [cap_val, stage_id],
-              )
-          else:
-            cursor.execute(
-                """
+                            """, [cap_val, stage_id])
+                    else:
+                        cursor.execute("""
                             INSERT INTO cal_sub_eq_stages (sub_code, stage_name, capacity, created_at)
                             VALUES (%s, %s, %s, NOW())
-                        """,
-                [sub_code, s_name, cap_val],
-            )
-            stage_id = cursor.lastrowid
+                        """, [sub_code, s_name, cap_val])
+                        stage_id = cursor.lastrowid
 
-          # ② 💡 [핵심 해결] 해당 단(stage_id)에 이미 저장된 DB 기본키(id) 목록을 순서대로 조회
-          cursor.execute(
-              """
+                    # ② 해당 단(stage_id)에 저장된 DB ID 목록 조회
+                    cursor.execute("""
                         SELECT id FROM cal_load_data 
                         WHERE stage_id = %s ORDER BY id ASC
-                    """,
-              [stage_id],
-          )
-          existing_db_ids = [r[0] for r in cursor.fetchall()]
+                    """, [stage_id])
+                    existing_db_ids = [r[0] for r in cursor.fetchall()]
 
-          # ③ 넘어온 각 하중 데이터를 정확한 DB 기본키에 매핑하여 UPDATE
-          for item in loads_list:
-            req_id = item.get("id")
-            target_db_id = None
+                    # ③ 데이터 매핑 및 UPDATE/INSERT
+                    for item in loads_list:
+                        req_id = item.get("id")
+                        target_db_id = None
 
-            if req_id and str(req_id).isdigit():
-              req_id_int = int(req_id)
-              # Case A: 넘어온 번호가 DB의 실제 기본키(id) 목록에 있는 경우
-              if req_id_int in existing_db_ids:
-                target_db_id = req_id_int
-              # Case B: 넘어온 번호가 화면상 '순번'(1, 2, 3...)인 경우 -> 순서 인덱스로 DB 기본키 자동 매핑
-              elif 0 < req_id_int <= len(existing_db_ids):
-                target_db_id = existing_db_ids[req_id_int - 1]
+                        if req_id and str(req_id).isdigit():
+                            req_id_int = int(req_id)
+                            if req_id_int in existing_db_ids:
+                                target_db_id = req_id_int
+                            elif 0 < req_id_int <= len(existing_db_ids):
+                                target_db_id = existing_db_ids[req_id_int - 1]
 
-            # 💡 대상 DB 기본키가 매핑되면 무조건 UPDATE (rowcount 조건 확인 안 함!)
-            if target_db_id is not None:
-              cursor.execute(
-                  """
+                        if target_db_id is not None:
+                            cursor.execute("""
                                 UPDATE cal_load_data 
                                 SET raw_val = %s, std_val = %s 
                                 WHERE id = %s
-                            """,
-                  [item["raw_val"], item["std_val"], target_db_id],
-              )
-            else:
-              # DB에 아예 없거나 새로 추가(+ 행 추가)된 번호인 경우에만 신규 INSERT
-              cursor.execute(
-                  """
+                            """, [item["raw_val"], item["std_val"], target_db_id])
+                        else:
+                            cursor.execute("""
                                 INSERT INTO cal_load_data (stage_id, raw_val, std_val)
                                 VALUES (%s, %s, %s)
-                            """,
-                  [stage_id, item["raw_val"], item["std_val"]],
-              )
+                            """, [stage_id, item["raw_val"], item["std_val"]])
 
-    return JsonResponse({
-        "status": "success",
-        "message": (
-            f"[{sub_code}] 선택한 보정 데이터가 신규 중복 없이 정확하게"
-            " 수정(업데이트)되었습니다!"
-        ),
-    })
+        return JsonResponse({
+            "status": "success",
+            "message": f"[{sub_code}] 데이터가 정상적으로 저장되었습니다."
+        })
 
-  except Exception as e:
-    return JsonResponse({
-        "status": "error",
-        "message": f"그리드 저장 실패: {str(e)}",
-    })
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": f"그리드 저장 실패: {str(e)}"
+        })
     
 
 @csrf_exempt
 def update_equipment_spec(request):
     """
-    상단 '교정성적서 상세 스펙' 박스에서 수정한 정보(cal_sub_eq 테이블의 실제 존재 컬럼)를 업데이트합니다.
+    상단 '교정성적서 상세 스펙' 박스에서 수정한 정보를 업데이트합니다.
+    - 공통 스펙(cert_no, issued_by 등) -> cal_sub_eq 테이블
+    - 정격용량(capacity) -> cal_sub_eq_stages 테이블 (단정보가 분리되어 있음!)
     """
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': 'Invalid method'})
@@ -4606,29 +4583,43 @@ def update_equipment_spec(request):
     try:
         data = json.loads(request.body)
         sub_code = data.get('sub_code')
+        new_capacity = data.get('capacity') # 프런트에서 보낸 정격용량
         
         if not sub_code:
             return JsonResponse({'status': 'error', 'message': '장비 코드가 없습니다.'})
         
-        with connections['default'].cursor() as cursor:
-            # 💡 주의: cal_sub_eq 테이블에는 capacity 컬럼이 없으므로 해당 컬럼을 제외하고 업데이트합니다!
-            cursor.execute("""
-                UPDATE cal_sub_eq 
-                SET cert_no = %s, 
-                    issued_by = %s, 
-                    cal_date = %s, 
-                    expire_date = %s,
-                    updated_at = NOW()
-                WHERE sub_code = %s
-            """, [
-                data.get('cert_no', ''), 
-                data.get('issued_by', ''), 
-                data.get('cal_date') or None, 
-                data.get('expire_date') or None, 
-                sub_code
-            ])
+        # 💡 두 테이블을 모두 안전하게 수정하기 위해 트랜잭션 사용!
+        with transaction.atomic():
+            with connections['default'].cursor() as cursor:
+                # 1. 장비 기본 스펙 업데이트 (cal_sub_eq 테이블)
+                cursor.execute("""
+                    UPDATE cal_sub_eq 
+                    SET cert_no = %s, 
+                        issued_by = %s, 
+                        cal_date = %s, 
+                        expire_date = %s,
+                        updated_at = NOW()
+                    WHERE sub_code = %s
+                """, [
+                    data.get('cert_no', ''), 
+                    data.get('issued_by', ''), 
+                    data.get('cal_date') or None, 
+                    data.get('expire_date') or None, 
+                    sub_code
+                ])
+                
+                # 2. ⭐ [핵심 추가] 분리된 단정보 테이블(cal_sub_eq_stages)의 용량 업데이트!
+                if new_capacity is not None and str(new_capacity).strip() != "":
+                    cursor.execute("""
+                        UPDATE cal_sub_eq_stages 
+                        SET capacity = %s 
+                        WHERE sub_code = %s
+                    """, [
+                        str(new_capacity).strip(), 
+                        sub_code
+                    ])
             
-        return JsonResponse({'status': 'success', 'message': '상세 스펙이 수정되었습니다.'})
+        return JsonResponse({'status': 'success', 'message': '상세 스펙 및 정격용량이 수정되었습니다.'})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f"스펙 저장 실패: {str(e)}"})
     
